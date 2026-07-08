@@ -272,28 +272,67 @@ def create_server(
                         return store.list_runs()
 
             # Legacy / snapshot reader endpoints
-            if path == "/api/status":
-                return reader.status()
-            if path == "/api/departments":
-                return reader.departments()
+            snap_db = db_path
+            if is_control_plane:
+                try:
+                    with sqlite3.connect(db_path) as conn:
+                        row = conn.execute(
+                            "SELECT output_dir FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                        ).fetchone()
+                        if row:
+                            out_dir = Path(row[0])
+                            for name in ("geds.sqlite", "staging.sqlite"):
+                                p = out_dir / name
+                                if p.is_file():
+                                    snap_db = p
+                                    break
+                except Exception:
+                    pass
+                if snap_db == db_path:
+                    fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                    if fb.is_file():
+                        snap_db = fb
 
-            common = {
-                "query": _text(query, "q"),
-                "limit": _integer(query, "limit", 50),
-                "offset": _integer(query, "offset", 0),
-            }
-            if path == "/api/orgs":
-                return reader.orgs(department=_text(query, "department"), **common)
-            if path == "/api/people":
-                return reader.people(department=_text(query, "department"), **common)
-            if path == "/api/queue":
-                return reader.queue(
-                    department=_text(query, "department"),
-                    status=_text(query, "status"),
-                    **common,
-                )
-            if path == "/api/errors":
-                return reader.errors(**common)
+            try:
+                req_reader = SnapshotReader(snap_db)
+                if path == "/api/status":
+                    return req_reader.status()
+                if path == "/api/departments":
+                    return req_reader.departments()
+
+                common = {
+                    "query": _text(query, "q"),
+                    "limit": _integer(query, "limit", 50),
+                    "offset": _integer(query, "offset", 0),
+                }
+                if path == "/api/orgs":
+                    return req_reader.orgs(department=_text(query, "department"), **common)
+                if path == "/api/people":
+                    return req_reader.people(department=_text(query, "department"), **common)
+                if path == "/api/queue":
+                    return req_reader.queue(
+                        department=_text(query, "department"),
+                        status=_text(query, "status"),
+                        **common,
+                    )
+                if path == "/api/errors":
+                    return req_reader.errors(**common)
+            except (FileNotFoundError, sqlite3.OperationalError):
+                if path == "/api/status":
+                    return {
+                        "run_status": "idle",
+                        "request_count": 0,
+                        "departments": 0,
+                        "org_units": 0,
+                        "people": 0,
+                        "errors": 0,
+                        "queue": {"done": 0, "pending": 0, "error": 0},
+                        "completion_percent": 0.0,
+                    }
+                elif path == "/api/departments":
+                    return []
+                else:
+                    return {"total": 0, "limit": 50, "offset": 0, "items": []}
             return None
 
         def _json(self, status: HTTPStatus, payload) -> None:
