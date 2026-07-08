@@ -312,32 +312,126 @@ def create_server(
                             pass
                     return runs
 
-            # Legacy / snapshot reader endpoints
-            snap_db = db_path
+            # Resolve the selected staging database based on the query parameter 'run_id'
+            selected_run_id = query.get("run_id", [""])[0]
+            
+            snap_dbs = []
             if is_control_plane:
-                try:
-                    with sqlite3.connect(db_path) as conn:
-                        row = conn.execute(
-                            "SELECT output_dir FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
-                        ).fetchone()
-                        if row:
-                            out_dir = Path(row[0])
-                            for name in ("geds.sqlite", "staging.sqlite"):
-                                p = out_dir / name
-                                if p.is_file():
-                                    snap_db = p
-                                    break
-                except Exception:
-                    pass
-                if snap_db == db_path:
+                if selected_run_id == "unmanaged":
                     fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                    if not fb.is_file():
+                        fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
                     if fb.is_file():
-                        snap_db = fb
+                        snap_dbs = [fb]
+                elif selected_run_id and selected_run_id != "all":
+                    try:
+                        with sqlite3.connect(db_path) as conn:
+                            row = conn.execute(
+                                "SELECT output_dir FROM crawl_runs WHERE id = ?",
+                                (selected_run_id,)
+                            ).fetchone()
+                            if row:
+                                out_dir = Path(row[0])
+                                for name in ("geds.sqlite", "staging.sqlite"):
+                                    p = out_dir / name
+                                    if p.is_file():
+                                        snap_dbs = [p]
+                                        break
+                    except Exception:
+                        pass
+                else:
+                    # "all" or empty: collect all staging DBs from runs plus unmanaged
+                    try:
+                        with sqlite3.connect(db_path) as conn:
+                            rows = conn.execute("SELECT output_dir FROM crawl_runs").fetchall()
+                            for r in rows:
+                                out_dir = Path(r[0])
+                                for name in ("geds.sqlite", "staging.sqlite"):
+                                    p = out_dir / name
+                                    if p.is_file():
+                                        snap_dbs.append(p)
+                                        break
+                    except Exception:
+                        pass
+                    fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                    if not fb.is_file():
+                        fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
+                    if fb.is_file() and fb not in snap_dbs:
+                        snap_dbs.append(fb)
+            else:
+                snap_dbs = [db_path]
 
-            try:
-                req_reader = SnapshotReader(snap_db)
+            if not snap_dbs:
                 if path == "/api/status":
-                    return req_reader.status()
+                    return {
+                        "run_status": "idle",
+                        "request_count": 0,
+                        "departments": 0,
+                        "org_units": 0,
+                        "people": 0,
+                        "errors": 0,
+                        "queue": {"done": 0, "pending": 0, "error": 0},
+                        "completion_percent": 0.0,
+                    }
+                elif path == "/api/departments":
+                    return []
+                else:
+                    return {"total": 0, "limit": 50, "offset": 0, "items": []}
+
+            # Aggregate stats for overview status
+            if path == "/api/status":
+                aggregated = {
+                    "run_status": "idle",
+                    "request_count": 0,
+                    "departments": 0,
+                    "org_units": 0,
+                    "people": 0,
+                    "errors": 0,
+                    "queue": {"done": 0, "pending": 0, "error": 0},
+                    "completion_percent": 0.0,
+                }
+                has_active = False
+                total_done = 0
+                total_pending = 0
+                total_failed = 0
+                
+                for db in snap_dbs:
+                    try:
+                        rdr = SnapshotReader(db)
+                        s = rdr.status()
+                        aggregated["request_count"] += s["request_count"]
+                        aggregated["departments"] += s["departments"]
+                        aggregated["org_units"] += s["org_units"]
+                        aggregated["people"] += s["people"]
+                        aggregated["errors"] += s["errors"]
+                        
+                        done = s["queue"].get("done", 0)
+                        pending = s["queue"].get("pending", 0)
+                        failed = s["queue"].get("error", 0)
+                        total_done += done
+                        total_pending += pending
+                        total_failed += failed
+                        
+                        if s["run_status"] in ("running", "stopping"):
+                            has_active = True
+                    except Exception:
+                        pass
+                        
+                aggregated["run_status"] = "running" if has_active else "idle"
+                aggregated["queue"]["done"] = total_done
+                aggregated["queue"]["pending"] = total_pending
+                aggregated["queue"]["error"] = total_failed
+                
+                total_queue = total_done + total_pending + total_failed
+                if total_queue > 0:
+                    aggregated["completion_percent"] = round((total_done + total_failed) * 100 / total_queue, 1)
+                
+                return aggregated
+
+            # For tables, query the primary/first DB in the list
+            try:
+                primary_db = snap_dbs[0]
+                req_reader = SnapshotReader(primary_db)
                 if path == "/api/departments":
                     return req_reader.departments()
 
@@ -359,18 +453,7 @@ def create_server(
                 if path == "/api/errors":
                     return req_reader.errors(**common)
             except (FileNotFoundError, sqlite3.OperationalError):
-                if path == "/api/status":
-                    return {
-                        "run_status": "idle",
-                        "request_count": 0,
-                        "departments": 0,
-                        "org_units": 0,
-                        "people": 0,
-                        "errors": 0,
-                        "queue": {"done": 0, "pending": 0, "error": 0},
-                        "completion_percent": 0.0,
-                    }
-                elif path == "/api/departments":
+                if path == "/api/departments":
                     return []
                 else:
                     return {"total": 0, "limit": 50, "offset": 0, "items": []}
@@ -589,6 +672,11 @@ DASHBOARD_HTML = """<!doctype html>
       <button class="nav-tab" data-tab="legacy">Snapshot Data</button>
     </nav>
 
+    <div id="overview-select-container" style="margin-bottom: 18px; display: flex; align-items: center; gap: 8px;" hidden>
+      <label for="overview-job-select" style="font-weight: bold; font-size: 12px; color: var(--muted); text-transform: uppercase;">Active Database View:</label>
+      <select id="overview-job-select" style="width: auto; min-width: 220px; height: 36px;"></select>
+    </div>
+
     <section class="metrics" id="legacy-metrics-section">
       <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
       <div class="metric"><span class="metric-label">Departments</span><strong id="m-departments" class="metric-value">-</strong></div>
@@ -801,6 +889,7 @@ DASHBOARD_HTML = """<!doctype html>
       document.getElementById("brand-title").textContent = "GEDS Crawl Control Plane";
       document.getElementById("control-tabs").hidden = false;
       document.getElementById("tab-legacy").style.display = "none";
+      document.getElementById("overview-select-container").hidden = false;
     }
 
     const views = {
@@ -917,6 +1006,22 @@ DASHBOARD_HTML = """<!doctype html>
           </tr>
         `;
       }).join("");
+
+      // Update overview dropdown
+      const selectEl = el("overview-job-select");
+      if (selectEl) {
+        const currentVal = selectEl.value || "all";
+        let optionsHtml = '<option value="all">All Active/Recent Runs (Combined)</option>';
+        runs.forEach(run => {
+          if (run.job_id === null) {
+            optionsHtml += `<option value="unmanaged">Unmanaged Crawl (${escapeHtml((run.started_at || "").split("T")[0])})</option>`;
+          } else {
+            optionsHtml += `<option value="${run.id}">${escapeHtml(run.job_name)} (${escapeHtml((run.started_at || "").split("T")[0])})</option>`;
+          }
+        });
+        selectEl.innerHTML = optionsHtml;
+        selectEl.value = currentVal;
+      }
     }
 
     async function loadControlCoverage() {
@@ -1002,6 +1107,12 @@ DASHBOARD_HTML = """<!doctype html>
     };
     el("job-name").addEventListener("input", updateOutputDirectory);
     updateOutputDirectory();
+
+    // Refresh overview stats and snapshot views on active DB dropdown changes
+    el("overview-job-select").addEventListener("change", () => {
+      state.offset = 0;
+      autoRefresh();
+    });
 
     el("new-job-form").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1103,7 +1214,9 @@ DASHBOARD_HTML = """<!doctype html>
 
     // --- Legacy / Snapshot Data view ---
     async function loadStatus() {
-      const data = await getJson("/api/status");
+      const runId = IS_CONTROL_PLANE ? el("overview-job-select").value : "";
+      const url = runId ? `/api/status?run_id=${encodeURIComponent(runId)}` : "/api/status";
+      const data = await getJson(url);
       el("run-state").textContent = `Status: ${data.run_status || "unknown"}`;
       el("m-requests").textContent = formatNumber(data.request_count);
       el("m-departments").textContent = formatNumber(data.departments);
@@ -1119,7 +1232,9 @@ DASHBOARD_HTML = """<!doctype html>
 
     async function loadDepartments() {
       const selected = el("department").value;
-      const departments = await getJson("/api/departments");
+      const runId = IS_CONTROL_PLANE ? el("overview-job-select").value : "";
+      const url = runId ? `/api/departments?run_id=${encodeURIComponent(runId)}` : "/api/departments";
+      const departments = await getJson(url);
       el("department").innerHTML = '<option value="">All departments</option>' +
         departments.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
       el("department").value = selected;
@@ -1131,6 +1246,10 @@ DASHBOARD_HTML = """<!doctype html>
         limit: el("page-size").value,
         offset: state.offset
       });
+      const runId = IS_CONTROL_PLANE ? el("overview-job-select").value : "";
+      if (runId) {
+        params.set("run_id", runId);
+      }
       if (state.view !== "errors" && el("department").value) {
         params.set("department", el("department").value);
       }
