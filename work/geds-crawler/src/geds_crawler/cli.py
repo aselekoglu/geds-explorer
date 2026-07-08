@@ -70,12 +70,20 @@ def main(argv: list[str] | None = None) -> int:
         for url in _server_urls(args.host, actual_port):
             print(f"  {url}", flush=True)
         print("Press Ctrl+C to stop.", flush=True)
-        try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            print("\nStopping UI.", flush=True)
-        finally:
-            server.server_close()
+        last_interrupt = 0
+        while True:
+            try:
+                server.serve_forever()
+                break
+            except KeyboardInterrupt:
+                now = time.time()
+                if now - last_interrupt < 1.5:
+                    print("\nStopping UI.", flush=True)
+                    break
+                else:
+                    print("\n[UI Server] Press Ctrl+C again within 1.5 seconds to stop.", flush=True)
+                    last_interrupt = now
+        server.server_close()
         return 0
     return 1
 
