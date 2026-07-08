@@ -271,14 +271,28 @@ def create_server(
                     with ControlStore(db_path) as store:
                         runs = store.list_runs()
                     
-                    fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                    fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
+                    if not fb.is_file():
+                        fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                        
                     if fb.is_file():
                         try:
                             with sqlite3.connect(fb) as conn:
                                 conn.row_factory = sqlite3.Row
-                                row = conn.execute(
-                                    "SELECT id, started_at, status, request_count, heartbeat_at, current_org_dn, current_department_dn FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
-                                ).fetchone()
+                                # Inspect actual columns to handle older schema versions gracefully
+                                cursor = conn.execute("PRAGMA table_info(crawl_runs)")
+                                cols = [c[1] for c in cursor.fetchall()]
+                                
+                                select_cols = ["id", "started_at", "status", "request_count"]
+                                if "heartbeat_at" in cols:
+                                    select_cols.append("heartbeat_at")
+                                if "current_org_dn" in cols:
+                                    select_cols.append("current_org_dn")
+                                if "current_department_dn" in cols:
+                                    select_cols.append("current_department_dn")
+                                    
+                                sql = f"SELECT {', '.join(select_cols)} FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                                row = conn.execute(sql).fetchone()
                                 if row:
                                     run_id = row["id"]
                                     if not any(r["id"] == run_id for r in runs):
@@ -290,9 +304,9 @@ def create_server(
                                             "status": row["status"],
                                             "request_count": row["request_count"],
                                             "pid": None,
-                                            "heartbeat_at": row["heartbeat_at"],
-                                            "current_org_dn": row["current_org_dn"],
-                                            "current_department_dn": row["current_department_dn"],
+                                            "heartbeat_at": row["heartbeat_at"] if "heartbeat_at" in row.keys() else None,
+                                            "current_org_dn": row["current_org_dn"] if "current_org_dn" in row.keys() else None,
+                                            "current_department_dn": row["current_department_dn"] if "current_department_dn" in row.keys() else None,
                                         })
                         except Exception:
                             pass
