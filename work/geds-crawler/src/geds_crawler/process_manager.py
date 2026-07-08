@@ -67,8 +67,9 @@ class ProcessManager:
                 "--stop-file",
                 str(stop_file),
             ]
-            for dn in dept_dns:
-                cmd.extend(["--department-dns", dn])
+            if dept_dns:
+                cmd.append("--department-dns")
+                cmd.extend(dept_dns)
         else:
             cmd = cmd_args
 
