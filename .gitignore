@@ -1,0 +1,11 @@
+outputs/
+work/geds-crawler/outputs/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.pytest_cache/
+.pytest_cache_custom/
+pytest_temp/
+__pycache__/
+*.pyc
+*.egg-info/
