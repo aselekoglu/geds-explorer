@@ -253,6 +253,64 @@ def create_server(
                     from .control_store import ControlStore
                     with ControlStore(db_path) as store:
                         return store.coverage()
+
+                elif path == "/api/control/estimates":
+                    # Scan all staging DBs for per-department stats
+                    estimates = {}  # { dept_dn: { org_units, people, db_size_bytes } }
+                    scan_dbs = []
+                    # Collect staging DB paths from completed runs
+                    try:
+                        with sqlite3.connect(db_path) as conn:
+                            rows = conn.execute("SELECT output_dir FROM crawl_runs WHERE status='finished'").fetchall()
+                            for r in rows:
+                                out_dir = Path(r[0])
+                                for name in ("geds.sqlite", "staging.sqlite"):
+                                    p = out_dir / name
+                                    if p.is_file():
+                                        scan_dbs.append(p)
+                                        break
+                    except Exception:
+                        pass
+                    # Also scan unmanaged crawl
+                    fb = (db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
+                    if not fb.is_file():
+                        fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
+                    if fb.is_file():
+                        scan_dbs.append(fb)
+
+                    for sdb in scan_dbs:
+                        try:
+                            with sqlite3.connect(sdb) as sconn:
+                                sconn.row_factory = sqlite3.Row
+                                # Per-department org unit count
+                                org_rows = sconn.execute(
+                                    "SELECT department_dn, COUNT(*) as cnt FROM org_units GROUP BY department_dn"
+                                ).fetchall()
+                                for r in org_rows:
+                                    dn = r["department_dn"]
+                                    if dn not in estimates or r["cnt"] > estimates[dn].get("org_units", 0):
+                                        if dn not in estimates:
+                                            estimates[dn] = {"org_units": 0, "people": 0, "db_size_bytes": 0}
+                                        estimates[dn]["org_units"] = r["cnt"]
+                                # Per-department people count
+                                ppl_rows = sconn.execute(
+                                    "SELECT department_dn, COUNT(*) as cnt FROM people_index GROUP BY department_dn"
+                                ).fetchall()
+                                for r in ppl_rows:
+                                    dn = r["department_dn"]
+                                    if dn not in estimates:
+                                        estimates[dn] = {"org_units": 0, "people": 0, "db_size_bytes": 0}
+                                    if r["cnt"] > estimates[dn].get("people", 0):
+                                        estimates[dn]["people"] = r["cnt"]
+                        except Exception:
+                            pass
+
+                    # Calculate rough per-department DB size estimates based on people count
+                    # Using ratio from unmanaged crawl: ~59MB for 43545 people ≈ 1.4KB/person
+                    for dn in estimates:
+                        estimates[dn]["db_size_bytes"] = int(estimates[dn]["people"] * 1400)
+
+                    return estimates
                         
                 elif path == "/api/control/schedules":
                     with sqlite3.connect(db_path) as conn:
@@ -740,12 +798,35 @@ DASHBOARD_HTML = """<!doctype html>
           </div>
           <div class="form-group" style="margin-bottom:16px;">
             <label>Select Departments</label>
-            <div style="max-height: 150px; overflow-y: scroll; border: 1px solid var(--line); padding: 8px; border-radius: 4px;" id="dept-selection-list">
-              <!-- Checkboxes populate dynamically -->
+            <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+              <input type="text" id="job-dept-search" placeholder="Search departments..." style="flex:1; min-width:180px; height:32px; font-size:12px;">
+              <button type="button" class="btn" onclick="deptSelectUncrawled()" style="height:32px;padding:0 10px;font-size:11px;">Select Uncrawled</button>
+              <button type="button" class="btn" onclick="deptSelectOutdated()" style="height:32px;padding:0 10px;font-size:11px;">Select Outdated (&gt;7d)</button>
+              <button type="button" class="btn" onclick="deptSelectAll()" style="height:32px;padding:0 10px;font-size:11px;">Select All</button>
+              <button type="button" class="btn" onclick="deptClearAll()" style="height:32px;padding:0 10px;font-size:11px;">Clear</button>
             </div>
-            <label style="margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-              <input type="checkbox" id="job-all-remaining" style="width: auto; height: auto;"> Or use "All remaining institutions"
-            </label>
+            <div style="max-height:260px; overflow-y:auto; border:1px solid var(--line); border-radius:6px;" id="dept-selection-wrap">
+              <table style="margin:0; font-size:12px;" id="dept-selection-table">
+                <thead style="position:sticky;top:0;z-index:1;background:var(--bg);">
+                  <tr>
+                    <th style="width:32px;text-align:center;cursor:pointer;" id="dept-th-check"><input type="checkbox" id="dept-toggle-all" style="width:auto;height:auto;"></th>
+                    <th style="cursor:pointer;" data-sort="name" id="dept-th-name">Department ▾</th>
+                    <th style="cursor:pointer;width:140px;" data-sort="age" id="dept-th-age">Last Crawled ▾</th>
+                    <th style="cursor:pointer;width:100px;" data-sort="status" id="dept-th-status">Status ▾</th>
+                    <th style="width:80px;text-align:right;">Org Units</th>
+                    <th style="width:80px;text-align:right;">People</th>
+                  </tr>
+                </thead>
+                <tbody id="dept-selection-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="crawl-estimation-panel" style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:24px;flex-wrap:wrap;">
+            <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;">Selected</span><br><strong id="est-selected">0 depts</strong></div>
+            <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;">Est. Requests</span><br><strong id="est-requests">0</strong></div>
+            <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;">Est. Duration</span><br><strong id="est-duration">0s</strong></div>
+            <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;">Est. People</span><br><strong id="est-people">0</strong></div>
+            <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;">Est. DB Size</span><br><strong id="est-size">0 MB</strong></div>
           </div>
           <button type="submit" class="btn btn-primary">Create and Start Job</button>
         </form>
@@ -971,18 +1052,140 @@ DASHBOARD_HTML = """<!doctype html>
       el("rps-warning-red").style.display = data.configured_rps > 2.0 ? "block" : "none";
     }
 
+    // --- Department selection state ---
+    let deptRows = []; // [{dn, name, status, last_crawled_at, age_days, org_units, people}]
+    let deptSortKey = "age";
+    let deptSortAsc = false; // false = descending for age (never crawled first)
+    let estimatesData = {};
+
     async function loadControlCatalog() {
-      const depts = await getJson("/api/control/catalog");
-      const listEl = el("dept-selection-list");
-      if (listEl.children.length === 0) {
-        listEl.innerHTML = depts.map(dept => `
-          <label style="display: block; margin-bottom: 4px;">
-            <input type="checkbox" name="dept-dns" value="${escapeHtml(dept.dn)}" style="width:auto;height:auto;">
-            ${escapeHtml(dept.name)}
-          </label>
-        `).join("");
-      }
+      const [depts, cov, est] = await Promise.all([
+        getJson("/api/control/catalog"),
+        getJson("/api/control/coverage"),
+        getJson("/api/control/estimates")
+      ]);
+      estimatesData = est;
+      const now = new Date();
+      deptRows = depts.map(dept => {
+        const info = cov[dept.dn] || { status: "unassigned", job_name: null, last_crawled_at: null };
+        const estInfo = est[dept.dn] || { org_units: 0, people: 0 };
+        let ageDays = -1; // -1 = never crawled
+        if (info.last_crawled_at) {
+          const crawlDate = new Date(info.last_crawled_at);
+          ageDays = Math.floor((now - crawlDate) / (1000 * 60 * 60 * 24));
+        }
+        return {
+          dn: dept.dn,
+          name: dept.name,
+          status: info.status,
+          last_crawled_at: info.last_crawled_at,
+          age_days: ageDays,
+          org_units: estInfo.org_units || 0,
+          people: estInfo.people || 0,
+        };
+      });
+      renderDeptTable();
     }
+
+    function renderDeptTable() {
+      const search = (el("job-dept-search").value || "").toLowerCase();
+      let filtered = deptRows.filter(r => r.name.toLowerCase().includes(search) || r.dn.toLowerCase().includes(search));
+
+      // Sort
+      filtered.sort((a, b) => {
+        let va, vb;
+        if (deptSortKey === "name") { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+        else if (deptSortKey === "age") { va = a.age_days; vb = b.age_days; }
+        else if (deptSortKey === "status") { va = a.status; vb = b.status; }
+        else { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+
+        // For age sort: -1 (never) should be first when descending
+        if (deptSortKey === "age") {
+          if (va === -1 && vb !== -1) return deptSortAsc ? 1 : -1;
+          if (vb === -1 && va !== -1) return deptSortAsc ? -1 : 1;
+        }
+
+        if (va < vb) return deptSortAsc ? -1 : 1;
+        if (va > vb) return deptSortAsc ? 1 : -1;
+        return 0;
+      });
+
+      const tbody = el("dept-selection-body");
+      // Preserve checked state
+      const checked = new Set();
+      document.querySelectorAll('input[name="dept-dns"]:checked').forEach(cb => checked.add(cb.value));
+
+      tbody.innerHTML = filtered.map(r => {
+        const isChecked = checked.has(r.dn) ? "checked" : "";
+        let ageLabel = '<span style="color:#ef4444;font-weight:600;">Never</span>';
+        if (r.age_days >= 0) {
+          if (r.age_days === 0) ageLabel = '<span style="color:#22c55e;">Today</span>';
+          else if (r.age_days <= 7) ageLabel = `<span style="color:#22c55e;">${r.age_days}d ago</span>`;
+          else if (r.age_days <= 30) ageLabel = `<span style="color:#eab308;">${r.age_days}d ago</span>`;
+          else ageLabel = `<span style="color:#ef4444;">${r.age_days}d ago</span>`;
+        }
+        return `<tr>
+          <td style="text-align:center;"><input type="checkbox" name="dept-dns" value="${escapeHtml(r.dn)}" ${isChecked} style="width:auto;height:auto;" onchange="updateEstimates()"></td>
+          <td>${escapeHtml(r.name)}</td>
+          <td>${ageLabel}</td>
+          <td><span class="badge ${r.status}">${r.status}</span></td>
+          <td style="text-align:right;">${r.org_units > 0 ? formatNumber(r.org_units) : '-'}</td>
+          <td style="text-align:right;">${r.people > 0 ? formatNumber(r.people) : '-'}</td>
+        </tr>`;
+      }).join("");
+
+      updateEstimates();
+    }
+
+    function updateEstimates() {
+      const checked = [];
+      document.querySelectorAll('input[name="dept-dns"]:checked').forEach(cb => {
+        const row = deptRows.find(r => r.dn === cb.value);
+        if (row) checked.push(row);
+      });
+      const totalOrgs = checked.reduce((s, r) => s + (r.org_units || 50), 0); // default 50 if unknown
+      const totalPeople = checked.reduce((s, r) => s + r.people, 0);
+      const rate = parseFloat(el("job-rate").value) || 1.0;
+      const durationSec = totalOrgs * rate;
+
+      el("est-selected").textContent = checked.length + " dept" + (checked.length !== 1 ? "s" : "");
+      el("est-requests").textContent = formatNumber(totalOrgs);
+      el("est-people").textContent = formatNumber(totalPeople);
+
+      // Format duration nicely
+      if (durationSec < 60) el("est-duration").textContent = Math.round(durationSec) + "s";
+      else if (durationSec < 3600) el("est-duration").textContent = Math.round(durationSec / 60) + "m";
+      else { const h = Math.floor(durationSec / 3600); const m = Math.round((durationSec % 3600) / 60); el("est-duration").textContent = h + "h " + m + "m"; }
+
+      const sizeBytes = totalPeople * 1400;
+      if (sizeBytes < 1024 * 1024) el("est-size").textContent = (sizeBytes / 1024).toFixed(0) + " KB";
+      else el("est-size").textContent = (sizeBytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    // Bulk actions
+    function deptSelectUncrawled() {
+      document.querySelectorAll('input[name="dept-dns"]').forEach(cb => {
+        const row = deptRows.find(r => r.dn === cb.value);
+        if (row && row.age_days === -1) cb.checked = true;
+      });
+      updateEstimates();
+    }
+    function deptSelectOutdated() {
+      document.querySelectorAll('input[name="dept-dns"]').forEach(cb => {
+        const row = deptRows.find(r => r.dn === cb.value);
+        if (row && (row.age_days === -1 || row.age_days > 7)) cb.checked = true;
+      });
+      updateEstimates();
+    }
+    function deptSelectAll() {
+      document.querySelectorAll('input[name="dept-dns"]').forEach(cb => cb.checked = true);
+      updateEstimates();
+    }
+    function deptClearAll() {
+      document.querySelectorAll('input[name="dept-dns"]').forEach(cb => cb.checked = false);
+      updateEstimates();
+    }
+
 
     async function loadControlRuns() {
       const runs = await getJson("/api/control/runs");
@@ -1119,27 +1322,42 @@ DASHBOARD_HTML = """<!doctype html>
       autoRefresh();
     });
 
+    // Department table search
+    el("job-dept-search").addEventListener("input", () => renderDeptTable());
+
+    // Department table sorting
+    document.querySelectorAll("#dept-selection-table thead th[data-sort]").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.sort;
+        if (deptSortKey === key) deptSortAsc = !deptSortAsc;
+        else { deptSortKey = key; deptSortAsc = true; }
+        renderDeptTable();
+      });
+    });
+
+    // Toggle all visible checkboxes
+    el("dept-toggle-all").addEventListener("change", (e) => {
+      document.querySelectorAll('input[name="dept-dns"]').forEach(cb => cb.checked = e.target.checked);
+      updateEstimates();
+    });
+
+    // Recalculate estimates when rate limit changes
+    el("job-rate").addEventListener("input", () => updateEstimates());
+
     el("new-job-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const name = el("job-name").value;
       const rate = parseFloat(el("job-rate").value);
       const policy = el("job-policy").value;
       const output = el("job-output").value;
-      const allRemaining = el("job-all-remaining").checked;
       
       let dns = [];
-      if (!allRemaining) {
-        document.querySelectorAll('input[name="dept-dns"]:checked').forEach(cb => {
-          dns.push(cb.value);
-        });
-        if (dns.length === 0) {
-          alert("Please select at least one department or check 'All remaining'");
-          return;
-        }
-      } else {
-        // "all remaining" - get from API
-        const rem = await getJson("/api/control/catalog");
-        dns = rem.map(r => r.dn);
+      document.querySelectorAll('input[name="dept-dns"]:checked').forEach(cb => {
+        dns.push(cb.value);
+      });
+      if (dns.length === 0) {
+        alert("Please select at least one department.");
+        return;
       }
       
       try {
