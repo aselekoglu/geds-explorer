@@ -76,13 +76,20 @@ class ProcessManager:
         stdout_log = open(output_dir / "worker.stdout.log", "w", encoding="utf-8")
         stderr_log = open(output_dir / "worker.stderr.log", "w", encoding="utf-8")
 
-        proc = subprocess.Popen(
-            cmd,
-            stdout=stdout_log,
-            stderr=stderr_log,
-            text=True,
-            close_fds=True,
-        )
+        kwargs = {
+            "stdout": stdout_log,
+            "stderr": stderr_log,
+            "text": True,
+            "close_fds": True,
+        }
+        if os.name == "nt":
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        proc = subprocess.Popen(cmd, **kwargs)
+        
+        # Close file handles in parent
+        stdout_log.close()
+        stderr_log.close()
         
         # Save PID to control DB and update status to running
         with self._connect() as con:
