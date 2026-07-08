@@ -113,13 +113,13 @@ def test_control_store_coverage(tmp_path):
         job2_id = store.create_job("Job 2", {"OU=CRTC,O=GC,C=CA"}, 1.0, "shared", "/tmp/j2")
         
         cov = store.coverage()
-        assert cov["OU=SSC-SPC,O=GC,C=CA"] == "scheduled"
-        assert cov["OU=ISED-ISDE,O=GC,C=CA"] == "unassigned"
-        assert cov["OU=CRTC,O=GC,C=CA"] == "overlap"
+        assert cov["OU=SSC-SPC,O=GC,C=CA"]["status"] == "scheduled"
+        assert cov["OU=ISED-ISDE,O=GC,C=CA"]["status"] == "unassigned"
+        assert cov["OU=CRTC,O=GC,C=CA"]["status"] == "overlap"
         
         # Test 2: running run sets it to running
         run_id = store.create_run(job1_id, "running")
         cov2 = store.coverage()
         # Since Job 1 includes SSC and CRTC, SSC should now be running
-        assert cov2["OU=SSC-SPC,O=GC,C=CA"] == "running"
+        assert cov2["OU=SSC-SPC,O=GC,C=CA"]["status"] == "running"
 

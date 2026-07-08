@@ -228,19 +228,25 @@ class ControlStore:
         ).fetchall()
         return {row["dn"] for row in rows}
 
-    def coverage(self) -> dict[str, str]:
+    def coverage(self) -> dict[str, dict[str, str | None]]:
         # Get all departments in the catalog
         cat_rows = self.db.execute("SELECT dn FROM department_catalog").fetchall()
         dns = {row["dn"] for row in cat_rows}
         
-        # Initialize all to unassigned
-        status_map = {dn: "unassigned" for dn in dns}
+        # Initialize map
+        status_map = {
+            dn: {
+                "status": "unassigned",
+                "job_name": None,
+                "last_crawled_at": None
+            } for dn in dns
+        }
         
-        # Count assignments to jobs
+        # 1. Map job names to departments
         job_dn_map = {}
         job_rows = self.db.execute(
             """
-            SELECT jd.department_dn, j.id as job_id, j.enabled
+            SELECT jd.department_dn, j.name as job_name, j.enabled
             FROM job_departments jd
             JOIN crawl_jobs j ON j.id = jd.job_id
             """
@@ -249,14 +255,15 @@ class ControlStore:
             dn = row["department_dn"]
             if dn not in job_dn_map:
                 job_dn_map[dn] = []
-            job_dn_map[dn].append((row["job_id"], row["enabled"]))
+            job_dn_map[dn].append((row["job_name"], row["enabled"]))
             
-        # Get active runs (running or queued)
+        # 2. Get active runs (running or queued)
         run_rows = self.db.execute(
             """
-            SELECT rd.department_dn, r.status, r.id
+            SELECT rd.department_dn, r.status, r.id, j.name as job_name
             FROM run_departments rd
             JOIN crawl_runs r ON r.id = rd.run_id
+            LEFT JOIN crawl_jobs j ON j.id = r.job_id
             WHERE r.status IN ('running', 'queued', 'stopping')
             """
         ).fetchall()
@@ -266,26 +273,26 @@ class ControlStore:
             dn = row["department_dn"]
             if dn not in active_runs_map:
                 active_runs_map[dn] = []
-            active_runs_map[dn].append(row["status"])
+            active_runs_map[dn].append((row["status"], row["job_name"]))
             
-        # Get last completed runs
+        # 3. Get last completed runs
         last_run_rows = self.db.execute(
             """
-            SELECT rd.department_dn, r.status, r.finished_at
+            SELECT rd.department_dn, r.status, r.finished_at, j.name as job_name
             FROM run_departments rd
             JOIN crawl_runs r ON r.id = rd.run_id
+            LEFT JOIN crawl_jobs j ON j.id = r.job_id
             WHERE r.status IN ('finished', 'failed', 'stopped')
             ORDER BY r.finished_at DESC
             """
         ).fetchall()
-        # Keep only the latest completed run per dn
         latest_completed = {}
         for row in last_run_rows:
             dn = row["department_dn"]
             if dn not in latest_completed:
                 latest_completed[dn] = row
                 
-        # Get scheduled jobs
+        # 4. Get scheduled jobs
         sched_rows = self.db.execute(
             """
             SELECT jd.department_dn
@@ -295,38 +302,82 @@ class ControlStore:
             """
         ).fetchall()
         scheduled_dns = {row["department_dn"] for row in sched_rows}
-        
+
+        # 5. Load unmanaged crawl data if it exists
+        unmanaged_dns = set()
+        unmanaged_status = "idle"
+        unmanaged_date = None
+        fb = (self.db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
+        if not fb.is_file():
+            fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+        if fb.is_file():
+            try:
+                with sqlite3.connect(fb) as conn:
+                    u_depts = conn.execute("SELECT dn FROM departments").fetchall()
+                    unmanaged_dns = {r[0] for r in u_depts}
+                    u_run = conn.execute(
+                        "SELECT status, started_at, finished_at FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                    ).fetchone()
+                    if u_run:
+                        unmanaged_status = u_run[0]
+                        unmanaged_date = u_run[2] or u_run[1]
+                        if unmanaged_date:
+                            unmanaged_date = unmanaged_date.split("T")[0]
+            except Exception:
+                pass
+
         # Calculate status for each DN
         for dn in dns:
-            # Overlap check: assigned to more than one enabled job
+            # Check unmanaged first if in catalog
+            if dn in unmanaged_dns:
+                status_map[dn]["job_name"] = "Unmanaged Crawl"
+                status_map[dn]["last_crawled_at"] = unmanaged_date
+                if unmanaged_status in ("running", "stopping"):
+                    status_map[dn]["status"] = "running"
+                elif unmanaged_status == "finished":
+                    status_map[dn]["status"] = "covered-current"
+                else:
+                    status_map[dn]["status"] = "failed"
+                # Active managed runs override unmanaged
+                if dn in active_runs_map:
+                    active_info = active_runs_map[dn][0]
+                    status_map[dn]["status"] = active_info[0]
+                    status_map[dn]["job_name"] = active_info[1] or "Unmanaged Crawl"
+                continue
+
+            # Overlap check
             jobs = job_dn_map.get(dn, [])
             enabled_jobs_count = sum(1 for j in jobs if j[1] == 1)
             if enabled_jobs_count > 1:
-                status_map[dn] = "overlap"
+                status_map[dn]["status"] = "overlap"
+                status_map[dn]["job_name"] = ", ".join(j[0] for j in jobs if j[1] == 1)
                 continue
                 
             # If active runs exist
-            active_statuses = active_runs_map.get(dn, [])
-            if "running" in active_statuses or "stopping" in active_statuses:
-                status_map[dn] = "running"
-                continue
-            if "queued" in active_statuses:
-                status_map[dn] = "queued"
+            if dn in active_runs_map:
+                active_info = active_runs_map[dn][0]
+                status_map[dn]["status"] = active_info[0]
+                status_map[dn]["job_name"] = active_info[1]
                 continue
                 
             # Check latest completed run
             if dn in latest_completed:
                 last_run = latest_completed[dn]
+                status_map[dn]["job_name"] = last_run["job_name"]
+                if last_run["finished_at"]:
+                    status_map[dn]["last_crawled_at"] = last_run["finished_at"].split("T")[0]
+                
                 if last_run["status"] == "finished":
-                    status_map[dn] = "covered-current"
+                    status_map[dn]["status"] = "covered-current"
                     continue
                 elif last_run["status"] in ("failed", "stopped"):
-                    status_map[dn] = "failed"
+                    status_map[dn]["status"] = "failed"
                     continue
                     
             # If assigned to enabled job, check if scheduled or just assigned
             if enabled_jobs_count == 1:
-                status_map[dn] = "scheduled"
+                status_map[dn]["status"] = "scheduled"
+                status_map[dn]["job_name"] = [j[0] for j in jobs if j[1] == 1][0]
                 continue
                 
         return status_map

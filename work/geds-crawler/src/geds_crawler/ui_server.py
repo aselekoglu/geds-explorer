@@ -781,7 +781,8 @@ DASHBOARD_HTML = """<!doctype html>
             <thead>
               <tr>
                 <th>Institution Name</th>
-                <th>Canonical DN</th>
+                <th>Job Name</th>
+                <th>Last Crawled</th>
                 <th>Coverage Status</th>
               </tr>
             </thead>
@@ -1029,11 +1030,15 @@ DASHBOARD_HTML = """<!doctype html>
       const depts = await getJson("/api/control/catalog");
       const tbody = el("coverage-table-body");
       tbody.innerHTML = depts.map(dept => {
-        const status = cov[dept.dn] || "unassigned";
+        const info = cov[dept.dn] || { status: "unassigned", job_name: null, last_crawled_at: null };
+        const status = info.status;
+        const jobName = info.job_name || "-";
+        const lastCrawled = info.last_crawled_at || "-";
         return `
           <tr>
             <td>${escapeHtml(dept.name)}</td>
-            <td>${escapeHtml(dept.dn)}</td>
+            <td>${escapeHtml(jobName)}</td>
+            <td>${escapeHtml(lastCrawled)}</td>
             <td><span class="badge ${status}">${status}</span></td>
           </tr>
         `;
