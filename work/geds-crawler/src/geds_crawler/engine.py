@@ -68,8 +68,8 @@ class CrawlEngine:
             # In simple CLI, it is always a new run or replacing the run_id record
             now = self._now()
             store.db.execute(
-                "INSERT OR REPLACE INTO crawl_runs (id, started_at, status, request_count) VALUES (?, ?, ?, ?)",
-                (self.config.run_id, now, "running", 0),
+                "INSERT OR REPLACE INTO crawl_runs (id, started_at, status, request_count, rate_limit_seconds) VALUES (?, ?, ?, ?, ?)",
+                (self.config.run_id, now, "running", 0, self.config.rate_limit_seconds),
             )
             store.commit()
             
@@ -134,6 +134,13 @@ class CrawlEngine:
                 )
                 store.commit()
                     
+                # Read rate limit dynamically from staging DB (supports shared rate limiting)
+                db_row = store.db.execute("SELECT rate_limit_seconds FROM crawl_runs WHERE id=?", (self.config.run_id,)).fetchone()
+                if db_row:
+                    fetch_rate = db_row["rate_limit_seconds"]
+                    if fetch_rate != fetcher.rate_limit_seconds:
+                        fetcher.rate_limit_seconds = fetch_rate
+
                 try:
                     page_html = fetcher.fetch_text(geds_url("014", org.dn))
                     seen_at = self._now()

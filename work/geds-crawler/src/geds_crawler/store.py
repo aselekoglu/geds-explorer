@@ -42,7 +42,8 @@ class SnapshotStore:
               heartbeat_at TEXT,
               current_org_dn TEXT,
               current_department_dn TEXT,
-              stop_reason TEXT
+              stop_reason TEXT,
+              rate_limit_seconds REAL NOT NULL DEFAULT 1.0
             );
 
             CREATE TABLE IF NOT EXISTS departments (
