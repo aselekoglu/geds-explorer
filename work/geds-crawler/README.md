@@ -1,5 +1,8 @@
 # GEDS Crawler
 
+> [!WARNING]
+> **Development only**: This repository contains an unauthenticated crawl control plane interface. Do not expose this service to an untrusted local area network (LAN) or the public internet.
+
 Privacy-preserving snapshot crawler for Government of Canada Electronic Directory Services.
 
 ## Setup
