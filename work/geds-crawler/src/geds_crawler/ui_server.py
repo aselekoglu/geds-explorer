@@ -589,6 +589,21 @@ DASHBOARD_HTML = """<!doctype html>
       <button class="nav-tab" data-tab="legacy">Snapshot Data</button>
     </nav>
 
+    <section class="metrics" id="legacy-metrics-section">
+      <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Departments</span><strong id="m-departments" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Org units</span><strong id="m-orgs" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">People</span><strong id="m-people" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Completed</span><strong id="m-done" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Pending</span><strong id="m-pending" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Queue errors</span><strong id="m-qerrors" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Crawl errors</span><strong id="m-errors" class="metric-value">-</strong></div>
+    </section>
+    <div class="progress-wrap" id="legacy-progress-section">
+      <div class="progress" aria-label="Queue completion"><div id="progress-bar"></div></div>
+      <span id="progress-label" class="progress-label">0%</span>
+    </div>
+
     <!-- OVERVIEW TAB -->
     <div class="tab-content" id="tab-overview">
       <section class="metrics">
@@ -736,20 +751,6 @@ DASHBOARD_HTML = """<!doctype html>
 
     <!-- LEGACY VIEW (SNAPSHOT DATA) -->
     <div class="tab-content" id="tab-legacy">
-      <section class="metrics" id="legacy-metrics-section">
-        <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
-        <div class="metric"><span class="metric-label">Departments</span><strong id="m-departments" class="metric-value">-</strong></div>
-        <div class="metric"><span class="metric-label">Org units</span><strong id="m-orgs" class="metric-value">-</strong></div>
-        <div class="metric"><span class="metric-label">People</span><strong id="m-people" class="metric-value">-</strong></div>
-        <div class="metric"><span class="metric-label">Completed</span><strong id="m-done" class="metric-value">-</strong></div>
-        <div class="metric"><span class="metric-label">Pending</span><strong id="m-pending" class="metric-value">-</strong></div>
-        <div class="metric"><span class="metric-label">Queue errors</span><strong id="m-qerrors" class="metric-value">-</strong></div>
-        <div class="metric"><span class="metric-label">Crawl errors</span><strong id="m-errors" class="metric-value">-</strong></div>
-      </section>
-      <div class="progress-wrap" id="legacy-progress-section">
-        <div class="progress" aria-label="Queue completion"><div id="progress-bar"></div></div>
-        <span id="progress-label" class="progress-label">0%</span>
-      </div>
 
       <section class="workspace">
         <nav class="tabs" aria-label="Snapshot tables">
@@ -800,8 +801,6 @@ DASHBOARD_HTML = """<!doctype html>
       document.getElementById("brand-title").textContent = "GEDS Crawl Control Plane";
       document.getElementById("control-tabs").hidden = false;
       document.getElementById("tab-legacy").style.display = "none";
-      document.getElementById("legacy-metrics-section").style.display = "none";
-      document.getElementById("legacy-progress-section").style.display = "none";
     }
 
     const views = {
@@ -1217,6 +1216,7 @@ DASHBOARD_HTML = """<!doctype html>
     function autoRefresh() {
       if (IS_CONTROL_PLANE && state.activeTab !== "legacy") {
         refreshControl();
+        loadStatus();
       } else {
         refreshLegacy();
       }
