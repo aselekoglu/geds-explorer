@@ -985,6 +985,24 @@ DASHBOARD_HTML = """<!doctype html>
       }
     };
 
+    // Auto-populate Output Directory dynamically based on Job Name and Date
+    const updateOutputDirectory = () => {
+      const name = el("job-name").value;
+      const dateStr = new Date().toISOString().split('T')[0];
+      const slug = name.toLowerCase()
+        .replace(/[^a-z0-9_ -]/g, '')
+        .replace(/\\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
+      if (slug) {
+        el("job-output").value = `outputs/runs/${dateStr}-${slug}`;
+      } else {
+        el("job-output").value = `outputs/runs/${dateStr}`;
+      }
+    };
+    el("job-name").addEventListener("input", updateOutputDirectory);
+    updateOutputDirectory();
+
     el("new-job-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const name = el("job-name").value;
