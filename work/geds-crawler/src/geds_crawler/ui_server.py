@@ -995,7 +995,7 @@ DASHBOARD_HTML = """<!doctype html>
         .replace(/-+/g, '-')
         .trim();
       if (slug) {
-        el("job-output").value = `outputs/runs/${dateStr}-${slug}`;
+        el("job-output").value = `outputs/runs/${dateStr}/${slug}`;
       } else {
         el("job-output").value = `outputs/runs/${dateStr}`;
       }
