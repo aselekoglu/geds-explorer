@@ -269,7 +269,34 @@ def create_server(
                 elif path == "/api/control/runs":
                     from .control_store import ControlStore
                     with ControlStore(db_path) as store:
-                        return store.list_runs()
+                        runs = store.list_runs()
+                    
+                    fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                    if fb.is_file():
+                        try:
+                            with sqlite3.connect(fb) as conn:
+                                conn.row_factory = sqlite3.Row
+                                row = conn.execute(
+                                    "SELECT id, started_at, status, request_count, heartbeat_at, current_org_dn, current_department_dn FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                                ).fetchone()
+                                if row:
+                                    run_id = row["id"]
+                                    if not any(r["id"] == run_id for r in runs):
+                                        runs.append({
+                                            "id": run_id,
+                                            "job_id": None,
+                                            "job_name": "Unmanaged Crawl",
+                                            "started_at": row["started_at"],
+                                            "status": row["status"],
+                                            "request_count": row["request_count"],
+                                            "pid": None,
+                                            "heartbeat_at": row["heartbeat_at"],
+                                            "current_org_dn": row["current_org_dn"],
+                                            "current_department_dn": row["current_department_dn"],
+                                        })
+                        except Exception:
+                            pass
+                    return runs
 
             # Legacy / snapshot reader endpoints
             snap_db = db_path
