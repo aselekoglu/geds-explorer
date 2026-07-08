@@ -189,10 +189,25 @@ class ProcessManager:
                 elif final_status == "stopped":
                     db_status = "stopped"
                     
+                now_iso = datetime.now(UTC).isoformat()
+                # Also read finished_at from staging DB if available
+                staging_finished = None
+                if staging_db.exists():
+                    try:
+                        with sqlite3.connect(staging_db) as stage_conn2:
+                            stage_conn2.row_factory = sqlite3.Row
+                            frow = stage_conn2.execute(
+                                "SELECT finished_at FROM crawl_runs WHERE id = ?", (run_id,)
+                            ).fetchone()
+                            if frow and frow["finished_at"]:
+                                staging_finished = frow["finished_at"]
+                    except Exception:
+                        pass
+                finished_ts = staging_finished or now_iso
                 with self._connect() as con:
                     con.execute(
-                        "UPDATE crawl_runs SET status = ?, request_count = ? WHERE id = ?",
-                        (db_status, req_count, run_id),
+                        "UPDATE crawl_runs SET status = ?, request_count = ?, finished_at = ? WHERE id = ?",
+                        (db_status, req_count, finished_ts, run_id),
                     )
                     con.commit()
             else:

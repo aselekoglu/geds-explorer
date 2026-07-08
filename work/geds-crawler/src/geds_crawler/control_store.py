@@ -278,7 +278,7 @@ class ControlStore:
         # 3. Get last completed runs
         last_run_rows = self.db.execute(
             """
-            SELECT rd.department_dn, r.status, r.finished_at, j.name as job_name
+            SELECT rd.department_dn, r.status, r.finished_at, r.started_at, j.name as job_name
             FROM run_departments rd
             JOIN crawl_runs r ON r.id = rd.run_id
             LEFT JOIN crawl_jobs j ON j.id = r.job_id
@@ -364,8 +364,9 @@ class ControlStore:
             if dn in latest_completed:
                 last_run = latest_completed[dn]
                 status_map[dn]["job_name"] = last_run["job_name"]
-                if last_run["finished_at"]:
-                    status_map[dn]["last_crawled_at"] = last_run["finished_at"].split("T")[0]
+                crawl_date = last_run["finished_at"] or last_run["started_at"]
+                if crawl_date:
+                    status_map[dn]["last_crawled_at"] = crawl_date.split("T")[0]
                 
                 if last_run["status"] == "finished":
                     status_map[dn]["status"] = "covered-current"
