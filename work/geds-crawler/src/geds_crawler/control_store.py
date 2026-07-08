@@ -307,9 +307,9 @@ class ControlStore:
         unmanaged_dns = set()
         unmanaged_status = "idle"
         unmanaged_date = None
-        fb = (self.db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
+        fb = (self.db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
         if not fb.is_file():
-            fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+            fb = (self.db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
         if fb.is_file():
             try:
                 with sqlite3.connect(fb) as conn:

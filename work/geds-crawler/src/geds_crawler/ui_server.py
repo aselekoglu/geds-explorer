@@ -271,9 +271,9 @@ def create_server(
                     with ControlStore(db_path) as store:
                         runs = store.list_runs()
                     
-                    fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
+                    fb = (db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
                     if not fb.is_file():
-                        fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                        fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
                         
                     if fb.is_file():
                         try:
@@ -318,7 +318,7 @@ def create_server(
             snap_dbs = []
             if is_control_plane:
                 if selected_run_id == "unmanaged":
-                    fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                    fb = (db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
                     if not fb.is_file():
                         fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
                     if fb.is_file():
@@ -353,7 +353,7 @@ def create_server(
                                         break
                     except Exception:
                         pass
-                    fb = Path("outputs/geds-snapshot-2026-07-08/geds.sqlite").resolve()
+                    fb = (db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
                     if not fb.is_file():
                         fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
                     if fb.is_file() and fb not in snap_dbs:
