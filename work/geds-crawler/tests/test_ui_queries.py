@@ -118,3 +118,69 @@ def test_limit_is_bounded(tmp_path):
 
     assert result["limit"] == 100
     assert result["offset"] == 0
+
+
+def test_snapshot_reader_with_overlays(tmp_path):
+    import os
+    base_path = tmp_path / "base.sqlite"
+    overlay_path = tmp_path / "overlay.sqlite"
+    
+    # 1. Create base DB with Ada
+    _create_snapshot(base_path)
+    base_mtime = base_path.stat().st_mtime
+    
+    # 2. Create overlay DB with:
+    #   - updated Ada (newer display name)
+    #   - a new person Charles
+    with SnapshotStore(overlay_path) as store:
+        store.init_schema()
+        # Ada (same source_url) but updated title / display name
+        ada_updated = PersonIndex(
+            display_name="Ada Updated",
+            title="Principal Engineer",
+            org_dn="ou=development,dc=ssc,dc=gc,dc=ca",
+            department_dn="dc=ssc,dc=gc,dc=ca",
+            department_name="Shared Services Canada",
+            org_unit="Application Development",
+            org_path="Shared Services Canada / Application Development",
+            source_url="https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=uid%3Dada",
+        )
+        # Charles (new person)
+        charles = PersonIndex(
+            display_name="Charles Babbage",
+            title="Inventor",
+            org_dn="ou=development,dc=ssc,dc=gc,dc=ca",
+            department_dn="dc=ssc,dc=gc,dc=ca",
+            department_name="Shared Services Canada",
+            org_unit="Application Development",
+            org_path="Shared Services Canada / Application Development",
+            source_url="https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=uid%3Dcharles",
+        )
+        store.upsert_person(ada_updated, "test-run-overlay", "2026-07-09T14:00:00Z")
+        store.upsert_person(charles, "test-run-overlay", "2026-07-09T14:00:00Z")
+        store.commit()
+
+    reader = SnapshotReader(base_path, overlay_db_paths=[overlay_path])
+    
+    # Verify status returns 2 unique people (Ada + Charles)
+    status = reader.status()
+    assert status["people"] == 2
+    
+    # Verify base file has not been modified
+    assert base_path.stat().st_mtime == base_mtime
+    
+    # Verify people query returns both, and the updated version of Ada is returned
+    res = reader.people(limit=10, offset=0)
+    assert res["total"] == 2
+    
+    items = {item["display_name"]: item for item in res["items"]}
+    assert "Ada Updated" in items
+    assert "Ada Example" not in items
+    assert items["Ada Updated"]["title"] == "Principal Engineer"
+    
+    assert "Charles Babbage" in items
+    assert items["Charles Babbage"]["title"] == "Inventor"
+    
+    # Verify sorting works: Ada Updated, Charles Babbage (alphabetical on display_name)
+    assert res["items"][0]["display_name"] == "Ada Updated"
+    assert res["items"][1]["display_name"] == "Charles Babbage"

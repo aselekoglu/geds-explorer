@@ -2,14 +2,52 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 
 class SnapshotReader:
-    def __init__(self, db_path: Path | str):
+    def __init__(self, db_path: Path | str, overlay_db_paths: Sequence[Path | str] = ()):
         self.db_path = Path(db_path).resolve()
         if not self.db_path.is_file():
             raise FileNotFoundError(f"Database not found: {self.db_path}")
+        self.overlay_db_paths = [Path(p).resolve() for p in overlay_db_paths]
+        for p in self.overlay_db_paths:
+            if not p.is_file():
+                raise FileNotFoundError(f"Overlay database not found: {p}")
+
+    def _connect_with_overlays(self) -> sqlite3.Connection:
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.execute("ATTACH DATABASE ? AS base", (str(self.db_path),))
+        for idx, path in enumerate(self.overlay_db_paths):
+            con.execute(f"ATTACH DATABASE ? AS overlay_{idx}", (str(path),))
+        return con
+
+    def _people_source_sql(self) -> str:
+        parts = [
+            "SELECT 0 AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen FROM base.people_index"
+        ]
+        for idx in range(len(self.overlay_db_paths)):
+            parts.append(
+                f"SELECT {idx + 1} AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen FROM overlay_{idx}.people_index"
+            )
+        union_sql = "\n  UNION ALL\n  ".join(parts)
+        
+        return f"""
+        WITH all_people AS (
+          {union_sql}
+        ),
+        ranked AS (
+          SELECT display_name, title, department_name, org_unit, org_path, source_url, last_seen,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY source_url ORDER BY precedence DESC, last_seen DESC
+                 ) AS rn
+          FROM all_people
+        )
+        SELECT display_name, title, department_name, org_unit, org_path, source_url
+        FROM ranked
+        WHERE rn = 1
+        """
 
     def status(self) -> dict[str, Any]:
         with self._connect() as con:
@@ -27,12 +65,20 @@ class SnapshotReader:
             failed = queue.get("error", 0)
             total = done + pending + failed
             completion = round((done + failed) * 100 / total, 1) if total else 0.0
+            
+            if self.overlay_db_paths:
+                with self._connect_with_overlays() as m_con:
+                    source_sql = self._people_source_sql()
+                    people_count = int(m_con.execute(f"SELECT COUNT(*) FROM ({source_sql})").fetchone()[0])
+            else:
+                people_count = self._count(con, "people_index")
+
             return {
                 "run_status": str(run["status"]) if run else None,
                 "request_count": int(run["request_count"]) if run else 0,
                 "departments": self._count(con, "departments"),
                 "org_units": self._count(con, "org_units"),
-                "people": self._count(con, "people_index"),
+                "people": people_count,
                 "errors": self._count(con, "crawl_errors"),
                 "queue": queue,
                 "completion_percent": completion,
@@ -99,17 +145,30 @@ class SnapshotReader:
         if department:
             clauses.append("department_name = ?")
             params.append(department)
-        return self._page(
-            """
-            SELECT display_name, title, department_name, org_unit, org_path, source_url
-            FROM people_index
-            """,
-            clauses,
-            params,
-            "display_name COLLATE NOCASE, org_path COLLATE NOCASE",
-            limit,
-            offset,
-        )
+
+        source_sql = self._people_source_sql()
+        bounded_limit = min(max(int(limit), 1), 100)
+        bounded_offset = max(int(offset), 0)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+
+        with self._connect_with_overlays() as con:
+            total = int(
+                con.execute(
+                    f"SELECT COUNT(*) FROM ({source_sql}){where}",
+                    params,
+                ).fetchone()[0]
+            )
+            rows = con.execute(
+                f"SELECT * FROM ({source_sql}){where} ORDER BY display_name COLLATE NOCASE, org_path COLLATE NOCASE LIMIT ? OFFSET ?",
+                [*params, bounded_limit, bounded_offset],
+            ).fetchall()
+
+        return {
+            "items": [dict(row) for row in rows],
+            "total": total,
+            "limit": bounded_limit,
+            "offset": bounded_offset,
+        }
 
     def queue(
         self,
