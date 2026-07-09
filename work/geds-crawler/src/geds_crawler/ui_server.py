@@ -992,6 +992,21 @@ DASHBOARD_HTML = """<!doctype html>
       background: rgba(8, 17, 31, 0.5);
       color: var(--muted);
     }
+    .command-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .attention-list, .activity-list { display: grid; gap: 10px; }
+    .attention-item, .activity-item {
+      border: 1px solid var(--line);
+      background: rgba(8, 17, 31, 0.58);
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      gap: 6px;
+    }
 
     @media (max-width: 760px) {
       .app-shell { grid-template-columns: 1fr; }
@@ -1223,6 +1238,22 @@ DASHBOARD_HTML = """<!doctype html>
       <div id="rps-warning-red" class="warning-banner" style="display:none; margin-bottom:18px; border-radius:6px; background:var(--danger-soft); color:var(--danger); border-color:var(--danger);">
         CRITICAL WARNING: Aggregated traffic limit is above 2.0 RPS!
       </div>
+      <div class="command-grid">
+        <section class="panel-card">
+          <h2 class="panel-title">Attention Queue</h2>
+          <p class="panel-subtitle">Problem-first list of stale, failed, missing, or overlapping work.</p>
+          <div id="attention-list" class="attention-list">
+            <div class="empty">No attention items loaded yet.</div>
+          </div>
+        </section>
+        <section class="panel-card">
+          <h2 class="panel-title">Live Activity</h2>
+          <p class="panel-subtitle">Active crawler runs, throughput, and progress.</p>
+          <div id="live-activity-list" class="activity-list">
+            <div class="empty">No active crawler activity loaded yet.</div>
+          </div>
+        </section>
+      </div>
     </div>
       </section>
 
@@ -1238,7 +1269,7 @@ DASHBOARD_HTML = """<!doctype html>
     <!-- CRAWLERS TAB -->
     <div class="tab-content" id="tab-crawlers">
       <!-- Create Crawler Job -->
-      <div class="form-section">
+      <div class="form-section" id="crawler-create-section">
         <h3>Create New Crawler Job</h3>
         <form id="new-job-form">
           <div class="form-grid">
@@ -1384,7 +1415,15 @@ DASHBOARD_HTML = """<!doctype html>
       <section class="workspace-panel" id="workspace-operate-history" data-workspace="#/operate/history">
         <div class="panel-card">
           <h2 class="panel-title">Run History</h2>
-          <p class="panel-subtitle">Historical run review will be moved here in the next guided-flow task.</p>
+          <p class="panel-subtitle">Completed, stopped, failed, and historical crawler runs.</p>
+          <div class="table-wrap">
+            <table class="responsive-table">
+              <thead>
+                <tr><th>Run</th><th>Status</th><th>Started</th><th>Finished</th><th>Progress</th><th>Action</th></tr>
+              </thead>
+              <tbody id="run-history-table-body"><tr><td colspan="6" class="empty">Loading run history...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -1551,6 +1590,7 @@ DASHBOARD_HTML = """<!doctype html>
         The crawler form is preserved on this screen while the guided drawer shell is introduced.
         Select departments, review the estimate, configure options, then confirm start from the crawler form.
       </div>
+      <div id="start-crawler-form-mount"></div>
       <div class="drawer-footer">
         <button type="button" class="btn" data-close-drawer="start-crawler-drawer">Cancel</button>
         <button type="button" class="btn btn-primary" data-close-drawer="start-crawler-drawer" onclick="document.getElementById('job-name').focus()">Continue to crawler form</button>
@@ -1758,6 +1798,7 @@ DASHBOARD_HTML = """<!doctype html>
       // Warn policies
       el("rps-warning-amber").style.display = data.configured_rps > 1.0 ? "block" : "none";
       el("rps-warning-red").style.display = data.configured_rps > 2.0 ? "block" : "none";
+      renderAttentionQueue(data);
     }
 
     // --- Department selection state ---
@@ -1997,6 +2038,68 @@ DASHBOARD_HTML = """<!doctype html>
         selectEl.innerHTML = optionsHtml;
         selectEl.value = currentVal;
       }
+      renderLiveActivity(runs);
+      renderRunHistory(runs);
+    }
+
+    function renderLiveActivity(runs) {
+      const list = el("live-activity-list");
+      if (!list) return;
+      const active = runs.filter(run => ["running", "starting", "stopping"].includes(run.status));
+      if (!active.length) {
+        list.innerHTML = '<div class="empty">No active crawlers right now.</div>';
+        return;
+      }
+      list.innerHTML = active.map(run => `
+        <div class="activity-item">
+          <strong>${escapeHtml(run.job_name || run.id || "Crawler run")}</strong>
+          <span class="status-label ${escapeHtml(run.status)}">${escapeHtml(run.status)}</span>
+          <span class="muted">RPS ${(run.measured_rps || run.pagination_metrics?.measured_rps || 0).toFixed(2)}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderRunHistory(runs) {
+      const tbody = el("run-history-table-body");
+      if (!tbody) return;
+      if (!runs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No run history yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = runs.map(run => `
+        <tr>
+          <td data-label="Run">${escapeHtml(run.job_name || run.id || "Unmanaged")}</td>
+          <td data-label="Status"><span class="status-label ${escapeHtml(run.status || "info")}">${escapeHtml(run.status || "-")}</span></td>
+          <td data-label="Started">${escapeHtml(run.started_at || "-")}</td>
+          <td data-label="Finished">${escapeHtml(run.finished_at || run.eta?.finish_time || "-")}</td>
+          <td data-label="Progress">${escapeHtml(run.crawl_kind || "crawl")}</td>
+          <td data-label="Action">${run.crawl_kind === "pagination_backfill" ? `<button class="btn" type="button" onclick="showPaginationOrgsPanel('${escapeHtml(run.id)}')">Inspect</button>` : '<span class="muted">-</span>'}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderAttentionQueue(data) {
+      const list = el("attention-list");
+      if (!list) return;
+      const items = [];
+      if ((data.active_workers || 0) === 0) {
+        items.push({ level: "attention", title: "No active crawlers", detail: "Start a crawler if coverage needs to be refreshed." });
+      }
+      if ((data.measured_rps || 0) < (data.configured_rps || 0) * 0.5 && (data.configured_rps || 0) > 0) {
+        items.push({ level: "attention", title: "Measured RPS is low", detail: "Throughput is below half of configured RPS." });
+      }
+      el("nav-attention-count").textContent = String(items.length);
+      if (!items.length) {
+        list.innerHTML = '<div class="empty">No attention items. System looks quiet.</div>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+        <div class="attention-item">
+          <span class="status-label ${item.level}">${item.level}</span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span class="muted">${escapeHtml(item.detail)}</span>
+        </div>
+      `).join("");
     }
 
     async function loadControlCoverage() {
@@ -2553,6 +2656,11 @@ DASHBOARD_HTML = """<!doctype html>
         document.querySelectorAll(".drawer:not([hidden])").forEach(drawer => closeDrawer(drawer.id));
       }
     });
+    const crawlerCreateSection = el("crawler-create-section");
+    const crawlerFormMount = el("start-crawler-form-mount");
+    if (crawlerCreateSection && crawlerFormMount) {
+      crawlerFormMount.appendChild(crawlerCreateSection);
+    }
 
     // Auto-refresh loop
     function autoRefresh() {
