@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Preserve user-owned changes in the master checkout; work only in isolated branch codex/canonical-snapshot-history.
+- The user explicitly authorized direct execution on master after the pre-existing agentic work was committed as 29c16b1; preserve subsequently observed user edits and stage only task-scoped files.
 - TDD is mandatory: each production behavior starts with a failing pytest test.
 - Do not commit SQLite files, person records, or raw person event exports to Git.
 - source_url is the initial strong person key. Never silently merge a new URL into another identity.
