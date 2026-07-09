@@ -1,4 +1,6 @@
+import pytest
 from geds_crawler.urls import canonical_dn, geds_url, parse_geds_link
+from geds_crawler.pagination import canonical_pagination_url
 
 
 def test_parse_geds_link_extracts_pgid_and_canonical_dn_from_relative_url():
@@ -30,3 +32,12 @@ def test_geds_url_encodes_dn_for_official_source_link():
 
     assert url.startswith("https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=")
     assert "CN%3DJane+Doe" not in url
+
+
+@pytest.mark.parametrize("href", [
+    "https://example.com/en/GEDS?pgid=014&dn=x&page=2",
+    "https://geds-sage.gc.ca/not-GEDS?pgid=014&dn=x&page=2",
+    "javascript:alert(1)",
+])
+def test_unsafe_next_link_is_rejected(href):
+    assert canonical_pagination_url(href) is None

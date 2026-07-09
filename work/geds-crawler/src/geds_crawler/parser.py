@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup, Tag
 
 from .models import Department, OrgUnit, PersonIndex
 from .urls import geds_url, parse_geds_link
+from .pagination import PeoplePage, canonical_pagination_url
 
 
 CONTACT_LINE_RE = re.compile(
@@ -119,18 +120,50 @@ def _parse_person_link_text(value: str) -> tuple[str, str | None]:
     return parts[0], clean_text(" ".join(parts[1:])) or None
 
 
-def extract_people(
+def _extract_next_page_url(soup: BeautifulSoup) -> str | None:
+    for link in soup.find_all("a", href=True):
+        href = link.get("href")
+        rel = link.get("rel")
+        if isinstance(rel, list):
+            is_next_rel = "next" in rel
+        elif isinstance(rel, str):
+            is_next_rel = rel.lower() == "next"
+        else:
+            is_next_rel = False
+
+        aria_label = link.get("aria-label", "").lower()
+        title_attr = link.get("title", "").lower()
+        text = _link_text(link).lower()
+
+        is_next_text = (
+            "next" in text
+            or "suivant" in text
+            or "next" in aria_label
+            or "suivant" in aria_label
+            or "next" in title_attr
+            or "suivant" in title_attr
+        )
+
+        if is_next_rel or is_next_text:
+            canonical = canonical_pagination_url(href)
+            if canonical:
+                return canonical
+    return None
+
+
+def extract_people_page(
     html: str,
     org_dn: str,
     department_dn: str,
     department_name: str,
     org_name: str,
     org_path: str,
-) -> list[PersonIndex]:
+) -> PeoplePage:
+    soup = _soup(html)
     people: list[PersonIndex] = []
     seen: set[str] = set()
 
-    for link in _soup(html).find_all("a", href=True):
+    for link in soup.find_all("a", href=True):
         parsed = parse_geds_link(link.get("href"))
         display_name, inline_title = _parse_person_link_text(_link_text(link))
         if not parsed or parsed.pgid != "015" or not display_name:
@@ -151,4 +184,24 @@ def extract_people(
             )
         )
 
-    return people
+    next_url = _extract_next_page_url(soup)
+    return PeoplePage(people=tuple(people), next_url=next_url)
+
+
+def extract_people(
+    html: str,
+    org_dn: str,
+    department_dn: str,
+    department_name: str,
+    org_name: str,
+    org_path: str,
+) -> list[PersonIndex]:
+    page = extract_people_page(
+        html=html,
+        org_dn=org_dn,
+        department_dn=department_dn,
+        department_name=department_name,
+        org_name=org_name,
+        org_path=org_path,
+    )
+    return list(page.people)

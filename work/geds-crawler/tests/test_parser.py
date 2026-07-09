@@ -1,11 +1,14 @@
 from pathlib import Path
+from urllib.parse import urlsplit, parse_qsl
 
 from geds_crawler.parser import (
     extract_departments,
     extract_org_children,
     extract_people,
+    extract_people_page,
     strip_contact_text,
 )
+from geds_crawler.urls import geds_url
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -82,3 +85,39 @@ def test_strip_contact_text_removes_phone_email_and_contact_labels():
     value = strip_contact_text("Director Telephone: 613-555-0100 Email: jane.doe@example.gc.ca")
 
     assert value == "Director"
+
+
+def test_extract_people_page_returns_people_and_canonical_next_url():
+    page = extract_people_page(
+        load_fixture("org_people_page_1.html"),
+        org_dn="OU=TEAM,OU=ISED-ISDE,O=GC,C=CA",
+        department_dn="OU=ISED-ISDE,O=GC,C=CA",
+        department_name="ISED",
+        org_name="Team",
+        org_path="ISED / Team",
+    )
+    assert len(page.people) == 25
+    assert page.next_url is not None
+    parsed = urlsplit(page.next_url)
+    assert (parsed.scheme, parsed.netloc, parsed.path) == (
+        "https", "geds-sage.gc.ca", "/en/GEDS"
+    )
+    assert dict(parse_qsl(parsed.query))["page"] == "2"
+
+
+def test_exactly_25_people_without_next_link_is_terminal():
+    links = "".join(
+        f'<a href="{geds_url("015", f"CN=Person {index},OU=TEAM,O=GC,C=CA")}">'
+        f"Person {index}</a>"
+        for index in range(25)
+    )
+    page = extract_people_page(
+        f"<html><body>{links}</body></html>",
+        org_dn="OU=TEAM,OU=ISED-ISDE,O=GC,C=CA",
+        department_dn="OU=ISED-ISDE,O=GC,C=CA",
+        department_name="ISED",
+        org_name="Team",
+        org_path="ISED / Team",
+    )
+    assert len(page.people) == 25
+    assert page.next_url is None
