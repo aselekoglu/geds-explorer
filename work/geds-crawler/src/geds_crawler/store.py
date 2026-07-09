@@ -535,5 +535,16 @@ class SnapshotStore:
             "active_org": active_org,
         }
 
+    def completed_org_samples(self) -> list[dict]:
+        cursor = self.db.execute(
+            """
+            SELECT pages_fetched, started_at, finished_at
+            FROM pagination_orgs
+            WHERE status = 'finished' AND finished_at IS NOT NULL
+            ORDER BY finished_at ASC
+            """
+        )
+        return [dict(row) for row in cursor]
+
     def commit(self) -> None:
         self.db.commit()
