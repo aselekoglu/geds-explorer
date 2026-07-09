@@ -124,6 +124,30 @@ def test_control_store_coverage(tmp_path):
         assert cov2["OU=SSC-SPC,O=GC,C=CA"]["status"] == "running"
 
 
+def test_completed_run_takes_priority_over_historical_job_overlap(tmp_path):
+    db_path = tmp_path / "control.sqlite"
+    department_dn = "OU=CRTC,O=GC,C=CA"
+
+    with ControlStore(db_path) as store:
+        store.init_schema()
+        store.upsert_catalog([Department(name="CRTC", dn=department_dn, source_url="url")])
+
+        first_job_id = store.create_job("CRTC", {department_dn}, 1.0, "shared", "/tmp/crtc")
+        store.create_job("Historical batch", {department_dn}, 1.0, "shared", "/tmp/batch")
+        run_id = store.create_run(first_job_id, "running")
+        store.db.execute(
+            "UPDATE crawl_runs SET status='finished', finished_at=? WHERE id=?",
+            ("2026-07-09T02:38:06+00:00", run_id),
+        )
+        store.db.commit()
+
+        coverage = store.coverage()[department_dn]
+
+        assert coverage["status"] == "covered-current"
+        assert coverage["last_crawled_at"] == "2026-07-09"
+        assert coverage["job_name"] == "CRTC"
+
+
 def test_control_store_v2_migration_and_freezing(tmp_path):
     # Setup: Create a v1 control database manually, close it, and run init_schema to migrate to v2
     db_path = tmp_path / "control.sqlite"
@@ -232,4 +256,3 @@ def test_control_store_v2_migration_and_freezing(tmp_path):
         assert len(seeds) == 1
         assert seeds[0]["org_dn"] == "OU=ORG1,OU=DEPT,O=GC,C=CA"
         assert seeds[0]["base_people_count"] == 25
-

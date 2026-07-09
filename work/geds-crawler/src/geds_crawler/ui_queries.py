@@ -6,10 +6,22 @@ from typing import Any, Sequence
 
 
 class SnapshotReader:
-    def __init__(self, db_path: Path | str, overlay_db_paths: Sequence[Path | str] = ()):
+    def __init__(
+        self,
+        db_path: Path | str,
+        overlay_db_paths: Sequence[Path | str] = (),
+        additional_base_db_paths: Sequence[Path | str] = (),
+    ):
         self.db_path = Path(db_path).resolve()
         if not self.db_path.is_file():
             raise FileNotFoundError(f"Database not found: {self.db_path}")
+        self.base_db_paths = [
+            self.db_path,
+            *[Path(p).resolve() for p in additional_base_db_paths],
+        ]
+        for p in self.base_db_paths:
+            if not p.is_file():
+                raise FileNotFoundError(f"Base database not found: {p}")
         self.overlay_db_paths = [Path(p).resolve() for p in overlay_db_paths]
         for p in self.overlay_db_paths:
             if not p.is_file():
@@ -19,14 +31,18 @@ class SnapshotReader:
         con = sqlite3.connect(":memory:")
         con.row_factory = sqlite3.Row
         con.execute("ATTACH DATABASE ? AS base", (str(self.db_path),))
+        for idx, path in enumerate(self.base_db_paths[1:], start=1):
+            con.execute(f"ATTACH DATABASE ? AS base_{idx}", (str(path),))
         for idx, path in enumerate(self.overlay_db_paths):
             con.execute(f"ATTACH DATABASE ? AS overlay_{idx}", (str(path),))
         return con
 
     def _people_source_sql(self) -> str:
-        parts = [
-            "SELECT 0 AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen, org_dn, department_dn FROM base.people_index"
-        ]
+        parts = []
+        for schema in self._base_schemas():
+            parts.append(
+                f"SELECT 0 AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen, org_dn, department_dn FROM {schema}.people_index"
+            )
         for idx in range(len(self.overlay_db_paths)):
             parts.append(
                 f"SELECT {idx + 1} AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen, org_dn, department_dn FROM overlay_{idx}.people_index"
@@ -48,6 +64,34 @@ class SnapshotReader:
         FROM ranked
         WHERE rn = 1
         """
+
+    def _orgs_source_sql(self) -> str:
+        parts = []
+        for schema in self._base_schemas():
+            parts.append(
+                f"""
+                SELECT o.name, d.name AS department_name, o.depth, o.org_path,
+                       o.source_url, o.dn
+                FROM {schema}.org_units o
+                JOIN {schema}.departments d ON d.dn = o.department_dn
+                """
+            )
+        union_sql = "\n  UNION ALL\n  ".join(parts)
+        return f"""
+        WITH all_orgs AS (
+          {union_sql}
+        ),
+        ranked AS (
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY dn ORDER BY org_path) AS rn
+          FROM all_orgs
+        )
+        SELECT name, department_name, depth, org_path, source_url
+        FROM ranked
+        WHERE rn = 1
+        """
+
+    def _base_schemas(self) -> list[str]:
+        return ["base", *[f"base_{idx}" for idx in range(1, len(self.base_db_paths))]]
 
     def status(self) -> dict[str, Any]:
         with self._connect() as con:
@@ -142,11 +186,37 @@ class SnapshotReader:
                 except Exception:
                     pass
 
+            if len(self.base_db_paths) > 1:
+                with self._connect_with_overlays() as m_con:
+                    departments_count = int(
+                        m_con.execute(
+                            "SELECT COUNT(DISTINCT dn) FROM ("
+                            + " UNION ALL ".join(
+                                f"SELECT dn FROM {schema}.departments"
+                                for schema in self._base_schemas()
+                            )
+                            + ")"
+                        ).fetchone()[0]
+                    )
+                    org_units_count = int(
+                        m_con.execute(
+                            "SELECT COUNT(DISTINCT dn) FROM ("
+                            + " UNION ALL ".join(
+                                f"SELECT dn FROM {schema}.org_units"
+                                for schema in self._base_schemas()
+                            )
+                            + ")"
+                        ).fetchone()[0]
+                    )
+            else:
+                departments_count = self._count(con, "departments")
+                org_units_count = self._count(con, "org_units")
+
             return {
                 "run_status": str(run["status"]) if run else None,
                 "request_count": int(run["request_count"]) if run else 0,
-                "departments": self._count(con, "departments"),
-                "org_units": self._count(con, "org_units"),
+                "departments": departments_count,
+                "org_units": org_units_count,
                 "people": people_count,
                 "errors": errors,
                 "queue": queue,
@@ -154,10 +224,21 @@ class SnapshotReader:
             }
 
     def departments(self) -> list[str]:
-        with self._connect() as con:
+        union_sql = " UNION ALL ".join(
+            f"SELECT dn, name FROM {schema}.departments"
+            for schema in self._base_schemas()
+        )
+        with self._connect_with_overlays() as con:
             return [
                 str(row["name"])
-                for row in con.execute("SELECT name FROM departments ORDER BY name COLLATE NOCASE")
+                for row in con.execute(
+                    f"""
+                    SELECT name
+                    FROM ({union_sql})
+                    GROUP BY dn
+                    ORDER BY name COLLATE NOCASE
+                    """
+                )
             ]
 
     def orgs(
@@ -177,18 +258,27 @@ class SnapshotReader:
         if department:
             clauses.append("d.name = ?")
             params.append(department)
-        return self._page(
-            """
-            SELECT o.name, d.name AS department_name, o.depth, o.org_path, o.source_url
-            FROM org_units o
-            JOIN departments d ON d.dn = o.department_dn
-            """,
-            clauses,
-            params,
-            "o.org_path COLLATE NOCASE",
-            limit,
-            offset,
-        )
+        source_sql = self._orgs_source_sql()
+        bounded_limit = min(max(int(limit), 1), 100)
+        bounded_offset = max(int(offset), 0)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._connect_with_overlays() as con:
+            total = int(
+                con.execute(
+                    f"SELECT COUNT(*) FROM ({source_sql}) o{where}",
+                    params,
+                ).fetchone()[0]
+            )
+            rows = con.execute(
+                f"SELECT name, department_name, depth, org_path, source_url FROM ({source_sql}) o{where} ORDER BY org_path COLLATE NOCASE LIMIT ? OFFSET ?",
+                [*params, bounded_limit, bounded_offset],
+            ).fetchall()
+        return {
+            "items": [dict(row) for row in rows],
+            "total": total,
+            "limit": bounded_limit,
+            "offset": bounded_offset,
+        }
 
     def people(
         self,

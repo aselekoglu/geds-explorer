@@ -6,7 +6,13 @@ from bs4 import BeautifulSoup, Tag
 
 from .models import Department, OrgUnit, PersonIndex
 from .urls import geds_url, parse_geds_link
-from .pagination import PeoplePage, canonical_pagination_url
+from .pagination import (
+    PEOPLE_PAGE_SIZE,
+    PeoplePage,
+    ajax_pagination_url,
+    canonical_pagination_url,
+    parse_ajax_pagination_url,
+)
 
 
 CONTACT_LINE_RE = re.compile(
@@ -16,6 +22,9 @@ CONTACT_LINE_RE = re.compile(
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 PHONE_RE = re.compile(r"(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}(?:\s*(?:x|ext\.?)\s*\d+)?", re.IGNORECASE)
 SPACE_RE = re.compile(r"\s+")
+AJAX_PAGE_CONTROLLER_RE = re.compile(
+    r"""showPageController\(\s*1\s*,\s*(\d+)\s*,\s*"([^"]+)"\s*,\s*1\s*,\s*"([^"]*)"\s*\)"""
+)
 
 
 def clean_text(value: str) -> str:
@@ -151,6 +160,35 @@ def _extract_next_page_url(soup: BeautifulSoup) -> str | None:
     return None
 
 
+def _extract_ajax_next_page_url(html: str, page_url: str | None) -> str | None:
+    if page_url:
+        current = parse_ajax_pagination_url(page_url)
+        if current:
+            page = int(current["p1"])
+            total = int(current["total"])
+            if page * PEOPLE_PAGE_SIZE < total:
+                return ajax_pagination_url(
+                    page + 1,
+                    total,
+                    current["p2"],
+                    current["p4"],
+                )
+            return None
+
+    match = AJAX_PAGE_CONTROLLER_RE.search(html)
+    if not match:
+        return None
+    total = int(match.group(1))
+    if total <= PEOPLE_PAGE_SIZE:
+        return None
+    return ajax_pagination_url(
+        page=2,
+        total=total,
+        signed_filter=match.group(2),
+        sort_type=match.group(3),
+    )
+
+
 def extract_people_page(
     html: str,
     org_dn: str,
@@ -158,6 +196,7 @@ def extract_people_page(
     department_name: str,
     org_name: str,
     org_path: str,
+    page_url: str | None = None,
 ) -> PeoplePage:
     soup = _soup(html)
     people: list[PersonIndex] = []
@@ -184,7 +223,7 @@ def extract_people_page(
             )
         )
 
-    next_url = _extract_next_page_url(soup)
+    next_url = _extract_ajax_next_page_url(html, page_url) or _extract_next_page_url(soup)
     return PeoplePage(people=tuple(people), next_url=next_url)
 
 

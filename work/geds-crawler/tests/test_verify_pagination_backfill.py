@@ -52,7 +52,7 @@ def base_and_overlay_dbs(tmp_path):
                 pages_fetched, status, last_error, terminal_reason
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("OU=ORG1,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org1", "Dept / Org1", "url-org1", "base.sqlite", 25, 2, "completed", None, None)
+            ("OU=ORG1,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org1", "Dept / Org1", "url-org1", "base.sqlite", 25, 2, "finished", None, None)
         )
         store.db.execute(
             """
@@ -61,7 +61,7 @@ def base_and_overlay_dbs(tmp_path):
                 pages_fetched, status, last_error, terminal_reason
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("OU=ORG2,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org2", "Dept / Org2", "url-org2", "base.sqlite", 25, 1, "completed", None, None)
+            ("OU=ORG2,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org2", "Dept / Org2", "url-org2", "base.sqlite", 25, 1, "finished", None, None)
         )
         # Put new crawled people in Org1 (making it exceed 25!)
         for i in range(25, 30):
@@ -118,7 +118,7 @@ def test_verifier_script_fails_if_neither_exceeds_25(base_and_overlay_dbs, tmp_p
                 pages_fetched, status, last_error, terminal_reason
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("OU=ORG1,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org1", "Dept / Org1", "url-org1", "base.sqlite", 25, 2, "completed", None, None)
+            ("OU=ORG1,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org1", "Dept / Org1", "url-org1", "base.sqlite", 25, 2, "finished", None, None)
         )
         store.db.execute(
             """
@@ -127,7 +127,7 @@ def test_verifier_script_fails_if_neither_exceeds_25(base_and_overlay_dbs, tmp_p
                 pages_fetched, status, last_error, terminal_reason
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("OU=ORG2,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org2", "Dept / Org2", "url-org2", "base.sqlite", 25, 1, "completed", None, None)
+            ("OU=ORG2,OU=DEPT,O=GC,C=CA", "OU=DEPT,O=GC,C=CA", "Dept", "Org2", "Dept / Org2", "url-org2", "base.sqlite", 25, 1, "finished", None, None)
         )
         store.commit()
 

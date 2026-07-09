@@ -484,14 +484,9 @@ class ControlStore:
                     status_map[dn]["job_name"] = active_info[1] or "Unmanaged Crawl"
                 continue
 
-            # Overlap check
             jobs = job_dn_map.get(dn, [])
             enabled_jobs_count = sum(1 for j in jobs if j[1] == 1)
-            if enabled_jobs_count > 1:
-                status_map[dn]["status"] = "overlap"
-                status_map[dn]["job_name"] = ", ".join(j[0] for j in jobs if j[1] == 1)
-                continue
-                
+
             # If active runs exist
             if dn in active_runs_map:
                 active_info = active_runs_map[dn][0]
@@ -513,6 +508,14 @@ class ControlStore:
                 elif last_run["status"] in ("failed", "stopped"):
                     status_map[dn]["status"] = "failed"
                     continue
+
+            # Flag a duplicate assignment only when it is not superseded by
+            # active or completed work. Historical jobs must not erase the
+            # department's most recent successful crawl from the coverage view.
+            if enabled_jobs_count > 1:
+                status_map[dn]["status"] = "overlap"
+                status_map[dn]["job_name"] = ", ".join(j[0] for j in jobs if j[1] == 1)
+                continue
                     
             # If assigned to enabled job, check if scheduled or just assigned
             if enabled_jobs_count == 1:
@@ -521,4 +524,3 @@ class ControlStore:
                 continue
                 
         return status_map
-

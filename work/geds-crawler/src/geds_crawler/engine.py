@@ -371,6 +371,7 @@ class CrawlEngine:
             department_name=item.department_name,
             org_name=item.org.name,
             org_path=item.org.org_path,
+            page_url=page_item.page_url,
         )
 
         next_url = page.next_url

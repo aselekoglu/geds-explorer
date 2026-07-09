@@ -25,6 +25,8 @@ class ControlQueries:
 
     def enrich_run(self, run: dict[str, Any], rate_limit_seconds: float = 1.0) -> dict[str, Any]:
         enriched = dict(run)
+        configured_rps = 1.0 / rate_limit_seconds if rate_limit_seconds > 0 else 1.0
+        enriched["configured_rps"] = configured_rps
         
         # Default neutral metrics
         total_orgs = 0
@@ -102,8 +104,6 @@ class ControlQueries:
             completed_org_request_samples=completed_samples,
         )
         
-        configured_rps = 1.0 / rate_limit_seconds if rate_limit_seconds > 0 else 1.0
-        
         measured_rps = None
         measured_at = None
         
@@ -146,6 +146,9 @@ class ControlQueries:
             "deduped_people": metrics["deduped_people"],
             "active_org": metrics["active_org"],
         }
+        enriched["request_count"] = int(stage_run["request_count"])
+        enriched["heartbeat_at"] = stage_run["heartbeat_at"]
+        enriched["current_org_dn"] = metrics["active_org"]
         enriched["eta"] = {
             "expected_seconds": eta_est.expected_seconds,
             "low_seconds": eta_est.low_seconds,

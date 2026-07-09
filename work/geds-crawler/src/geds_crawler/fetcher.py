@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+
+from .config import GEDS_PATH
+from .pagination import parse_ajax_pagination_url
 
 
 @dataclass
@@ -30,12 +35,37 @@ class PoliteFetcher:
         for attempt in range(attempts):
             self._wait()
             try:
-                request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
+                ajax = parse_ajax_pagination_url(url)
+                if ajax:
+                    endpoint = urllib.parse.urlunsplit(
+                        ("https", urllib.parse.urlsplit(url).netloc, GEDS_PATH, "pgid=153", "")
+                    )
+                    body = urllib.parse.urlencode(
+                        {key: ajax[key] for key in ("p1", "p2", "p3", "p4")}
+                    ).encode()
+                    request = urllib.request.Request(
+                        endpoint,
+                        data=body,
+                        headers={
+                            "User-Agent": self.user_agent,
+                            "Content-Type": "application/x-www-form-urlencoded",
+                        },
+                        method="POST",
+                    )
+                else:
+                    request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
                 with urllib.request.urlopen(request, timeout=30) as response:
                     self.stats.request_count += 1
                     raw = response.read()
                     charset = response.headers.get_content_charset() or "utf-8"
-                    return raw.decode(charset, errors="replace")
+                    text = raw.decode(charset, errors="replace")
+                    if ajax:
+                        payload = json.loads(text)
+                        result = payload.get("searchResults")
+                        if not isinstance(result, str):
+                            raise RuntimeError("GEDS pagination response omitted searchResults")
+                        return result
+                    return text
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 last_error = exc
                 if attempt < len(self.retry_delays_seconds):

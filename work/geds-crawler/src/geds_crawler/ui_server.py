@@ -473,14 +473,28 @@ def create_server(
                             ).fetchone()
                             if row:
                                 if row["crawl_kind"] == "pagination_backfill":
-                                    primary_db = Path(row["source_db_path"]).resolve()
+                                    base_rows = conn.execute(
+                                        """
+                                        SELECT DISTINCT base_db_path
+                                        FROM run_pagination_seeds
+                                        WHERE run_id = ?
+                                        ORDER BY base_db_path
+                                        """,
+                                        (selected_run_id,),
+                                    ).fetchall()
+                                    snap_dbs = [
+                                        Path(base_row["base_db_path"]).resolve()
+                                        for base_row in base_rows
+                                        if Path(base_row["base_db_path"]).resolve().is_file()
+                                    ]
+                                    if not snap_dbs:
+                                        snap_dbs = [Path(row["source_db_path"]).resolve()]
                                     out_dir = Path(row["output_dir"])
                                     for name in ("geds.sqlite", "staging.sqlite"):
                                         p = out_dir / name
                                         if p.is_file():
                                             self.overlay_db_paths = [p]
                                             break
-                                    snap_dbs = [primary_db]
                                 else:
                                     out_dir = Path(row["output_dir"])
                                     for name in ("geds.sqlite", "staging.sqlite"):
@@ -559,27 +573,26 @@ def create_server(
                 total_pending = 0
                 total_failed = 0
                 
-                for db in snap_dbs:
-                    try:
-                        rdr = SnapshotReader(db, self.overlay_db_paths)
-                        s = rdr.status()
-                        aggregated["request_count"] += s["request_count"]
-                        aggregated["departments"] += s["departments"]
-                        aggregated["org_units"] += s["org_units"]
-                        aggregated["people"] += s["people"]
-                        aggregated["errors"] += s["errors"]
-                        
-                        done = s["queue"].get("done", 0)
-                        pending = s["queue"].get("pending", 0)
-                        failed = s["queue"].get("error", 0)
-                        total_done += done
-                        total_pending += pending
-                        total_failed += failed
-                        
-                        if s["run_status"] in ("running", "stopping"):
-                            has_active = True
-                    except Exception:
-                        pass
+                try:
+                    rdr = SnapshotReader(
+                        snap_dbs[0],
+                        self.overlay_db_paths,
+                        additional_base_db_paths=snap_dbs[1:],
+                    )
+                    s = rdr.status()
+                    aggregated["request_count"] = s["request_count"]
+                    aggregated["departments"] = s["departments"]
+                    aggregated["org_units"] = s["org_units"]
+                    aggregated["people"] = s["people"]
+                    aggregated["errors"] = s["errors"]
+
+                    total_done = s["queue"].get("done", 0)
+                    total_pending = s["queue"].get("pending", 0)
+                    total_failed = s["queue"].get("error", 0)
+                    if s["run_status"] in ("running", "stopping"):
+                        has_active = True
+                except Exception:
+                    pass
                         
                 aggregated["run_status"] = "running" if has_active else "idle"
                 aggregated["queue"]["done"] = total_done
@@ -607,6 +620,9 @@ def create_server(
                                     rate_limit = job_row["rate_limit_seconds"]
 
                                 enriched = queries.enrich_run(dict(run_row), rate_limit)
+                                aggregated["run_status"] = enriched.get(
+                                    "status", aggregated["run_status"]
+                                )
                                 aggregated["crawl_kind"] = enriched.get("crawl_kind", "full")
                                 aggregated["eta"] = enriched.get("eta")
                                 aggregated["measured_rps"] = enriched.get("measured_rps")
@@ -620,7 +636,6 @@ def create_server(
 
                                     pag_m = enriched.get("pagination_metrics", {})
                                     aggregated["request_count"] = pag_m.get("pages_fetched", 0)
-                                    aggregated["people"] = pag_m.get("new_people", 0)
                                     # Use total failures/errors in backfill as errors count
                                     aggregated["errors"] = prog.get("failed_orgs", 0)
                     except Exception:
@@ -631,7 +646,11 @@ def create_server(
             # For tables, query the primary/first DB in the list
             try:
                 primary_db = snap_dbs[0]
-                req_reader = SnapshotReader(primary_db, getattr(self, "overlay_db_paths", []))
+                req_reader = SnapshotReader(
+                    primary_db,
+                    getattr(self, "overlay_db_paths", []),
+                    additional_base_db_paths=snap_dbs[1:],
+                )
                 if path == "/api/departments":
                     return req_reader.departments()
 
@@ -1174,6 +1193,87 @@ DASHBOARD_HTML = """<!doctype html>
       background: white; cursor: pointer;
     }
     .pager button:disabled { opacity: .45; cursor: default; }
+
+    /* The control-plane shell is intentionally dark. These overrides sit after
+       the legacy snapshot styles so embedded forms and tables cannot revert to
+       an unreadable light surface. */
+    .main-stage .metrics,
+    .main-stage .workspace,
+    .main-stage .form-section {
+      background: var(--surface);
+      border-color: var(--line);
+      color: var(--text);
+    }
+    .main-stage .metrics { border-radius: var(--radius-md); }
+    .main-stage .metric { border-color: var(--line); }
+    .main-stage .metric-value { color: var(--text); }
+    .main-stage .tabs { background: var(--surface-2); }
+    .main-stage .tab { color: var(--muted); border-color: var(--line); }
+    .main-stage .tab:hover, .main-stage .tab.active {
+      background: var(--surface-3);
+      color: var(--text);
+    }
+    .main-stage input, .main-stage select {
+      background: var(--surface-2);
+      border-color: var(--line);
+      color: var(--text);
+    }
+    .main-stage input::placeholder { color: #7e91aa; }
+    .main-stage input[type="checkbox"] {
+      width: auto;
+      height: auto;
+      accent-color: var(--accent-strong);
+    }
+    .main-stage th {
+      background: var(--surface-3);
+      color: var(--muted);
+      border-color: var(--line);
+    }
+    .main-stage td { color: var(--text); border-color: var(--line); }
+    .main-stage tbody tr:hover { background: rgba(148, 163, 184, 0.08); }
+    .main-stage .footer,
+    .main-stage .filters { border-color: var(--line); background: var(--surface); }
+    .main-stage .pager button,
+    .main-stage .btn {
+      background: var(--surface-2);
+      border-color: var(--line);
+      color: var(--text);
+    }
+    .main-stage .btn:hover, .main-stage .pager button:hover:not(:disabled) { background: var(--surface-3); }
+    .main-stage .btn-primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #04111f; }
+    .main-stage .btn-danger { background: #dc2626; border-color: #dc2626; color: white; }
+    .main-stage .badge.done,
+    .main-stage .badge.running,
+    .main-stage .badge.covered-current,
+    .main-stage .badge.completed,
+    .main-stage .badge.crawling { color: #86efac; background: rgba(34, 197, 94, 0.13); }
+    .main-stage .badge.pending,
+    .main-stage .badge.queued,
+    .main-stage .badge.scheduled { color: #fcd34d; background: var(--warning-soft); }
+    .main-stage .badge.error,
+    .main-stage .badge.failed,
+    .main-stage .badge.overlap { color: #fca5a5; background: var(--danger-soft); }
+    .main-stage .source { color: #6ee7b7; }
+    .drawer .form-section,
+    .drawer .workspace,
+    .drawer .metrics { background: var(--surface-2); border-color: var(--line); color: var(--text); }
+    .drawer input, .drawer select { background: var(--surface-3); border-color: var(--line); color: var(--text); }
+    .drawer th { background: var(--surface-3); color: var(--muted); border-color: var(--line); }
+    .drawer td { color: var(--text); border-color: var(--line); }
+    .drawer tbody tr:hover { background: rgba(148, 163, 184, 0.08); }
+    .data-explorer-intro {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 6px 0 14px;
+    }
+    .data-explorer-intro h2 { margin: 0 0 6px; font-size: 20px; }
+    .data-explorer-intro p { margin: 0; color: var(--muted); }
+    .data-source-context { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) {
+      .data-explorer-intro { display: grid; }
+    }
   </style>
 </head>
 <body>
@@ -1560,25 +1660,32 @@ DASHBOARD_HTML = """<!doctype html>
       <section class="workspace-panel" id="workspace-explore-snapshot" data-workspace="#/explore/snapshot">
 
     <div id="overview-select-container" class="panel-card" style="margin-bottom: 18px; display: flex; align-items: center; gap: 12px;" hidden>
-      <label for="overview-job-select">Active database view</label>
+      <label for="overview-job-select">Data source</label>
       <select id="overview-job-select" style="width: auto; min-width: 220px;"></select>
     </div>
 
-    <section class="metrics" id="legacy-metrics-section">
-      <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
+    <section class="metrics" id="data-explorer-summary" aria-label="Dataset overview">
+      <div class="metric"><span class="metric-label">Source pages</span><strong id="m-requests" class="metric-value">-</strong></div>
       <div class="metric"><span class="metric-label">Departments</span><strong id="m-departments" class="metric-value">-</strong></div>
       <div class="metric"><span class="metric-label">Org units</span><strong id="m-orgs" class="metric-value">-</strong></div>
       <div class="metric"><span class="metric-label">People</span><strong id="m-people" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Completed</span><strong id="m-done" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Pending</span><strong id="m-pending" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Queue errors</span><strong id="m-qerrors" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Crawl errors</span><strong id="m-errors" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Indexed records</span><strong id="m-done" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Queued records</span><strong id="m-pending" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Collection errors</span><strong id="m-qerrors" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Record errors</span><strong id="m-errors" class="metric-value">-</strong></div>
     </section>
+    <div class="data-explorer-intro">
+      <div>
+        <p class="eyebrow">Dataset overview</p>
+        <h2>Browse data</h2>
+        <p>Search and filter the selected snapshot without leaving the data explorer.</p>
+      </div>
+    </div>
     <div class="progress-wrap" id="legacy-progress-section" style="display:none;">
       <div class="progress" aria-label="Queue completion"><div id="progress-bar"></div></div>
       <span id="progress-label" class="progress-label">0%</span>
     </div>
-    <div id="active-db" class="muted" aria-live="polite">Snapshot database view</div>
+    <div id="active-db" class="data-source-context" aria-live="polite">Choose a data source to browse its snapshot.</div>
 
     <div class="tab-content" id="tab-legacy">
 
@@ -1714,7 +1821,15 @@ DASHBOARD_HTML = """<!doctype html>
       }
     };
     
-    const state = { view: "orgs", offset: 0, total: 0, loading: false, activeTab: "overview" };
+    const state = {
+      view: "orgs",
+      offset: 0,
+      total: 0,
+      loading: false,
+      snapshotLoading: false,
+      snapshotRefreshQueued: false,
+      activeTab: "overview"
+    };
     const pagState = { runId: "", offset: 0, limit: 25, total: 0, status: "" };
     const el = id => document.getElementById(id);
 
@@ -1747,7 +1862,7 @@ DASHBOARD_HTML = """<!doctype html>
       "#/explore/snapshot": {
         title: "Snapshot Data",
         description: "Inspect active database snapshots, tables, and rows.",
-        refresh: () => Promise.all([refresh(), loadDepartments()])
+        refresh: async () => { await refreshRuns(); await refresh(); }
       }
     };
 
@@ -2013,6 +2128,20 @@ DASHBOARD_HTML = """<!doctype html>
       updateEstimates();
     }
 
+    function updateDataSourceContext() {
+      const selectEl = el("overview-job-select");
+      const context = el("active-db");
+      if (!selectEl || !context) return;
+      const selected = selectEl.options[selectEl.selectedIndex];
+      if (!selected) {
+        context.textContent = "Choose a data source to browse its snapshot.";
+        return;
+      }
+      context.textContent = selectEl.value === "all"
+        ? "Browsing all available snapshot records."
+        : `Browsing snapshot records from ${selected.textContent}.`;
+    }
+
     async function loadControlRuns() {
       const runs = await getJson("/api/control/runs");
       const tbody = el("runs-table-body");
@@ -2039,8 +2168,7 @@ DASHBOARD_HTML = """<!doctype html>
                 <span class="badge done" style="margin-top:4px;">Pagination backfill</span>
               </td>
               <td>
-                ${escapeHtml(run.started_at)}<br>
-                <small class="muted" id="run-heartbeat-age-${run.id}">${formatHeartbeatAge(run.heartbeat_at)}</small>
+                ${escapeHtml(run.started_at)}
               </td>
               <td id="run-progress-${run.id}">
                 <span class="badge ${escapeHtml(run.status)}">${escapeHtml(run.status)}</span><br>
@@ -2063,14 +2191,18 @@ DASHBOARD_HTML = """<!doctype html>
               </td>
               <td>
                 PID: ${run.pid || "-"}<br>
-                <small class="muted">RPS: ${(run.pagination_metrics.measured_rps || 0.0).toFixed(2)} / ${(run.pagination_metrics.configured_rps || 1.0).toFixed(1)}</small>
+                <small class="muted">RPS: ${(run.measured_rps ?? run.pagination_metrics.measured_rps ?? 0.0).toFixed(2)} / ${(run.configured_rps ?? run.pagination_metrics.configured_rps ?? 1.0).toFixed(1)}</small>
               </td>
               <td>
-                New: ${formatNumber(run.pagination_metrics.new_people)}<br>
-                <small class="muted" style="font-size:11px;">Total: ${formatNumber(run.pagination_metrics.total_people)}</small>
+                ${escapeHtml(run.heartbeat_at || "-")}<br>
+                <small class="muted" style="font-size:11px;">${formatHeartbeatAge(run.heartbeat_at)}</small>
               </td>
               <td>
-                ${run.status === 'running' ? escapeHtml(run.pagination_metrics.active_org || run.current_org_dn || '-') : (run.eta.finish_time ? 'Finished: ' + run.eta.finish_time : '-')}
+                ${run.status === 'running'
+                  ? escapeHtml(run.pagination_metrics.active_org || run.current_org_dn || '-')
+                  : (run.eta.estimated_finish_at || run.eta.finish_time
+                    ? 'Finished: ' + escapeHtml(run.eta.estimated_finish_at || run.eta.finish_time)
+                    : '-')}
               </td>
               <td onclick="event.stopPropagation()">${actionBtn}</td>
             </tr>
@@ -2098,13 +2230,15 @@ DASHBOARD_HTML = """<!doctype html>
         let optionsHtml = '<option value="all">All Active/Recent Runs (Combined)</option>';
         runs.forEach(run => {
           if (run.job_id === null) {
-            optionsHtml += `<option value="unmanaged">Unmanaged Crawl (${escapeHtml((run.started_at || "").split("T")[0])})</option>`;
+            optionsHtml += `<option value="unmanaged">Imported snapshot (${escapeHtml((run.started_at || "").split("T")[0])})</option>`;
           } else {
             optionsHtml += `<option value="${run.id}">${escapeHtml(run.job_name)} (${escapeHtml((run.started_at || "").split("T")[0])})</option>`;
           }
         });
         selectEl.innerHTML = optionsHtml;
         selectEl.value = currentVal;
+        if (!selectEl.value) selectEl.value = "all";
+        updateDataSourceContext();
       }
       renderLiveActivity(runs);
       renderRunHistory(runs);
@@ -2296,6 +2430,7 @@ DASHBOARD_HTML = """<!doctype html>
     // Refresh overview stats and snapshot views on active DB dropdown changes
     el("overview-job-select").addEventListener("change", () => {
       state.offset = 0;
+      updateDataSourceContext();
       autoRefresh();
     });
 
@@ -2638,8 +2773,11 @@ DASHBOARD_HTML = """<!doctype html>
     }
 
     async function refreshLegacy() {
-      if (state.loading) return;
-      state.loading = true;
+      if (state.snapshotLoading) {
+        state.snapshotRefreshQueued = true;
+        return;
+      }
+      state.snapshotLoading = true;
       try {
         await Promise.all([loadStatus(), loadDepartments()]);
         const data = await getJson(queryUrl());
@@ -2650,7 +2788,11 @@ DASHBOARD_HTML = """<!doctype html>
         el("error-banner").textContent = error.message;
         el("error-banner").style.display = "block";
       } finally {
-        state.loading = false;
+        state.snapshotLoading = false;
+        if (state.snapshotRefreshQueued) {
+          state.snapshotRefreshQueued = false;
+          refreshLegacy();
+        }
       }
     }
 

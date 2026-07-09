@@ -121,3 +121,58 @@ def test_exactly_25_people_without_next_link_is_terminal():
     )
     assert len(page.people) == 25
     assert page.next_url is None
+
+
+def test_live_ajax_pagination_metadata_produces_second_page_request():
+    html = """
+    <div id="personResults">
+      <a href="?pgid=015&dn=Q049SmFuZSBEb2UsT1U9VEVBTSxPPUdDLEM9Q0E=">Doe, Jane</a>
+    </div>
+    <script>
+      showPageController(1,116,"signed-filter-token",1,"");
+    </script>
+    """
+
+    page = extract_people_page(
+        html,
+        org_dn="OU=TEAM,O=GC,C=CA",
+        department_dn="OU=DEPT,O=GC,C=CA",
+        department_name="Department",
+        org_name="Team",
+        org_path="Department / Team",
+        page_url="https://geds-sage.gc.ca/en/GEDS?pgid=014&dn=seed",
+    )
+
+    assert page.next_url is not None
+    query = dict(parse_qsl(urlsplit(page.next_url).query, keep_blank_values=True))
+    assert query == {
+        "p1": "2",
+        "p2": "signed-filter-token",
+        "p3": "1",
+        "p4": "",
+        "pgid": "153",
+        "total": "116",
+    }
+
+
+def test_ajax_result_page_uses_request_metadata_to_continue_until_total():
+    html = '<ol start="26"><li><a href="?pgid=015&dn=Q049Sm9obiBEb2UsT1U9VEVBTSxPPUdDLEM9Q0E=">Doe, John</a></li></ol>'
+    page_url = (
+        "https://geds-sage.gc.ca/en/GEDS?"
+        "pgid=153&p1=2&p2=signed-filter-token&p3=1&p4=&total=116"
+    )
+
+    page = extract_people_page(
+        html,
+        org_dn="OU=TEAM,O=GC,C=CA",
+        department_dn="OU=DEPT,O=GC,C=CA",
+        department_name="Department",
+        org_name="Team",
+        org_path="Department / Team",
+        page_url=page_url,
+    )
+
+    assert page.next_url is not None
+    query = dict(parse_qsl(urlsplit(page.next_url).query, keep_blank_values=True))
+    assert query["p1"] == "3"
+    assert query["total"] == "116"
