@@ -63,6 +63,9 @@ def create_server(
                 )
                 self._send(HTTPStatus.OK, html.encode("utf-8"), "text/html; charset=utf-8")
                 return
+            if parsed.path == "/favicon.ico":
+                self._send(HTTPStatus.NO_CONTENT, b"", "image/x-icon")
+                return
                 
             try:
                 payload = self._api_payload(parsed.path, parse_qs(parsed.query))
@@ -759,6 +762,335 @@ DASHBOARD_HTML = """<!doctype html>
       color: var(--ink); border-bottom-color: var(--accent); font-weight: bold;
     }
 
+    :root {
+      --bg: #08111f;
+      --bg-deep: #050a13;
+      --surface: #111c2d;
+      --surface-2: #172437;
+      --surface-3: #203149;
+      --line: rgba(148, 163, 184, 0.22);
+      --text: #e5edf8;
+      --muted: #94a3b8;
+      --accent: #34d399;
+      --accent-strong: #10b981;
+      --warning: #f59e0b;
+      --warning-soft: rgba(245, 158, 11, 0.14);
+      --danger: #f87171;
+      --danger-soft: rgba(248, 113, 113, 0.14);
+      --info: #60a5fa;
+      --info-soft: rgba(96, 165, 250, 0.14);
+      --shadow: 0 22px 70px rgba(0, 0, 0, 0.32);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 32rem), var(--bg-deep);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    :focus-visible {
+      outline: 3px solid rgba(52, 211, 153, 0.92);
+      outline-offset: 3px;
+      border-radius: 8px;
+    }
+    .security-strip {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 18px;
+      background: rgba(245, 158, 11, 0.12);
+      border-bottom: 1px solid rgba(245, 158, 11, 0.22);
+      color: #fde68a;
+      font-size: 13px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+    .status-warning { background: var(--warning); box-shadow: 0 0 0 4px var(--warning-soft); }
+    .app-shell {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: calc(100vh - 42px);
+    }
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: rgba(8, 17, 31, 0.92);
+      padding: 22px 16px;
+      position: sticky;
+      top: 0;
+      height: calc(100vh - 42px);
+    }
+    .brand-block { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), #22d3ee);
+      color: #04111f;
+      font-weight: 800;
+    }
+    .brand-title { font-weight: 800; letter-spacing: 0.08em; }
+    .brand-subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .rail-nav { display: grid; gap: 6px; }
+    .rail-group-label {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin: 18px 10px 6px;
+    }
+    .rail-item {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 12px;
+      padding: 10px 12px;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .rail-item:hover, .rail-item.active {
+      color: var(--text);
+      background: rgba(148, 163, 184, 0.10);
+      border-color: var(--line);
+    }
+    .rail-count {
+      min-width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--warning-soft);
+      color: #fbbf24;
+      font-size: 12px;
+    }
+    .main-stage { min-width: 0; padding: 24px; }
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); }
+    .page-description { margin: 6px 0 0; color: var(--muted); max-width: 680px; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .connection-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(17, 28, 45, 0.82);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .workspace-panel { display: none; }
+    .workspace-panel.active { display: block; }
+    .panel-card {
+      background: rgba(17, 28, 45, 0.86);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .panel-title { margin: 0 0 6px; font-size: 16px; }
+    .panel-subtitle { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+    .status-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+    .status-label.healthy, .status-label.running { color: #86efac; background: rgba(34, 197, 94, 0.13); }
+    .status-label.attention, .status-label.stale { color: #fbbf24; background: var(--warning-soft); }
+    .status-label.failed, .status-label.blocked { color: #fca5a5; background: var(--danger-soft); }
+    .status-label.info, .status-label.scheduled { color: #93c5fd; background: var(--info-soft); }
+    .icon-button { display: none; }
+    .workspace-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .section-title { margin: 0; font-size: 22px; }
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.52);
+      z-index: 50;
+    }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(760px, 100vw);
+      height: 100vh;
+      overflow: auto;
+      background: var(--surface);
+      border-left: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      z-index: 60;
+      padding: 22px;
+    }
+    .drawer-header, .drawer-footer {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .drawer-body { display: grid; gap: 18px; margin-top: 18px; }
+    .drawer-footer {
+      position: sticky;
+      bottom: 0;
+      justify-content: flex-end;
+      padding-top: 18px;
+      background: linear-gradient(180deg, rgba(17, 28, 45, 0), var(--surface) 28%);
+    }
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 0;
+      margin: 18px 0;
+      list-style: none;
+    }
+    .flow-steps li {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    .drawer-note {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(8, 17, 31, 0.5);
+      color: var(--muted);
+    }
+    .command-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .attention-list, .activity-list { display: grid; gap: 10px; }
+    .attention-item, .activity-item {
+      border: 1px solid var(--line);
+      background: rgba(8, 17, 31, 0.58);
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      gap: 6px;
+    }
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .summary-row span {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      color: var(--muted);
+    }
+    .summary-row strong { display: block; color: var(--text); font-size: 24px; margin-top: 6px; }
+    .filter-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(17, 28, 45, 0.82);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .chip.active {
+      color: var(--text);
+      border-color: rgba(52, 211, 153, 0.55);
+      background: rgba(52, 211, 153, 0.14);
+    }
+
+    @media (max-width: 760px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: fixed;
+        inset: 42px auto 0 0;
+        width: min(82vw, 320px);
+        transform: translateX(-105%);
+        transition: transform 180ms ease;
+        z-index: 40;
+      }
+      body.nav-open .sidebar { transform: translateX(0); }
+      .main-stage { padding: 16px; }
+      .topbar { flex-direction: column; }
+      .icon-button {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+      .topbar-actions { justify-content: flex-start; }
+      table.responsive-table thead { display: none; }
+      table.responsive-table, table.responsive-table tbody, table.responsive-table tr, table.responsive-table td {
+        display: block;
+        width: 100%;
+      }
+      table.responsive-table tr {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        margin-bottom: 10px;
+        padding: 10px;
+        background: rgba(17, 28, 45, 0.7);
+      }
+      table.responsive-table td {
+        border: 0;
+        padding: 6px 0;
+      }
+      table.responsive-table td::before {
+        content: attr(data-label);
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+    }
+
     /* Metrics Grid */
     .metrics {
       display: grid; grid-template-columns: repeat(4, 1fr);
@@ -845,32 +1177,55 @@ DASHBOARD_HTML = """<!doctype html>
   </style>
 </head>
 <body>
-  <div class="warning-banner">
-    Development only: unauthenticated crawl control. Do not expose this service to an untrusted LAN or the public internet.
+  <div class="security-strip" role="status" aria-live="polite">
+    <span class="status-dot status-warning" aria-hidden="true"></span>
+    <span><strong>Local control plane:</strong> unauthenticated LAN UI. Use only on trusted networks.</span>
   </div>
-  <header>
-    <div class="brand">
-      <h1 id="brand-title">GEDS Snapshot Monitor</h1>
-      <span id="run-state" class="run-state">Connecting...</span>
-    </div>
-    <div class="refresh-meta">
-      <span id="last-refresh">Waiting for data</span>
-      <button id="refresh" class="header-button" type="button">Refresh</button>
-    </div>
-  </header>
-  <main>
-    <nav class="nav-tabs" id="control-tabs" hidden>
-      <button class="nav-tab active" data-tab="overview">Overview</button>
-      <button class="nav-tab" data-tab="crawlers">Crawlers</button>
-      <button class="nav-tab" data-tab="coverage">Coverage</button>
-      <button class="nav-tab" data-tab="schedules">Schedules</button>
-      <button class="nav-tab" data-tab="legacy">Snapshot Data</button>
-    </nav>
 
-    <div id="overview-select-container" style="margin-bottom: 18px; display: flex; align-items: center; gap: 8px;" hidden>
-      <label for="overview-job-select" style="font-weight: bold; font-size: 12px; color: var(--muted); text-transform: uppercase;">Active Database View:</label>
-      <select id="overview-job-select" style="width: auto; min-width: 220px; height: 36px;"></select>
-    </div>
+  <div class="app-shell">
+    <aside class="sidebar" id="primary-sidebar">
+      <div class="brand-block">
+        <span class="brand-mark" aria-hidden="true">G</span>
+        <div>
+          <div class="brand-title">GEDS</div>
+          <div class="brand-subtitle">Control Plane</div>
+        </div>
+      </div>
+
+      <nav class="rail-nav" aria-label="Primary workspace navigation">
+        <div class="rail-group-label">Operate</div>
+        <button class="rail-item active" type="button" data-route="#/operate/overview">
+          <span>Overview</span>
+          <span class="rail-count" id="nav-attention-count">0</span>
+        </button>
+        <button class="rail-item" type="button" data-route="#/operate/crawlers">Crawlers</button>
+        <button class="rail-item" type="button" data-route="#/operate/history">Run History</button>
+
+        <div class="rail-group-label">Plan</div>
+        <button class="rail-item" type="button" data-route="#/plan/coverage">Coverage</button>
+        <button class="rail-item" type="button" data-route="#/plan/schedules">Schedules</button>
+
+        <div class="rail-group-label">Explore Data</div>
+        <button class="rail-item" type="button" data-route="#/explore/snapshot">Snapshot Data</button>
+      </nav>
+    </aside>
+
+    <main class="main-stage">
+      <header class="topbar">
+        <button id="mobile-nav-toggle" class="icon-button" type="button" aria-controls="primary-sidebar" aria-expanded="false">Menu</button>
+        <div>
+          <p class="eyebrow">Prime Radiant</p>
+          <h1 id="page-title">Operate</h1>
+          <p id="page-description" class="page-description">Live crawler status, attention items, and next actions.</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="run-state" class="connection-pill" role="status" aria-live="polite">Connecting...</span>
+          <span id="last-updated" class="muted"></span>
+          <button id="refresh" class="btn" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <section class="workspace-panel active" id="workspace-operate-overview" data-workspace="#/operate/overview">
 
     <!-- Top progress and estimation section -->
     <div id="top-progress-section" style="display:none; margin-bottom: 18px; padding: 12px 16px; background: white; border: 1px solid #e1e8ed; border-radius: 6px;">
@@ -897,21 +1252,6 @@ DASHBOARD_HTML = """<!doctype html>
       </div>
     </div>
 
-    <section class="metrics" id="legacy-metrics-section">
-      <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Departments</span><strong id="m-departments" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Org units</span><strong id="m-orgs" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">People</span><strong id="m-people" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Completed</span><strong id="m-done" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Pending</span><strong id="m-pending" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Queue errors</span><strong id="m-qerrors" class="metric-value">-</strong></div>
-      <div class="metric"><span class="metric-label">Crawl errors</span><strong id="m-errors" class="metric-value">-</strong></div>
-    </section>
-    <div class="progress-wrap" id="legacy-progress-section" style="display:none;">
-      <div class="progress" aria-label="Queue completion"><div id="progress-bar"></div></div>
-      <span id="progress-label" class="progress-label">0%</span>
-    </div>
-
     <!-- OVERVIEW TAB -->
     <div class="tab-content" id="tab-overview">
       <section class="metrics">
@@ -928,12 +1268,38 @@ DASHBOARD_HTML = """<!doctype html>
       <div id="rps-warning-red" class="warning-banner" style="display:none; margin-bottom:18px; border-radius:6px; background:var(--danger-soft); color:var(--danger); border-color:var(--danger);">
         CRITICAL WARNING: Aggregated traffic limit is above 2.0 RPS!
       </div>
+      <div class="command-grid">
+        <section class="panel-card">
+          <h2 class="panel-title">Attention Queue</h2>
+          <p class="panel-subtitle">Problem-first list of stale, failed, missing, or overlapping work.</p>
+          <div id="attention-list" class="attention-list">
+            <div class="empty">No attention items loaded yet.</div>
+          </div>
+        </section>
+        <section class="panel-card">
+          <h2 class="panel-title">Live Activity</h2>
+          <p class="panel-subtitle">Active crawler runs, throughput, and progress.</p>
+          <div id="live-activity-list" class="activity-list">
+            <div class="empty">No active crawler activity loaded yet.</div>
+          </div>
+        </section>
+      </div>
     </div>
+      </section>
+
+      <section class="workspace-panel" id="workspace-operate-crawlers" data-workspace="#/operate/crawlers">
+        <div class="workspace-header-row">
+          <div>
+            <h2 class="section-title">Crawlers</h2>
+            <p class="panel-subtitle">Monitor active runs and start focused crawler work.</p>
+          </div>
+          <button id="open-start-crawler" class="btn btn-primary" type="button">Start crawler</button>
+        </div>
 
     <!-- CRAWLERS TAB -->
-    <div class="tab-content" id="tab-crawlers" style="display:none;">
+    <div class="tab-content" id="tab-crawlers">
       <!-- Create Crawler Job -->
-      <div class="form-section">
+      <div class="form-section" id="crawler-create-section">
         <h3>Create New Crawler Job</h3>
         <form id="new-job-form">
           <div class="form-grid">
@@ -1074,12 +1440,50 @@ DASHBOARD_HTML = """<!doctype html>
         </div>
       </div>
     </div>
+      </section>
+
+      <section class="workspace-panel" id="workspace-operate-history" data-workspace="#/operate/history">
+        <div class="panel-card">
+          <h2 class="panel-title">Run History</h2>
+          <p class="panel-subtitle">Completed, stopped, failed, and historical crawler runs.</p>
+          <div class="table-wrap">
+            <table class="responsive-table">
+              <thead>
+                <tr><th>Run</th><th>Status</th><th>Started</th><th>Finished</th><th>Progress</th><th>Action</th></tr>
+              </thead>
+              <tbody id="run-history-table-body"><tr><td colspan="6" class="empty">Loading run history...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace-panel" id="workspace-plan-coverage" data-workspace="#/plan/coverage">
 
     <!-- COVERAGE TAB -->
-    <div class="tab-content" id="tab-coverage" style="display:none;">
-      <div class="workspace">
+    <div class="tab-content" id="tab-coverage">
+      <section class="panel-card">
+        <div class="workspace-header-row">
+          <div>
+            <h2 class="panel-title">Coverage</h2>
+            <p class="panel-subtitle">Problem-first view of missing, stale, and overlapping department coverage.</p>
+          </div>
+          <button class="btn" type="button" onclick="refreshCoverage()">Refresh coverage</button>
+        </div>
+        <div class="summary-row coverage-summary">
+          <span>Covered <strong id="plan-covered-count">0</strong></span>
+          <span>Missing <strong id="plan-missing-count">0</strong></span>
+          <span>Overlap <strong id="plan-overlap-count">0</strong></span>
+          <span>Stale <strong id="plan-stale-count">0</strong></span>
+        </div>
+        <div class="filter-chips" role="toolbar" aria-label="Coverage filters">
+          <button class="chip active" type="button" data-coverage-filter="attention">Needs attention</button>
+          <button class="chip" type="button" data-coverage-filter="all">All</button>
+          <button class="chip" type="button" data-coverage-filter="missing">Missing</button>
+          <button class="chip" type="button" data-coverage-filter="overlap">Overlap</button>
+          <button class="chip" type="button" data-coverage-filter="stale">Stale</button>
+        </div>
         <div class="table-wrap">
-          <table>
+          <table class="responsive-table">
             <thead>
               <tr>
                 <th>Institution Name</th>
@@ -1091,12 +1495,22 @@ DASHBOARD_HTML = """<!doctype html>
             <tbody id="coverage-table-body"></tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
+      </section>
+
+      <section class="workspace-panel" id="workspace-plan-schedules" data-workspace="#/plan/schedules">
+        <div class="workspace-header-row">
+          <div>
+            <h2 class="section-title">Schedules</h2>
+            <p class="panel-subtitle">Recurring crawler work with next-run context.</p>
+          </div>
+          <button id="open-new-schedule" class="btn btn-primary" type="button">New schedule</button>
+        </div>
 
     <!-- SCHEDULES TAB -->
-    <div class="tab-content" id="tab-schedules" style="display:none;">
-      <div class="form-section">
+    <div class="tab-content" id="tab-schedules">
+      <div class="form-section" id="schedule-create-section">
         <h3>Create Persistent Schedule</h3>
         <form id="new-schedule-form">
           <div class="form-grid">
@@ -1141,6 +1555,31 @@ DASHBOARD_HTML = """<!doctype html>
     </div>
 
     <!-- LEGACY VIEW (SNAPSHOT DATA) -->
+      </section>
+
+      <section class="workspace-panel" id="workspace-explore-snapshot" data-workspace="#/explore/snapshot">
+
+    <div id="overview-select-container" class="panel-card" style="margin-bottom: 18px; display: flex; align-items: center; gap: 12px;" hidden>
+      <label for="overview-job-select">Active database view</label>
+      <select id="overview-job-select" style="width: auto; min-width: 220px;"></select>
+    </div>
+
+    <section class="metrics" id="legacy-metrics-section">
+      <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Departments</span><strong id="m-departments" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Org units</span><strong id="m-orgs" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">People</span><strong id="m-people" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Completed</span><strong id="m-done" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Pending</span><strong id="m-pending" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Queue errors</span><strong id="m-qerrors" class="metric-value">-</strong></div>
+      <div class="metric"><span class="metric-label">Crawl errors</span><strong id="m-errors" class="metric-value">-</strong></div>
+    </section>
+    <div class="progress-wrap" id="legacy-progress-section" style="display:none;">
+      <div class="progress" aria-label="Queue completion"><div id="progress-bar"></div></div>
+      <span id="progress-label" class="progress-label">0%</span>
+    </div>
+    <div id="active-db" class="muted" aria-live="polite">Snapshot database view</div>
+
     <div class="tab-content" id="tab-legacy">
 
       <section class="workspace">
@@ -1182,23 +1621,71 @@ DASHBOARD_HTML = """<!doctype html>
         </div>
       </section>
     </div>
-  </main>
+      </section>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="start-crawler-backdrop" hidden></div>
+  <aside class="drawer" id="start-crawler-drawer" role="dialog" aria-modal="true" aria-labelledby="start-crawler-title" hidden>
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">Guided flow</p>
+        <h2 id="start-crawler-title">Start crawler</h2>
+      </div>
+      <button class="btn" type="button" data-close-drawer="start-crawler-drawer">Close</button>
+    </div>
+    <ol class="flow-steps" aria-label="Crawler setup steps">
+      <li>Select target</li>
+      <li>Review estimate</li>
+      <li>Configure options</li>
+      <li>Confirm start</li>
+    </ol>
+    <div class="drawer-body">
+      <div class="drawer-note">
+        Select departments, review the estimate, configure options, then create and start the crawler from this guided flow.
+      </div>
+      <div id="start-crawler-form-mount"></div>
+      <div class="drawer-footer">
+        <button type="button" class="btn" data-close-drawer="start-crawler-drawer">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('job-name').focus()">Configure crawler</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="drawer-backdrop" id="new-schedule-backdrop" hidden></div>
+  <aside class="drawer" id="new-schedule-drawer" role="dialog" aria-modal="true" aria-labelledby="new-schedule-title" hidden>
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">Guided flow</p>
+        <h2 id="new-schedule-title">New schedule</h2>
+      </div>
+      <button class="btn" type="button" data-close-drawer="new-schedule-drawer">Close</button>
+    </div>
+    <ol class="flow-steps" aria-label="Schedule setup steps">
+      <li>Select target</li>
+      <li>Select cadence</li>
+      <li>Next run preview</li>
+      <li>Advanced cron</li>
+    </ol>
+    <div class="drawer-body">
+      <div class="drawer-note">
+        Use the schedule form on this screen to choose the target job, cadence or Advanced cron expression,
+        overlap policy, and review server-validated next-run behavior.
+      </div>
+      <section class="estimate-panel">
+        <h3>Next run preview</h3>
+        <p id="schedule-next-preview" class="muted">Next run preview updates after cadence selection.</p>
+      </section>
+      <div id="new-schedule-form-mount"></div>
+      <div class="drawer-footer">
+        <button type="button" class="btn" data-close-drawer="new-schedule-drawer">Cancel</button>
+        <button type="button" class="btn btn-primary" data-close-drawer="new-schedule-drawer" onclick="document.getElementById('sched-job').focus()">Continue to schedule form</button>
+      </div>
+    </div>
+  </aside>
 
   <script>
     const IS_CONTROL_PLANE = false;
-    
-    // UI Router
-    if (IS_CONTROL_PLANE) {
-      document.getElementById("brand-title").textContent = "GEDS Crawl Control Plane";
-      document.getElementById("control-tabs").hidden = false;
-      document.getElementById("tab-legacy").style.display = "none";
-      document.getElementById("overview-select-container").hidden = false;
-      document.getElementById("top-progress-section").style.display = "block";
-      document.getElementById("legacy-progress-section").style.display = "none";
-    } else {
-      document.getElementById("top-progress-section").style.display = "none";
-      document.getElementById("legacy-progress-section").style.display = "block";
-    }
 
     const views = {
       orgs: {
@@ -1230,6 +1717,70 @@ DASHBOARD_HTML = """<!doctype html>
     const state = { view: "orgs", offset: 0, total: 0, loading: false, activeTab: "overview" };
     const pagState = { runId: "", offset: 0, limit: 25, total: 0, status: "" };
     const el = id => document.getElementById(id);
+
+    const routes = {
+      "#/operate/overview": {
+        title: "Operate",
+        description: "Live crawler status, attention items, and next actions.",
+        refresh: () => refreshControl()
+      },
+      "#/operate/crawlers": {
+        title: "Crawlers",
+        description: "Start crawler work and monitor active runs.",
+        refresh: () => Promise.all([refreshJobs(), refreshRuns(), refreshEstimates()])
+      },
+      "#/operate/history": {
+        title: "Run History",
+        description: "Review completed, stopped, and failed crawler runs.",
+        refresh: () => refreshRuns()
+      },
+      "#/plan/coverage": {
+        title: "Coverage",
+        description: "Find missing, stale, or overlapping department coverage.",
+        refresh: () => refreshCoverage()
+      },
+      "#/plan/schedules": {
+        title: "Schedules",
+        description: "Keep coverage fresh with recurring crawler work.",
+        refresh: () => refreshSchedules()
+      },
+      "#/explore/snapshot": {
+        title: "Snapshot Data",
+        description: "Inspect active database snapshots, tables, and rows.",
+        refresh: () => Promise.all([refresh(), loadDepartments()])
+      }
+    };
+
+    function currentRoute() {
+      return routes[window.location.hash] ? window.location.hash : "#/operate/overview";
+    }
+
+    function activateRoute(route) {
+      const targetRoute = routes[route] ? route : "#/operate/overview";
+      document.querySelectorAll("[data-workspace]").forEach(panel => {
+        panel.classList.toggle("active", panel.dataset.workspace === targetRoute);
+      });
+      document.querySelectorAll("[data-route]").forEach(button => {
+        button.classList.toggle("active", button.dataset.route === targetRoute);
+      });
+      el("page-title").textContent = routes[targetRoute].title;
+      el("page-description").textContent = routes[targetRoute].description;
+      state.activeTab = targetRoute;
+      document.body.classList.remove("nav-open");
+      const navToggle = el("mobile-nav-toggle");
+      if (navToggle) navToggle.setAttribute("aria-expanded", "false");
+    }
+
+    async function refreshCurrentRoute() {
+      const route = currentRoute();
+      activateRoute(route);
+      await routes[route].refresh();
+    }
+
+    function setLastUpdated() {
+      const node = el("last-updated");
+      if (node) node.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    }
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -1311,6 +1862,7 @@ DASHBOARD_HTML = """<!doctype html>
       // Warn policies
       el("rps-warning-amber").style.display = data.configured_rps > 1.0 ? "block" : "none";
       el("rps-warning-red").style.display = data.configured_rps > 2.0 ? "block" : "none";
+      renderAttentionQueue(data);
     }
 
     // --- Department selection state ---
@@ -1318,6 +1870,10 @@ DASHBOARD_HTML = """<!doctype html>
     let deptSortKey = "age";
     let deptSortAsc = false; // false = descending for age (never crawled first)
     let estimatesData = {};
+    const planState = {
+      coverageFilter: "attention",
+      coverageRows: []
+    };
 
     async function loadControlCatalog() {
       const [depts, cov, est] = await Promise.all([
@@ -1474,6 +2030,7 @@ DASHBOARD_HTML = """<!doctype html>
           const percent = Math.round(compFailed * 100 / total);
           const compPercent = ((run.progress.completed_orgs || 0) / total * 100).toFixed(1);
           const failPercent = ((run.progress.failed_orgs || 0) / total * 100).toFixed(1);
+          const pendingPages = run.pagination_metrics.known_pending_pages ?? run.pagination_metrics["pages_pending"] ?? 0;
           
           return `
             <tr style="cursor: pointer;" onclick="showPaginationOrgsPanel('${run.id}')">
@@ -1502,7 +2059,7 @@ DASHBOARD_HTML = """<!doctype html>
               </td>
               <td>
                 Pages: ${formatNumber(run.pagination_metrics.pages_fetched)}<br>
-                <span class="muted" style="font-size:11px;">Pending: ${formatNumber(run.pagination_metrics.pages_pending)}</span>
+                <span class="muted" style="font-size:11px;">Pending: ${formatNumber(pendingPages)}</span>
               </td>
               <td>
                 PID: ${run.pid || "-"}<br>
@@ -1513,7 +2070,7 @@ DASHBOARD_HTML = """<!doctype html>
                 <small class="muted" style="font-size:11px;">Total: ${formatNumber(run.pagination_metrics.total_people)}</small>
               </td>
               <td>
-                ${run.status === 'running' ? escapeHtml(run.current_org_dn || '-') : (run.eta.finish_time ? 'Finished: ' + run.eta.finish_time : '-')}
+                ${run.status === 'running' ? escapeHtml(run.pagination_metrics.active_org || run.current_org_dn || '-') : (run.eta.finish_time ? 'Finished: ' + run.eta.finish_time : '-')}
               </td>
               <td onclick="event.stopPropagation()">${actionBtn}</td>
             </tr>
@@ -1549,26 +2106,123 @@ DASHBOARD_HTML = """<!doctype html>
         selectEl.innerHTML = optionsHtml;
         selectEl.value = currentVal;
       }
+      renderLiveActivity(runs);
+      renderRunHistory(runs);
+    }
+
+    function renderLiveActivity(runs) {
+      const list = el("live-activity-list");
+      if (!list) return;
+      const active = runs.filter(run => ["running", "starting", "stopping"].includes(run.status));
+      if (!active.length) {
+        list.innerHTML = '<div class="empty">No active crawlers right now.</div>';
+        return;
+      }
+      list.innerHTML = active.map(run => `
+        <div class="activity-item">
+          <strong>${escapeHtml(run.job_name || run.id || "Crawler run")}</strong>
+          <span class="status-label ${escapeHtml(run.status)}">${escapeHtml(run.status)}</span>
+          <span class="muted">RPS ${(run.measured_rps || run.pagination_metrics?.measured_rps || 0).toFixed(2)}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderRunHistory(runs) {
+      const tbody = el("run-history-table-body");
+      if (!tbody) return;
+      if (!runs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No run history yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = runs.map(run => `
+        <tr>
+          <td data-label="Run">${escapeHtml(run.job_name || run.id || "Unmanaged")}</td>
+          <td data-label="Status"><span class="status-label ${escapeHtml(run.status || "info")}">${escapeHtml(run.status || "-")}</span></td>
+          <td data-label="Started">${escapeHtml(run.started_at || "-")}</td>
+          <td data-label="Finished">${escapeHtml(run.finished_at || run.eta?.finish_time || "-")}</td>
+          <td data-label="Progress">${escapeHtml(run.crawl_kind || "crawl")}</td>
+          <td data-label="Action">${run.crawl_kind === "pagination_backfill" ? `<button class="btn" type="button" onclick="showPaginationOrgsPanel('${escapeHtml(run.id)}')">Inspect</button>` : '<span class="muted">-</span>'}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderAttentionQueue(data) {
+      const list = el("attention-list");
+      if (!list) return;
+      const items = [];
+      if ((data.active_workers || 0) === 0) {
+        items.push({ level: "attention", title: "No active crawlers", detail: "Start a crawler if coverage needs to be refreshed." });
+      }
+      if ((data.measured_rps || 0) < (data.configured_rps || 0) * 0.5 && (data.configured_rps || 0) > 0) {
+        items.push({ level: "attention", title: "Measured RPS is low", detail: "Throughput is below half of configured RPS." });
+      }
+      el("nav-attention-count").textContent = String(items.length);
+      if (!items.length) {
+        list.innerHTML = '<div class="empty">No attention items. System looks quiet.</div>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+        <div class="attention-item">
+          <span class="status-label ${item.level}">${item.level}</span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span class="muted">${escapeHtml(item.detail)}</span>
+        </div>
+      `).join("");
     }
 
     async function loadControlCoverage() {
       const cov = await getJson("/api/control/coverage");
       const depts = await getJson("/api/control/catalog");
-      const tbody = el("coverage-table-body");
-      tbody.innerHTML = depts.map(dept => {
+      planState.coverageRows = depts.map(dept => {
         const info = cov[dept.dn] || { status: "unassigned", job_name: null, last_crawled_at: null };
-        const status = info.status;
+        const status = info.status === "covered-current" ? "covered" : (info.status || "missing");
         const jobName = info.job_name || "-";
         const lastCrawled = info.last_crawled_at || "-";
-        return `
+        return {
+          name: dept.name,
+          jobName,
+          lastCrawled,
+          status,
+          source: dept.source_url || ""
+        };
+      });
+      const covered = planState.coverageRows.filter(row => row.status === "covered").length;
+      const missing = planState.coverageRows.filter(row => row.status === "missing" || row.status === "unassigned").length;
+      const overlap = planState.coverageRows.filter(row => row.status === "overlap").length;
+      const stale = planState.coverageRows.filter(row => row.status === "stale").length;
+      setText("plan-covered-count", covered);
+      setText("plan-missing-count", missing);
+      setText("plan-overlap-count", overlap);
+      setText("plan-stale-count", stale);
+      renderCoverageRows(planState.coverageRows);
+    }
+
+    function setText(id, value) {
+      const node = el(id);
+      if (node) node.textContent = String(value);
+    }
+
+    function renderCoverageRows(rows) {
+      const tbody = el("coverage-table-body");
+      if (!tbody) return;
+      const filter = planState.coverageFilter;
+      const filtered = rows.filter(row => {
+        if (filter === "all") return true;
+        if (filter === "attention") return row.status !== "covered";
+        return row.status === filter;
+      });
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No rows match this coverage filter.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtered.map(row => `
           <tr>
-            <td>${escapeHtml(dept.name)}</td>
-            <td>${escapeHtml(jobName)}</td>
-            <td>${escapeHtml(lastCrawled)}</td>
-            <td><span class="badge ${status}">${status}</span></td>
+            <td data-label="Institution Name">${escapeHtml(row.name)}</td>
+            <td data-label="Job Name">${escapeHtml(row.jobName)}</td>
+            <td data-label="Last Crawled">${escapeHtml(row.lastCrawled)}</td>
+            <td data-label="Coverage Status"><span class="status-label ${row.status === "covered" ? "healthy" : "attention"}">${escapeHtml(row.status)}</span></td>
           </tr>
-        `;
-      }).join("");
+        `).join("");
     }
 
     async function loadControlSchedules() {
@@ -1828,6 +2482,33 @@ DASHBOARD_HTML = """<!doctype html>
       loadPaginationOrgs();
     });
 
+    async function refreshJobs() {
+      await loadControlCatalog();
+    }
+
+    async function refreshRuns() {
+      await loadControlRuns();
+      if (pagState.runId) {
+        await loadPaginationOrgs();
+      }
+    }
+
+    async function refreshSchedules() {
+      await loadControlSchedules();
+    }
+
+    async function refreshCoverage() {
+      await loadControlCoverage();
+    }
+
+    async function refreshEstimates() {
+      await loadControlCatalog();
+    }
+
+    async function refresh() {
+      await refreshLegacy();
+    }
+
     async function refreshControl() {
       if (state.loading) return;
       state.loading = true;
@@ -1840,35 +2521,13 @@ DASHBOARD_HTML = """<!doctype html>
         if (pagState.runId) {
           await loadPaginationOrgs();
         }
-        el("last-refresh").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        setLastUpdated();
       } catch (err) {
         console.error(err);
       } finally {
         state.loading = false;
       }
     }
-
-    // Tab switching for Control Plane
-    document.querySelectorAll("#control-tabs .nav-tab").forEach(tab => {
-      tab.addEventListener("click", () => {
-        document.querySelectorAll("#control-tabs .nav-tab").forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        
-        const target = tab.dataset.tab;
-        state.activeTab = target;
-        
-        // Hide all tab contents
-        document.querySelectorAll(".tab-content").forEach(tc => tc.style.display = "none");
-        
-        if (target === "legacy") {
-          el("tab-legacy").style.display = "block";
-          refreshLegacy();
-        } else {
-          el(`tab-${target}`).style.display = "block";
-          refreshControl();
-        }
-      });
-    });
 
     // --- Legacy / Snapshot Data view ---
     async function loadStatus() {
@@ -1986,7 +2645,7 @@ DASHBOARD_HTML = """<!doctype html>
         const data = await getJson(queryUrl());
         renderTable(data);
         el("error-banner").style.display = "none";
-        el("last-refresh").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        setLastUpdated();
       } catch (error) {
         el("error-banner").textContent = error.message;
         el("error-banner").style.display = "block";
@@ -2007,22 +2666,14 @@ DASHBOARD_HTML = """<!doctype html>
     // Attach event listeners for legacy view
     document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => setView(tab.dataset.view)));
     el("refresh").addEventListener("click", () => {
-      if (IS_CONTROL_PLANE && state.activeTab !== "legacy") {
-        refreshControl();
-      } else {
-        refreshLegacy();
-      }
+      refreshCurrentRoute().catch(error => console.error(error));
     });
     
     el("search").addEventListener("input", () => {
       state.offset = 0;
       clearTimeout(window.searchTimer);
       window.searchTimer = setTimeout(() => {
-        if (IS_CONTROL_PLANE && state.activeTab !== "legacy") {
-          // Add search filter for control plane views if needed
-        } else {
-          refreshLegacy();
-        }
+        if (currentRoute() === "#/explore/snapshot") refreshLegacy();
       }, 250);
     });
     
@@ -2040,14 +2691,92 @@ DASHBOARD_HTML = """<!doctype html>
       refreshLegacy();
     });
 
+    let lastFocusedElement = null;
+
+    function openDrawer(drawerId) {
+      const drawer = el(drawerId);
+      const backdrop = el(drawerId.replace("-drawer", "-backdrop"));
+      if (!drawer) return;
+      lastFocusedElement = document.activeElement;
+      drawer.hidden = false;
+      if (backdrop) backdrop.hidden = false;
+      const firstInput = drawer.querySelector("button, input, select, textarea");
+      if (firstInput) firstInput.focus();
+    }
+
+    function closeDrawer(drawerId) {
+      const drawer = el(drawerId);
+      const backdrop = el(drawerId.replace("-drawer", "-backdrop"));
+      if (!drawer) return;
+      drawer.hidden = true;
+      if (backdrop) backdrop.hidden = true;
+      if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+        lastFocusedElement.focus();
+      }
+    }
+
+    if (el("open-start-crawler")) {
+      el("open-start-crawler").addEventListener("click", () => openDrawer("start-crawler-drawer"));
+    }
+    if (el("open-new-schedule")) {
+      el("open-new-schedule").addEventListener("click", () => openDrawer("new-schedule-drawer"));
+    }
+    document.querySelectorAll("[data-close-drawer]").forEach(button => {
+      button.addEventListener("click", () => closeDrawer(button.dataset.closeDrawer));
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        document.querySelectorAll(".drawer:not([hidden])").forEach(drawer => closeDrawer(drawer.id));
+      }
+    });
+    const crawlerCreateSection = el("crawler-create-section");
+    const crawlerFormMount = el("start-crawler-form-mount");
+    if (crawlerCreateSection && crawlerFormMount) {
+      crawlerFormMount.appendChild(crawlerCreateSection);
+    }
+    const scheduleCreateSection = el("schedule-create-section");
+    const scheduleFormMount = el("new-schedule-form-mount");
+    if (scheduleCreateSection && scheduleFormMount) {
+      scheduleFormMount.appendChild(scheduleCreateSection);
+    }
+    document.querySelectorAll("[data-coverage-filter]").forEach(button => {
+      button.addEventListener("click", () => {
+        planState.coverageFilter = button.dataset.coverageFilter;
+        document.querySelectorAll("[data-coverage-filter]").forEach(chip => {
+          chip.classList.toggle("active", chip.dataset.coverageFilter === planState.coverageFilter);
+        });
+        renderCoverageRows(planState.coverageRows);
+      });
+    });
+    function updateSchedulePreview() {
+      const cron = el("sched-cron") ? el("sched-cron").value : "";
+      const preview = el("schedule-next-preview");
+      if (preview) preview.textContent = `Next run preview: ${cron || "server default"} in America/Toronto. Server validates the cron expression when saved.`;
+    }
+    if (el("sched-cron")) {
+      el("sched-cron").addEventListener("input", updateSchedulePreview);
+      updateSchedulePreview();
+    }
+
+    document.querySelectorAll("[data-route]").forEach(button => {
+      button.addEventListener("click", () => {
+        window.location.hash = button.dataset.route;
+      });
+    });
+    window.addEventListener("hashchange", () => {
+      refreshCurrentRoute().catch(error => console.error(error));
+    });
+    if (el("mobile-nav-toggle")) {
+      el("mobile-nav-toggle").addEventListener("click", () => {
+        const open = !document.body.classList.contains("nav-open");
+        document.body.classList.toggle("nav-open", open);
+        el("mobile-nav-toggle").setAttribute("aria-expanded", String(open));
+      });
+    }
+
     // Auto-refresh loop
     function autoRefresh() {
-      if (IS_CONTROL_PLANE && state.activeTab !== "legacy") {
-        refreshControl();
-        loadStatus();
-      } else {
-        refreshLegacy();
-      }
+      refreshCurrentRoute().catch(error => console.error(error));
     }
     
     autoRefresh();
