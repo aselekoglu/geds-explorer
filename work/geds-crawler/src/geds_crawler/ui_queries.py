@@ -25,11 +25,11 @@ class SnapshotReader:
 
     def _people_source_sql(self) -> str:
         parts = [
-            "SELECT 0 AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen FROM base.people_index"
+            "SELECT 0 AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen, org_dn, department_dn FROM base.people_index"
         ]
         for idx in range(len(self.overlay_db_paths)):
             parts.append(
-                f"SELECT {idx + 1} AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen FROM overlay_{idx}.people_index"
+                f"SELECT {idx + 1} AS precedence, display_name, title, department_name, org_unit, org_path, source_url, last_seen, org_dn, department_dn FROM overlay_{idx}.people_index"
             )
         union_sql = "\n  UNION ALL\n  ".join(parts)
         
@@ -38,13 +38,13 @@ class SnapshotReader:
           {union_sql}
         ),
         ranked AS (
-          SELECT display_name, title, department_name, org_unit, org_path, source_url, last_seen,
+          SELECT display_name, title, department_name, org_unit, org_path, source_url, last_seen, org_dn, department_dn,
                  ROW_NUMBER() OVER (
                    PARTITION BY source_url ORDER BY precedence DESC, last_seen DESC
                  ) AS rn
           FROM all_people
         )
-        SELECT display_name, title, department_name, org_unit, org_path, source_url
+        SELECT display_name, title, department_name, org_unit, org_path, source_url, org_dn, department_dn
         FROM ranked
         WHERE rn = 1
         """
@@ -190,7 +190,7 @@ class SnapshotReader:
                 ).fetchone()[0]
             )
             rows = con.execute(
-                f"SELECT * FROM ({source_sql}){where} ORDER BY display_name COLLATE NOCASE, org_path COLLATE NOCASE LIMIT ? OFFSET ?",
+                f"SELECT display_name, title, department_name, org_unit, org_path, source_url FROM ({source_sql}){where} ORDER BY display_name COLLATE NOCASE, org_path COLLATE NOCASE LIMIT ? OFFSET ?",
                 [*params, bounded_limit, bounded_offset],
             ).fetchall()
 

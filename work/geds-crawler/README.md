@@ -92,3 +92,27 @@ py -m geds_crawler.cli crawl `
 - `crawl_report.md`
 
 The crawler does not store phone, email, fax, or address fields. Person rows keep only display name, title when visible, department, org context, official GEDS source URL, and crawl metadata.
+
+## Pagination Backfill Operator Workflow
+
+Follow this workflow to perform a pagination backfill for capped organizations (those showing exactly 25 people in the base snapshot):
+
+1. **Initialize/Upgrade Control Schema**: Ensure the control plane database has all migrations applied.
+2. **Create Backfill Job**: Set up a `pagination_backfill` job targeting the finished base snapshot database (e.g. `outputs/geds-snapshot-2026-07-08/geds.sqlite`) through the UI or API.
+3. **Run Bounded Live Verification**: Before launching the production run, verify the setup with a 2-organization test:
+   - Start the run in the UI.
+   - Wait until at least one continuation page has been crawled, then click **Stop** in the UI to pause.
+   - Click **Resume** to ensure continuation works and the crawl completes.
+   - Run the verifier script to validate integrity:
+     ```powershell
+     py scripts/verify_pagination_backfill.py `
+       --base-db outputs/geds-snapshot-2026-07-08/geds.sqlite `
+       --overlay-db outputs/runs/2026-07-09/two-org-backfill/geds.sqlite `
+       --expected-org-dn "OU=FIRST-CAPPED-ORG,O=GC,C=CA" `
+       --expected-org-dn "OU=SECOND-CAPPED-ORG,O=GC,C=CA"
+     ```
+   - Review that `base_unchanged` is `true`, no contact columns exist, and the UI progress bar and ETA calculations behave stably.
+4. **Create Production Job**: Once verified, create the full 1,418 capped organization production backfill.
+
+> [!NOTE]
+> GEDS and TBS employee totals represent different populations and are not expected to be identical. Do not attempt to force them to match.
