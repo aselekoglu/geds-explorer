@@ -928,6 +928,70 @@ DASHBOARD_HTML = """<!doctype html>
     .status-label.failed, .status-label.blocked { color: #fca5a5; background: var(--danger-soft); }
     .status-label.info, .status-label.scheduled { color: #93c5fd; background: var(--info-soft); }
     .icon-button { display: none; }
+    .workspace-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .section-title { margin: 0; font-size: 22px; }
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.52);
+      z-index: 50;
+    }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(760px, 100vw);
+      height: 100vh;
+      overflow: auto;
+      background: var(--surface);
+      border-left: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      z-index: 60;
+      padding: 22px;
+    }
+    .drawer-header, .drawer-footer {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .drawer-body { display: grid; gap: 18px; margin-top: 18px; }
+    .drawer-footer {
+      position: sticky;
+      bottom: 0;
+      justify-content: flex-end;
+      padding-top: 18px;
+      background: linear-gradient(180deg, rgba(17, 28, 45, 0), var(--surface) 28%);
+    }
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 0;
+      margin: 18px 0;
+      list-style: none;
+    }
+    .flow-steps li {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    .drawer-note {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(8, 17, 31, 0.5);
+      color: var(--muted);
+    }
 
     @media (max-width: 760px) {
       .app-shell { grid-template-columns: 1fr; }
@@ -1163,6 +1227,13 @@ DASHBOARD_HTML = """<!doctype html>
       </section>
 
       <section class="workspace-panel" id="workspace-operate-crawlers" data-workspace="#/operate/crawlers">
+        <div class="workspace-header-row">
+          <div>
+            <h2 class="section-title">Crawlers</h2>
+            <p class="panel-subtitle">Monitor active runs and start focused crawler work.</p>
+          </div>
+          <button id="open-start-crawler" class="btn btn-primary" type="button">Start crawler</button>
+        </div>
 
     <!-- CRAWLERS TAB -->
     <div class="tab-content" id="tab-crawlers">
@@ -1340,6 +1411,13 @@ DASHBOARD_HTML = """<!doctype html>
       </section>
 
       <section class="workspace-panel" id="workspace-plan-schedules" data-workspace="#/plan/schedules">
+        <div class="workspace-header-row">
+          <div>
+            <h2 class="section-title">Schedules</h2>
+            <p class="panel-subtitle">Recurring crawler work with next-run context.</p>
+          </div>
+          <button id="open-new-schedule" class="btn btn-primary" type="button">New schedule</button>
+        </div>
 
     <!-- SCHEDULES TAB -->
     <div class="tab-content" id="tab-schedules">
@@ -1452,6 +1530,60 @@ DASHBOARD_HTML = """<!doctype html>
       </section>
     </main>
   </div>
+
+  <div class="drawer-backdrop" id="start-crawler-backdrop" hidden></div>
+  <aside class="drawer" id="start-crawler-drawer" role="dialog" aria-modal="true" aria-labelledby="start-crawler-title" hidden>
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">Guided flow</p>
+        <h2 id="start-crawler-title">Start crawler</h2>
+      </div>
+      <button class="btn" type="button" data-close-drawer="start-crawler-drawer">Close</button>
+    </div>
+    <ol class="flow-steps" aria-label="Crawler setup steps">
+      <li>Select target</li>
+      <li>Review estimate</li>
+      <li>Configure options</li>
+      <li>Confirm start</li>
+    </ol>
+    <div class="drawer-body">
+      <div class="drawer-note">
+        The crawler form is preserved on this screen while the guided drawer shell is introduced.
+        Select departments, review the estimate, configure options, then confirm start from the crawler form.
+      </div>
+      <div class="drawer-footer">
+        <button type="button" class="btn" data-close-drawer="start-crawler-drawer">Cancel</button>
+        <button type="button" class="btn btn-primary" data-close-drawer="start-crawler-drawer" onclick="document.getElementById('job-name').focus()">Continue to crawler form</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="drawer-backdrop" id="new-schedule-backdrop" hidden></div>
+  <aside class="drawer" id="new-schedule-drawer" role="dialog" aria-modal="true" aria-labelledby="new-schedule-title" hidden>
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">Guided flow</p>
+        <h2 id="new-schedule-title">New schedule</h2>
+      </div>
+      <button class="btn" type="button" data-close-drawer="new-schedule-drawer">Close</button>
+    </div>
+    <ol class="flow-steps" aria-label="Schedule setup steps">
+      <li>Select target</li>
+      <li>Select cadence</li>
+      <li>Next run preview</li>
+      <li>Advanced cron</li>
+    </ol>
+    <div class="drawer-body">
+      <div class="drawer-note">
+        Use the schedule form on this screen to choose the target job, cadence or Advanced cron expression,
+        overlap policy, and review server-validated next-run behavior.
+      </div>
+      <div class="drawer-footer">
+        <button type="button" class="btn" data-close-drawer="new-schedule-drawer">Cancel</button>
+        <button type="button" class="btn btn-primary" data-close-drawer="new-schedule-drawer" onclick="document.getElementById('sched-job').focus()">Continue to schedule form</button>
+      </div>
+    </div>
+  </aside>
 
   <script>
     const IS_CONTROL_PLANE = false;
@@ -2381,6 +2513,45 @@ DASHBOARD_HTML = """<!doctype html>
     el("next").addEventListener("click", () => {
       state.offset += Number(el("page-size").value);
       refreshLegacy();
+    });
+
+    let lastFocusedElement = null;
+
+    function openDrawer(drawerId) {
+      const drawer = el(drawerId);
+      const backdrop = el(drawerId.replace("-drawer", "-backdrop"));
+      if (!drawer) return;
+      lastFocusedElement = document.activeElement;
+      drawer.hidden = false;
+      if (backdrop) backdrop.hidden = false;
+      const firstInput = drawer.querySelector("button, input, select, textarea");
+      if (firstInput) firstInput.focus();
+    }
+
+    function closeDrawer(drawerId) {
+      const drawer = el(drawerId);
+      const backdrop = el(drawerId.replace("-drawer", "-backdrop"));
+      if (!drawer) return;
+      drawer.hidden = true;
+      if (backdrop) backdrop.hidden = true;
+      if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+        lastFocusedElement.focus();
+      }
+    }
+
+    if (el("open-start-crawler")) {
+      el("open-start-crawler").addEventListener("click", () => openDrawer("start-crawler-drawer"));
+    }
+    if (el("open-new-schedule")) {
+      el("open-new-schedule").addEventListener("click", () => openDrawer("new-schedule-drawer"));
+    }
+    document.querySelectorAll("[data-close-drawer]").forEach(button => {
+      button.addEventListener("click", () => closeDrawer(button.dataset.closeDrawer));
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        document.querySelectorAll(".drawer:not([hidden])").forEach(drawer => closeDrawer(drawer.id));
+      }
     });
 
     // Auto-refresh loop
