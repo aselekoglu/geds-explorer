@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from .models import Department, OrgUnit, PersonIndex, QueueItem
+from .models import Department, OrgUnit, PersonIndex, QueueItem, PaginationTarget, PeoplePageItem
 
 
 class SnapshotStore:
@@ -104,6 +104,44 @@ class SnapshotStore:
               created_at TEXT NOT NULL,
               crawl_run_id TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS pagination_orgs (
+              org_dn TEXT PRIMARY KEY,
+              department_dn TEXT NOT NULL,
+              department_name TEXT NOT NULL,
+              org_name TEXT NOT NULL,
+              org_path TEXT NOT NULL,
+              source_url TEXT NOT NULL,
+              base_db_path TEXT NOT NULL,
+              base_people_count INTEGER NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              pages_fetched INTEGER NOT NULL DEFAULT 0,
+              people_observed INTEGER NOT NULL DEFAULT 0,
+              people_inserted INTEGER NOT NULL DEFAULT 0,
+              people_deduped INTEGER NOT NULL DEFAULT 0,
+              last_page_url TEXT,
+              started_at TEXT,
+              heartbeat_at TEXT,
+              finished_at TEXT,
+              terminal_reason TEXT,
+              last_error TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS people_page_queue (
+              page_url TEXT PRIMARY KEY,
+              org_dn TEXT NOT NULL,
+              page_index INTEGER NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              attempts INTEGER NOT NULL DEFAULT 0,
+              discovered_from TEXT,
+              last_error TEXT,
+              first_seen TEXT NOT NULL,
+              completed_at TEXT,
+              FOREIGN KEY (org_dn) REFERENCES pagination_orgs(org_dn)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_people_page_queue_status ON people_page_queue (status, org_dn, page_index);
+            CREATE INDEX IF NOT EXISTS idx_pagination_orgs_status ON pagination_orgs (status);
             """
         )
         self.db.commit()
@@ -282,6 +320,219 @@ class SnapshotStore:
         return {
             row["status"]: int(row["count"])
             for row in self.db.execute("SELECT status, COUNT(*) AS count FROM crawl_queue GROUP BY status")
+        }
+
+    def seed_pagination_target(self, target: PaginationTarget, seen_at: str) -> None:
+        self.db.execute(
+            """
+            INSERT INTO pagination_orgs (
+                org_dn, department_dn, department_name, org_name, org_path, source_url,
+                base_db_path, base_people_count, status, started_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            ON CONFLICT(org_dn) DO NOTHING
+            """,
+            (
+                target.org.dn,
+                target.org.department_dn,
+                target.department_name,
+                target.org.name,
+                target.org.org_path,
+                target.org.source_url,
+                target.base_db_path,
+                target.base_people_count,
+                seen_at,
+            ),
+        )
+
+    def enqueue_people_page(self, org_dn: str, page_url: str, page_index: int, discovered_from: str | None, seen_at: str) -> None:
+        self.db.execute(
+            """
+            INSERT INTO people_page_queue (
+                page_url, org_dn, page_index, status, discovered_from, first_seen
+            )
+            VALUES (?, ?, ?, 'pending', ?, ?)
+            ON CONFLICT(page_url) DO NOTHING
+            """,
+            (page_url, org_dn, page_index, discovered_from, seen_at),
+        )
+
+    def next_pending_people_page(self, org_dn: str | None = None) -> PeoplePageItem | None:
+        if org_dn:
+            row = self.db.execute(
+                """
+                SELECT org_dn, page_url, page_index
+                FROM people_page_queue
+                WHERE status = 'pending' AND org_dn = ?
+                ORDER BY page_index ASC
+                LIMIT 1
+                """,
+                (org_dn,),
+            ).fetchone()
+        else:
+            row = self.db.execute(
+                """
+                SELECT org_dn, page_url, page_index
+                FROM people_page_queue
+                WHERE status = 'pending'
+                ORDER BY org_dn, page_index ASC
+                LIMIT 1
+                """
+            ).fetchone()
+
+        if row is None:
+            return None
+        return PeoplePageItem(
+            org_dn=row["org_dn"],
+            page_url=row["page_url"],
+            page_index=row["page_index"],
+        )
+
+    def complete_people_page(
+        self,
+        page_url: str,
+        next_url: str | None,
+        people_observed: int,
+        people_inserted: int,
+        people_deduped: int,
+        completed_at: str,
+    ) -> None:
+        row = self.db.execute(
+            "SELECT org_dn, page_index, status FROM people_page_queue WHERE page_url = ?",
+            (page_url,),
+        ).fetchone()
+        if not row:
+            return
+
+        if row["status"] != "pending":
+            return
+
+        org_dn = row["org_dn"]
+        page_index = row["page_index"]
+
+        self.db.execute(
+            """
+            UPDATE people_page_queue
+            SET status = 'done', completed_at = ?
+            WHERE page_url = ?
+            """,
+            (completed_at, page_url),
+        )
+
+        if next_url:
+            self.enqueue_people_page(
+                org_dn=org_dn,
+                page_url=next_url,
+                page_index=page_index + 1,
+                discovered_from=page_url,
+                seen_at=completed_at,
+            )
+
+        self.db.execute(
+            """
+            UPDATE pagination_orgs
+            SET pages_fetched = pages_fetched + 1,
+                people_observed = people_observed + ?,
+                people_inserted = people_inserted + ?,
+                people_deduped = people_deduped + ?,
+                last_page_url = ?,
+                heartbeat_at = ?,
+                status = 'running'
+            WHERE org_dn = ?
+            """,
+            (
+                people_observed,
+                people_inserted,
+                people_deduped,
+                page_url,
+                completed_at,
+                org_dn,
+            ),
+        )
+
+    def mark_pagination_org_success(self, org_dn: str, reason: str, finished_at: str) -> None:
+        self.db.execute(
+            """
+            UPDATE pagination_orgs
+            SET status = 'finished',
+                terminal_reason = ?,
+                finished_at = ?,
+                heartbeat_at = ?
+            WHERE org_dn = ?
+            """,
+            (reason, finished_at, finished_at, org_dn),
+        )
+
+    def mark_pagination_org_error(self, org_dn: str, error: str, finished_at: str) -> None:
+        self.db.execute(
+            """
+            UPDATE pagination_orgs
+            SET status = 'failed',
+                last_error = ?,
+                finished_at = ?,
+                heartbeat_at = ?
+            WHERE org_dn = ?
+            """,
+            (error, finished_at, finished_at, org_dn),
+        )
+
+    def pagination_progress(self) -> dict[str, int | float]:
+        row = self.db.execute(
+            """
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'finished' THEN 1 ELSE 0 END) as finished,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+            FROM pagination_orgs
+            """
+        ).fetchone()
+
+        total = row["total"] or 0
+        finished = row["finished"] or 0
+        failed = row["failed"] or 0
+        terminal = finished + failed
+        percent = (terminal / total * 100.0) if total > 0 else 0.0
+
+        return {
+            "total_orgs": total,
+            "completed_orgs": finished,
+            "failed_orgs": failed,
+            "terminal_orgs": terminal,
+            "percent": percent,
+        }
+
+    def pagination_metrics(self) -> dict[str, int]:
+        row_orgs = self.db.execute(
+            """
+            SELECT
+                COALESCE(SUM(pages_fetched), 0) as pages_fetched,
+                COALESCE(SUM(people_inserted), 0) as people_inserted,
+                COALESCE(SUM(people_deduped), 0) as people_deduped
+            FROM pagination_orgs
+            """
+        ).fetchone()
+
+        row_pending = self.db.execute(
+            "SELECT COUNT(*) FROM people_page_queue WHERE status = 'pending'"
+        ).fetchone()
+
+        active_row = self.db.execute(
+            """
+            SELECT org_dn
+            FROM pagination_orgs
+            WHERE status = 'running'
+            ORDER BY heartbeat_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        active_org = active_row["org_dn"] if active_row else None
+
+        return {
+            "pages_fetched": row_orgs["pages_fetched"],
+            "known_pending_pages": row_pending[0],
+            "new_people": row_orgs["people_inserted"],
+            "deduped_people": row_orgs["people_deduped"],
+            "active_org": active_org,
         }
 
     def commit(self) -> None:

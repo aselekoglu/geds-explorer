@@ -51,3 +51,18 @@ class CrawlError:
 class QueueItem:
     org: OrgUnit
     department_name: str
+
+
+@dataclass(frozen=True)
+class PaginationTarget:
+    org: OrgUnit
+    department_name: str
+    base_db_path: str
+    base_people_count: int
+
+
+@dataclass(frozen=True)
+class PeoplePageItem:
+    org_dn: str
+    page_url: str
+    page_index: int
