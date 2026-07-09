@@ -51,9 +51,17 @@ class SnapshotReader:
 
     def status(self) -> dict[str, Any]:
         with self._connect() as con:
-            run = con.execute(
-                "SELECT request_count, status FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
-            ).fetchone()
+            crawl_kind = "full"
+            try:
+                run = con.execute(
+                    "SELECT request_count, status, crawl_kind FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
+                if run:
+                    crawl_kind = run["crawl_kind"] or "full"
+            except sqlite3.OperationalError:
+                run = con.execute(
+                    "SELECT request_count, status FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
             
             # Read status/request_count from latest overlay if present
             if self.overlay_db_paths:
@@ -62,10 +70,12 @@ class SnapshotReader:
                     with sqlite3.connect(f"file:{self.overlay_db_paths[-1].as_posix()}?mode=ro", uri=True) as o_con:
                         o_con.row_factory = sqlite3.Row
                         o_run = o_con.execute(
-                            "SELECT request_count, status FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                            "SELECT request_count, status, crawl_kind FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
                         ).fetchone()
                         if o_run:
                             run = o_run
+                            if "crawl_kind" in o_run.keys():
+                                crawl_kind = o_run["crawl_kind"] or "full"
                 except Exception:
                     pass
 
@@ -75,8 +85,28 @@ class SnapshotReader:
                     "SELECT status, COUNT(*) AS count FROM crawl_queue GROUP BY status"
                 )
             }
-            # Also overlay queue status counts if present
-            if self.overlay_db_paths:
+
+            if crawl_kind == "pagination_backfill" and self.overlay_db_paths:
+                try:
+                    with sqlite3.connect(f"file:{self.overlay_db_paths[-1].as_posix()}?mode=ro", uri=True) as o_con:
+                        o_con.row_factory = sqlite3.Row
+                        o_queue = {"done": 0, "pending": 0, "error": 0}
+                        rows = o_con.execute(
+                            "SELECT status, COUNT(*) AS count FROM pagination_orgs GROUP BY status"
+                        ).fetchall()
+                        for row in rows:
+                            status_val = row["status"]
+                            count_val = int(row["count"])
+                            if status_val == "completed":
+                                o_queue["done"] += count_val
+                            elif status_val == "failed":
+                                o_queue["error"] += count_val
+                            else:
+                                o_queue["pending"] += count_val
+                        queue = o_queue
+                except Exception:
+                    pass
+            elif self.overlay_db_paths:
                 try:
                     with sqlite3.connect(f"file:{self.overlay_db_paths[-1].as_posix()}?mode=ro", uri=True) as o_con:
                         o_con.row_factory = sqlite3.Row
@@ -104,13 +134,21 @@ class SnapshotReader:
             else:
                 people_count = self._count(con, "people_index")
 
+            errors = self._count(con, "crawl_errors")
+            if self.overlay_db_paths:
+                try:
+                    with sqlite3.connect(f"file:{self.overlay_db_paths[-1].as_posix()}?mode=ro", uri=True) as o_con:
+                        errors = int(o_con.execute("SELECT COUNT(*) FROM crawl_errors").fetchone()[0])
+                except Exception:
+                    pass
+
             return {
                 "run_status": str(run["status"]) if run else None,
                 "request_count": int(run["request_count"]) if run else 0,
                 "departments": self._count(con, "departments"),
                 "org_units": self._count(con, "org_units"),
                 "people": people_count,
-                "errors": self._count(con, "crawl_errors"),
+                "errors": errors,
                 "queue": queue,
                 "completion_percent": completion,
             }

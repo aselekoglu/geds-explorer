@@ -547,6 +547,9 @@ def create_server(
                     "errors": 0,
                     "queue": {"done": 0, "pending": 0, "error": 0},
                     "completion_percent": 0.0,
+                    "crawl_kind": "full",
+                    "eta": None,
+                    "measured_rps": None,
                 }
                 has_active = False
                 total_done = 0
@@ -555,7 +558,7 @@ def create_server(
                 
                 for db in snap_dbs:
                     try:
-                        rdr = SnapshotReader(db)
+                        rdr = SnapshotReader(db, self.overlay_db_paths)
                         s = rdr.status()
                         aggregated["request_count"] += s["request_count"]
                         aggregated["departments"] += s["departments"]
@@ -583,6 +586,42 @@ def create_server(
                 total_queue = total_done + total_pending + total_failed
                 if total_queue > 0:
                     aggregated["completion_percent"] = round((total_done + total_failed) * 100 / total_queue, 1)
+
+                if is_control_plane and selected_run_id and selected_run_id not in ("all", "unmanaged"):
+                    try:
+                        from .control_queries import ControlQueries
+                        queries = ControlQueries(db_path)
+                        with sqlite3.connect(db_path) as conn:
+                            conn.row_factory = sqlite3.Row
+                            run_row = conn.execute(
+                                "SELECT id, job_id, output_dir, crawl_kind, source_db_path, started_at, status FROM crawl_runs WHERE id = ?",
+                                (selected_run_id,)
+                            ).fetchone()
+                            if run_row:
+                                rate_limit = 1.0
+                                job_row = conn.execute("SELECT rate_limit_seconds FROM crawl_jobs WHERE id = ?", (run_row["job_id"],)).fetchone()
+                                if job_row:
+                                    rate_limit = job_row["rate_limit_seconds"]
+
+                                enriched = queries.enrich_run(dict(run_row), rate_limit)
+                                aggregated["crawl_kind"] = enriched.get("crawl_kind", "full")
+                                aggregated["eta"] = enriched.get("eta")
+                                aggregated["measured_rps"] = enriched.get("measured_rps")
+
+                                if enriched.get("crawl_kind") == "pagination_backfill":
+                                    prog = enriched.get("progress", {})
+                                    aggregated["completion_percent"] = prog.get("percent", 0.0)
+                                    aggregated["queue"]["done"] = prog.get("completed_orgs", 0)
+                                    aggregated["queue"]["pending"] = prog.get("total_orgs", 0) - prog.get("terminal_orgs", 0)
+                                    aggregated["queue"]["error"] = prog.get("failed_orgs", 0)
+
+                                    pag_m = enriched.get("pagination_metrics", {})
+                                    aggregated["request_count"] = pag_m.get("pages_fetched", 0)
+                                    aggregated["people"] = pag_m.get("new_people", 0)
+                                    # Use total failures/errors in backfill as errors count
+                                    aggregated["errors"] = prog.get("failed_orgs", 0)
+                    except Exception:
+                        pass
                 
                 return aggregated
 
@@ -833,6 +872,31 @@ DASHBOARD_HTML = """<!doctype html>
       <select id="overview-job-select" style="width: auto; min-width: 220px; height: 36px;"></select>
     </div>
 
+    <!-- Top progress and estimation section -->
+    <div id="top-progress-section" style="display:none; margin-bottom: 18px; padding: 12px 16px; background: white; border: 1px solid #e1e8ed; border-radius: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span id="top-progress-text" style="font-weight: 600; font-size: 13px; color: var(--dark);">Crawl Progress</span>
+        <span id="top-progress-label" style="font-weight: 600; font-size: 13px; color: var(--muted);">0% complete</span>
+      </div>
+      <div class="progress" style="margin: 0 0 10px 0;"><div id="top-progress-bar" style="width: 0%;"></div></div>
+
+      <!-- Top Estimation Metadata (ETA & RPS) -->
+      <div id="top-estimation-meta" style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; border-top: 1px solid #f0f4f8; padding-top: 8px;">
+        <div style="flex: 1; min-width: 140px;">
+          <span style="color: var(--muted); text-transform: uppercase; font-size: 10px; font-weight: bold;">Estimated Finish (ETA)</span>
+          <span id="top-eta-val" style="display: block; font-weight: 600; margin-top: 2px;">Calculating ETA</span>
+        </div>
+        <div style="flex: 1; min-width: 100px;">
+          <span style="color: var(--muted); text-transform: uppercase; font-size: 10px; font-weight: bold;">Measured Rate</span>
+          <span id="top-rps-val" style="display: block; font-weight: 600; margin-top: 2px;">-</span>
+        </div>
+        <div style="flex: 1; min-width: 160px;">
+          <span style="color: var(--muted); text-transform: uppercase; font-size: 10px; font-weight: bold;">Crawl Kind</span>
+          <span id="top-kind-val" style="display: block; font-weight: 600; margin-top: 2px; text-transform: capitalize;">Full crawl</span>
+        </div>
+      </div>
+    </div>
+
     <section class="metrics" id="legacy-metrics-section">
       <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
       <div class="metric"><span class="metric-label">Departments</span><strong id="m-departments" class="metric-value">-</strong></div>
@@ -843,7 +907,7 @@ DASHBOARD_HTML = """<!doctype html>
       <div class="metric"><span class="metric-label">Queue errors</span><strong id="m-qerrors" class="metric-value">-</strong></div>
       <div class="metric"><span class="metric-label">Crawl errors</span><strong id="m-errors" class="metric-value">-</strong></div>
     </section>
-    <div class="progress-wrap" id="legacy-progress-section">
+    <div class="progress-wrap" id="legacy-progress-section" style="display:none;">
       <div class="progress" aria-label="Queue completion"><div id="progress-bar"></div></div>
       <span id="progress-label" class="progress-label">0%</span>
     </div>
@@ -1129,6 +1193,11 @@ DASHBOARD_HTML = """<!doctype html>
       document.getElementById("control-tabs").hidden = false;
       document.getElementById("tab-legacy").style.display = "none";
       document.getElementById("overview-select-container").hidden = false;
+      document.getElementById("top-progress-section").style.display = "block";
+      document.getElementById("legacy-progress-section").style.display = "none";
+    } else {
+      document.getElementById("top-progress-section").style.display = "none";
+      document.getElementById("legacy-progress-section").style.display = "block";
     }
 
     const views = {
@@ -1815,8 +1884,41 @@ DASHBOARD_HTML = """<!doctype html>
       el("m-pending").textContent = formatNumber(data.queue.pending);
       el("m-qerrors").textContent = formatNumber(data.queue.error);
       el("m-errors").textContent = formatNumber(data.errors);
+
+      // Update legacy elements for backward compatibility
       el("progress-bar").style.width = `${data.completion_percent}%`;
       el("progress-label").textContent = `${data.completion_percent}% complete`;
+
+      // Update new top progress bar and label
+      const pct = data.completion_percent || 0.0;
+      el("top-progress-bar").style.width = `${pct}%`;
+      el("top-progress-label").textContent = `${pct}% complete`;
+
+      const doneVal = data.queue.done || 0;
+      const pendingVal = data.queue.pending || 0;
+      const errorVal = data.queue.error || 0;
+      const totalVal = doneVal + pendingVal + errorVal;
+
+      if (data.crawl_kind === "pagination_backfill") {
+        el("top-progress-text").textContent = `Backfill Progress: ${formatNumber(doneVal + errorVal)} / ${formatNumber(totalVal)} orgs`;
+      } else {
+        el("top-progress-text").textContent = `Crawl Progress: ${formatNumber(doneVal + errorVal)} / ${formatNumber(totalVal)} pages`;
+      }
+
+      // Update top estimation metadata
+      el("top-kind-val").textContent = data.crawl_kind === "pagination_backfill" ? "Pagination Backfill" : "Full crawl";
+
+      if (data.measured_rps != null) {
+        el("top-rps-val").textContent = `${data.measured_rps.toFixed(2)} RPS`;
+      } else {
+        el("top-rps-val").textContent = "-";
+      }
+
+      if (data.eta) {
+        el("top-eta-val").textContent = formatRunEta(data.eta);
+      } else {
+        el("top-eta-val").textContent = "Calculating ETA";
+      }
     }
 
     async function loadDepartments() {

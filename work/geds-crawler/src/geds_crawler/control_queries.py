@@ -34,6 +34,7 @@ class ControlQueries:
                 total_orgs = row[0] if row else 0
 
         enriched["progress"] = calculate_progress(total_orgs, 0, 0)
+        enriched["measured_rps"] = None
         enriched["pagination_metrics"] = {
             "pages_fetched": 0,
             "known_pending_pages": 0,
@@ -153,6 +154,7 @@ class ControlQueries:
             "basis": eta_est.basis,
             "estimated_finish_at": eta_est.estimated_finish_at,
         }
+        enriched["measured_rps"] = measured_rps
         
         return enriched
 
