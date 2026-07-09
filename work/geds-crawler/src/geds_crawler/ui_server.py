@@ -1789,6 +1789,7 @@ DASHBOARD_HTML = """<!doctype html>
           const percent = Math.round(compFailed * 100 / total);
           const compPercent = ((run.progress.completed_orgs || 0) / total * 100).toFixed(1);
           const failPercent = ((run.progress.failed_orgs || 0) / total * 100).toFixed(1);
+          const pendingPages = run.pagination_metrics.known_pending_pages ?? run.pagination_metrics["pages_pending"] ?? 0;
           
           return `
             <tr style="cursor: pointer;" onclick="showPaginationOrgsPanel('${run.id}')">
@@ -1817,7 +1818,7 @@ DASHBOARD_HTML = """<!doctype html>
               </td>
               <td>
                 Pages: ${formatNumber(run.pagination_metrics.pages_fetched)}<br>
-                <span class="muted" style="font-size:11px;">Pending: ${formatNumber(run.pagination_metrics.known_pending_pages)}</span>
+                <span class="muted" style="font-size:11px;">Pending: ${formatNumber(pendingPages)}</span>
               </td>
               <td>
                 PID: ${run.pid || "-"}<br>
