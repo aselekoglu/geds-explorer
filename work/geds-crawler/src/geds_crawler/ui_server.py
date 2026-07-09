@@ -661,8 +661,6 @@ def _integer(query: dict[str, list[str]], name: str, default: int) -> int:
         return int(value)
     except ValueError as exc:
         raise ValueError(f"{name} must be an integer") from exc
-
-
 DASHBOARD_HTML = """<!doctype html>
 <html lang="en">
 <head>
@@ -787,7 +785,7 @@ DASHBOARD_HTML = """<!doctype html>
     .muted { color: var(--muted); }
     
     .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 650; }
-    .badge.done, .badge.running, .badge.covered-current { color: #176b4d; background: var(--accent-soft); }
+    .badge.done, .badge.running, .badge.covered-current, .badge.completed, .badge.crawling { color: #176b4d; background: var(--accent-soft); }
     .badge.pending, .badge.queued, .badge.scheduled { color: var(--warning); background: #fff0db; }
     .badge.error, .badge.failed, .badge.overlap { color: var(--danger); background: var(--danger-soft); }
     
@@ -880,6 +878,13 @@ DASHBOARD_HTML = """<!doctype html>
               <input type="text" id="job-name" required placeholder="e.g. ISED + CRTC">
             </div>
             <div class="form-group">
+              <label for="job-crawl-kind">Crawl Kind</label>
+              <select id="job-crawl-kind">
+                <option value="full">Full crawl</option>
+                <option value="pagination_backfill">Pagination backfill</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label for="job-policy">Traffic Policy</label>
               <select id="job-policy">
                 <option value="queue">Queue (Safe budget)</option>
@@ -895,8 +900,12 @@ DASHBOARD_HTML = """<!doctype html>
               <label for="job-output">Output Directory</label>
               <input type="text" id="job-output" required placeholder="outputs/runs/ised-run">
             </div>
+            <div class="form-group" id="source-db-container" style="display:none;">
+              <label for="job-source-db">Source Database Path</label>
+              <input type="text" id="job-source-db" placeholder="e.g. outputs/geds.sqlite">
+            </div>
           </div>
-          <div class="form-group" style="margin-bottom:16px;">
+          <div class="form-group" id="dept-selection-container" style="margin-bottom:16px;">
             <label>Select Departments</label>
             <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
               <input type="text" id="job-dept-search" placeholder="Search departments..." style="flex:1; min-width:180px; height:32px; font-size:12px;">
@@ -950,6 +959,54 @@ DASHBOARD_HTML = """<!doctype html>
             </thead>
             <tbody id="runs-table-body"></tbody>
           </table>
+        </div>
+      </div>
+      
+      <!-- PAGINATION ORGS DETAILS PANEL -->
+      <div id="pagination-orgs-panel" class="form-section" style="display:none; margin-top:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h3>Pagination Backfill Details: <span id="pag-panel-run-name">-</span></h3>
+          <button type="button" class="btn" onclick="hidePaginationOrgsPanel()">Close Panel</button>
+        </div>
+        <div class="filters" style="grid-template-columns: 1fr 180px 110px; border-bottom:0; padding:12px 0;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:bold; color:var(--muted);">Filter Status:</span>
+            <select id="pag-filter-status" style="width:160px; height:32px;">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="crawling">Crawling</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          <div></div>
+          <div></div>
+        </div>
+        <div class="table-wrap" style="min-height:240px; border: 1px solid var(--line); border-radius:6px;">
+          <table id="pag-orgs-table">
+            <thead>
+              <tr>
+                <th>Org Path</th>
+                <th>Status</th>
+                <th>Pages</th>
+                <th>New People</th>
+                <th>Deduped People</th>
+                <th>Last Page URL</th>
+                <th>Reason / Error</th>
+              </tr>
+            </thead>
+            <tbody id="pag-orgs-table-body">
+              <tr><td colspan="7" class="empty">No data loaded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="footer" style="border-top:0; padding-left:0; padding-right:0;">
+          <span id="pag-result-count" class="muted">No rows loaded</span>
+          <div class="pager">
+            <button id="pag-previous" type="button">&lt;</button>
+            <span id="pag-page-label">Page 1</span>
+            <button id="pag-next" type="button">&gt;</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1102,6 +1159,7 @@ DASHBOARD_HTML = """<!doctype html>
     };
     
     const state = { view: "orgs", offset: 0, total: 0, loading: false, activeTab: "overview" };
+    const pagState = { runId: "", offset: 0, limit: 25, total: 0, status: "" };
     const el = id => document.getElementById(id);
 
     function escapeHtml(value) {
@@ -1112,6 +1170,40 @@ DASHBOARD_HTML = """<!doctype html>
 
     function formatNumber(value) {
       return Number(value || 0).toLocaleString();
+    }
+
+    // ETA/Heartbeat helpers
+    function formatDuration(seconds) {
+      if (seconds == null || isNaN(seconds) || seconds < 0) return "";
+      if (seconds < 60) return `${Math.round(seconds)}s`;
+      if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+      const h = Math.floor(seconds / 3600);
+      const m = Math.round((seconds % 3600) / 60);
+      return `${h}h ${m}m`;
+    }
+
+    function formatDurationRange(lowSeconds, highSeconds) {
+      if (lowSeconds == null || highSeconds == null || isNaN(lowSeconds) || isNaN(highSeconds)) return "Calculating ETA";
+      const low = formatDuration(lowSeconds);
+      const high = formatDuration(highSeconds);
+      if (!low || !high) return "Calculating ETA";
+      return `${low}–${high}`;
+    }
+
+    function formatHeartbeatAge(heartbeatAt) {
+      if (!heartbeatAt) return "No heartbeat";
+      const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(heartbeatAt)) / 1000));
+      if (isNaN(seconds)) return "No heartbeat";
+      return `${formatDuration(seconds)} ago`;
+    }
+
+    function formatRunEta(eta) {
+      if (!eta || eta.expected_seconds == null || isNaN(eta.expected_seconds)) {
+        return "Calculating ETA · low confidence";
+      }
+      const range = formatDurationRange(eta.low_seconds, eta.high_seconds);
+      const confidence = eta.confidence || "low";
+      return `${range} · ${confidence} confidence`;
     }
 
     async function getJson(url) {
@@ -1238,6 +1330,16 @@ DASHBOARD_HTML = """<!doctype html>
     }
 
     function updateEstimates() {
+      const crawlKind = el("job-crawl-kind").value;
+      if (crawlKind === "pagination_backfill") {
+        el("est-selected").innerHTML = "Pagination Backfill";
+        el("est-requests").innerHTML = "~2,800 to ~11,400 <span style='font-size:10px;color:var(--muted); font-weight:normal;'>(Planning Range)</span>";
+        el("est-duration").innerHTML = "1.2h to 5.5h <span style='font-size:10px;color:var(--muted); font-weight:normal;'>(Planning Range)</span>";
+        el("est-people").innerHTML = "~30k to ~200k <span style='font-size:10px;color:var(--muted); font-weight:normal;'>(Planning Range)</span>";
+        el("est-size").innerHTML = "~220 MB to ~460 MB <span style='font-size:10px;color:var(--muted); font-weight:normal;'>(Planning Range)</span>";
+        return;
+      }
+
       const checked = [];
       document.querySelectorAll('input[name="dept-dns"]:checked').forEach(cb => {
         const row = deptRows.find(r => r.dn === cb.value);
@@ -1286,7 +1388,6 @@ DASHBOARD_HTML = """<!doctype html>
       updateEstimates();
     }
 
-
     async function loadControlRuns() {
       const runs = await getJson("/api/control/runs");
       const tbody = el("runs-table-body");
@@ -1297,6 +1398,59 @@ DASHBOARD_HTML = """<!doctype html>
         } else if (run.status === "stopped" || run.status === "failed") {
           actionBtn = `<button class="btn btn-primary" onclick="resumeRun('${run.id}')" style="height:28px;padding:0 8px;">Resume</button>`;
         }
+        
+        if (run.crawl_kind === "pagination_backfill") {
+          const compFailed = (run.progress.completed_orgs || 0) + (run.progress.failed_orgs || 0);
+          const total = run.progress.total_orgs || 1;
+          const percent = Math.round(compFailed * 100 / total);
+          const compPercent = ((run.progress.completed_orgs || 0) / total * 100).toFixed(1);
+          const failPercent = ((run.progress.failed_orgs || 0) / total * 100).toFixed(1);
+          
+          return `
+            <tr style="cursor: pointer;" onclick="showPaginationOrgsPanel('${run.id}')">
+              <td>
+                <strong>${escapeHtml(run.job_name || "Unmanaged")}</strong><br>
+                <span class="badge done" style="margin-top:4px;">Pagination backfill</span>
+              </td>
+              <td>
+                ${escapeHtml(run.started_at)}<br>
+                <small class="muted" id="run-heartbeat-age-${run.id}">${formatHeartbeatAge(run.heartbeat_at)}</small>
+              </td>
+              <td id="run-progress-${run.id}">
+                <span class="badge ${escapeHtml(run.status)}">${escapeHtml(run.status)}</span><br>
+                <div class="progress-wrap" style="margin-top: 4px; width: 120px;">
+                  <div class="progress" style="height: 6px; display: flex; background: #eef2f5; border-radius: 3px; overflow: hidden;">
+                    <div style="background: var(--accent); width: ${compPercent}%;"></div>
+                    <div style="background: var(--danger); width: ${failPercent}%;"></div>
+                  </div>
+                </div>
+                <small style="font-size:11px; white-space:nowrap;">
+                  ${compFailed} / ${total} orgs (${percent}%)
+                </small>
+                <div id="run-eta-${run.id}" style="margin-top:2px; font-size:11px; color:var(--muted); white-space:nowrap;">
+                  ${formatRunEta(run.eta)}
+                </div>
+              </td>
+              <td>
+                Pages: ${formatNumber(run.pagination_metrics.pages_fetched)}<br>
+                <span class="muted" style="font-size:11px;">Pending: ${formatNumber(run.pagination_metrics.pages_pending)}</span>
+              </td>
+              <td>
+                PID: ${run.pid || "-"}<br>
+                <small class="muted">RPS: ${(run.pagination_metrics.measured_rps || 0.0).toFixed(2)} / ${(run.pagination_metrics.configured_rps || 1.0).toFixed(1)}</small>
+              </td>
+              <td>
+                New: ${formatNumber(run.pagination_metrics.new_people)}<br>
+                <small class="muted" style="font-size:11px;">Total: ${formatNumber(run.pagination_metrics.total_people)}</small>
+              </td>
+              <td>
+                ${run.status === 'running' ? escapeHtml(run.current_org_dn || '-') : (run.eta.finish_time ? 'Finished: ' + run.eta.finish_time : '-')}
+              </td>
+              <td onclick="event.stopPropagation()">${actionBtn}</td>
+            </tr>
+          `;
+        }
+
         return `
           <tr>
             <td>${escapeHtml(run.job_name || "Unmanaged")}</td>
@@ -1444,33 +1598,64 @@ DASHBOARD_HTML = """<!doctype html>
     // Recalculate estimates when rate limit changes
     el("job-rate").addEventListener("input", () => updateEstimates());
 
+    // Crawl Kind Form field toggle
+    el("job-crawl-kind").addEventListener("change", () => {
+      const isBackfill = el("job-crawl-kind").value === "pagination_backfill";
+      el("dept-selection-container").style.display = isBackfill ? "none" : "block";
+      el("source-db-container").style.display = isBackfill ? "block" : "none";
+      el("job-source-db").required = isBackfill;
+      updateEstimates();
+    });
+
     el("new-job-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const name = el("job-name").value;
+      const crawlKind = el("job-crawl-kind").value;
       const rate = parseFloat(el("job-rate").value);
       const policy = el("job-policy").value;
       const output = el("job-output").value;
+      const sourceDb = el("job-source-db").value;
       
       let dns = [];
-      document.querySelectorAll('input[name="dept-dns"]:checked').forEach(cb => {
-        dns.push(cb.value);
-      });
-      if (dns.length === 0) {
-        alert("Please select at least one department.");
-        return;
+      if (crawlKind === "full") {
+        document.querySelectorAll('input[name="dept-dns"]:checked').forEach(cb => {
+          dns.push(cb.value);
+        });
+        if (dns.length === 0) {
+          alert("Please select at least one department.");
+          return;
+        }
+      } else {
+        if (!sourceDb) {
+          alert("Please specify a source database path.");
+          return;
+        }
       }
       
       try {
-        const resp = await postJson("/api/control/jobs", {
+        const payload = {
           name: name,
-          department_dns: dns,
+          crawl_kind: crawlKind,
           rate_limit_seconds: rate,
           traffic_policy: policy,
           output_dir: output
-        });
+        };
+        if (crawlKind === "full") {
+          payload.department_dns = dns;
+        } else {
+          payload.source_db_path = sourceDb;
+        }
+        
+        const resp = await postJson("/api/control/jobs", payload);
         // Start run automatically
         await postJson("/api/control/runs", { job_id: resp.job_id });
         el("new-job-form").reset();
+        
+        // Reset crawl kind UI toggles
+        el("dept-selection-container").style.display = "block";
+        el("source-db-container").style.display = "none";
+        el("job-source-db").required = false;
+        
         refreshControl();
       } catch (err) {
         alert(err.message);
@@ -1496,6 +1681,84 @@ DASHBOARD_HTML = """<!doctype html>
       }
     });
 
+    // Pagination Orgs Details logic
+    async function loadPaginationOrgs() {
+      if (!pagState.runId) return;
+      const params = new URLSearchParams({
+        limit: pagState.limit,
+        offset: pagState.offset,
+        status: pagState.status
+      });
+      try {
+        const data = await getJson(`/api/control/runs/${pagState.runId}/pagination-orgs?${params}`);
+        const tbody = el("pag-orgs-table-body");
+        if (!data.items.length) {
+          tbody.innerHTML = `<tr><td colspan="7" class="empty">No matching organizations</td></tr>`;
+        } else {
+          tbody.innerHTML = data.items.map(item => {
+            return `
+              <tr>
+                <td>
+                  <strong>${escapeHtml(item.department_name)}</strong><br>
+                  <small class="muted">${escapeHtml(item.org_path)}</small>
+                </td>
+                <td><span class="badge ${escapeHtml(item.status)}">${escapeHtml(item.status)}</span></td>
+                <td>${formatNumber(item.pages_crawled)}</td>
+                <td>${formatNumber(item.new_people_count)}</td>
+                <td>${formatNumber(item.deduplicated_people_count)}</td>
+                <td style="font-size:11px; word-break:break-all;">
+                  ${item.last_page_url ? `<a class="source" href="${escapeHtml(item.last_page_url)}" target="_blank">${escapeHtml(item.last_page_url)}</a>` : "-"}
+                </td>
+                <td class="muted">${escapeHtml(item.failure_reason || "-")}</td>
+              </tr>
+            `;
+          }).join("");
+        }
+        
+        pagState.total = data.total;
+        const start = data.total ? data.offset + 1 : 0;
+        const end = Math.min(data.offset + data.items.length, data.total);
+        const page = Math.floor(data.offset / pagState.limit) + 1;
+        const pages = Math.max(Math.ceil(data.total / pagState.limit), 1);
+        
+        el("pag-result-count").textContent = `${formatNumber(start)}-${formatNumber(end)} of ${formatNumber(data.total)}`;
+        el("pag-page-label").textContent = `Page ${page} of ${pages}`;
+        el("pag-previous").disabled = pagState.offset === 0;
+        el("pag-next").disabled = pagState.offset + pagState.limit >= data.total;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    window.showPaginationOrgsPanel = function(runId) {
+      pagState.runId = runId;
+      pagState.offset = 0;
+      pagState.status = el("pag-filter-status").value = "";
+      el("pag-panel-run-name").textContent = runId;
+      el("pagination-orgs-panel").style.display = "block";
+      el("pagination-orgs-panel").scrollIntoView({ behavior: "smooth" });
+      loadPaginationOrgs();
+    };
+
+    window.hidePaginationOrgsPanel = function() {
+      pagState.runId = "";
+      el("pagination-orgs-panel").style.display = "none";
+    };
+
+    el("pag-filter-status").addEventListener("change", () => {
+      pagState.status = el("pag-filter-status").value;
+      pagState.offset = 0;
+      loadPaginationOrgs();
+    });
+    el("pag-previous").addEventListener("click", () => {
+      pagState.offset = Math.max(0, pagState.offset - pagState.limit);
+      loadPaginationOrgs();
+    });
+    el("pag-next").addEventListener("click", () => {
+      pagState.offset += pagState.limit;
+      loadPaginationOrgs();
+    });
+
     async function refreshControl() {
       if (state.loading) return;
       state.loading = true;
@@ -1505,6 +1768,9 @@ DASHBOARD_HTML = """<!doctype html>
         await loadControlRuns();
         await loadControlCoverage();
         await loadControlSchedules();
+        if (pagState.runId) {
+          await loadPaginationOrgs();
+        }
         el("last-refresh").textContent = `Updated ${new Date().toLocaleTimeString()}`;
       } catch (err) {
         console.error(err);

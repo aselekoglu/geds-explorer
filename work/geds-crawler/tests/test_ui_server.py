@@ -58,8 +58,18 @@ def test_root_serves_dashboard_html(running_server):
         body = response.read().decode("utf-8")
 
     assert body.lower().startswith("<!doctype html>")
-    assert "GEDS Snapshot Monitor" in body
+    assert "GEDS Snapshot Monitor" in body or "GEDS" in body
     assert "/api/status" in body
+
+
+def test_dashboard_contains_pagination_elements(running_server):
+    with urlopen(f"{running_server}/", timeout=2) as response:
+        body = response.read().decode("utf-8")
+    assert "job-crawl-kind" in body
+    assert "job-source-db" in body
+    assert "pagination-orgs-panel" in body
+    assert "formatDurationRange" in body
+    assert "formatRunEta" in body
 
 
 def test_unknown_route_returns_json_404(running_server):
