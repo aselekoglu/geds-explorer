@@ -13,6 +13,8 @@ class Job:
     traffic_policy: str
     output_dir: str
     enabled: bool = True
+    crawl_kind: str = "full"
+    source_db_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,8 @@ class CrawlRun:
     pid: int | None
     stop_requested: bool
     output_dir: str
+    crawl_kind: str = "full"
+    source_db_path: str | None = None
 
 
 @dataclass(frozen=True)

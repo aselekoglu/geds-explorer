@@ -117,9 +117,45 @@ class ControlStore:
         # Initialize schema version if empty
         row = self.db.execute("SELECT version FROM schema_version").fetchone()
         if row is None:
-            self.db.execute("INSERT INTO schema_version (version) VALUES (1)")
+            self.db.execute("INSERT INTO schema_version (version) VALUES (2)")
+            self._migrate_to_v2()
+        elif row[0] < 2:
+            self._migrate_to_v2()
+            self.db.execute("UPDATE schema_version SET version = 2")
             
         self.db.commit()
+
+    def _migrate_to_v2(self) -> None:
+        job_cols = {r[1] for r in self.db.execute("PRAGMA table_info(crawl_jobs)")}
+        if "crawl_kind" not in job_cols:
+            self.db.execute("ALTER TABLE crawl_jobs ADD COLUMN crawl_kind TEXT NOT NULL DEFAULT 'full'")
+        if "source_db_path" not in job_cols:
+            self.db.execute("ALTER TABLE crawl_jobs ADD COLUMN source_db_path TEXT")
+
+        run_cols = {r[1] for r in self.db.execute("PRAGMA table_info(crawl_runs)")}
+        if "crawl_kind" not in run_cols:
+            self.db.execute("ALTER TABLE crawl_runs ADD COLUMN crawl_kind TEXT NOT NULL DEFAULT 'full'")
+        if "source_db_path" not in run_cols:
+            self.db.execute("ALTER TABLE crawl_runs ADD COLUMN source_db_path TEXT")
+
+        self.db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS run_pagination_seeds (
+              run_id TEXT NOT NULL,
+              org_dn TEXT NOT NULL,
+              source_url TEXT NOT NULL,
+              department_dn TEXT NOT NULL,
+              department_name TEXT NOT NULL,
+              org_name TEXT NOT NULL,
+              org_path TEXT NOT NULL,
+              base_db_path TEXT NOT NULL,
+              base_people_count INTEGER NOT NULL,
+              seeded_at TEXT NOT NULL,
+              PRIMARY KEY (run_id, org_dn),
+              FOREIGN KEY (run_id) REFERENCES crawl_runs(id) ON DELETE CASCADE
+            )
+            """
+        )
 
     def create_job(
         self,
@@ -128,16 +164,44 @@ class ControlStore:
         rate_limit_seconds: float,
         traffic_policy: str,
         output_dir: str,
+        *,
+        crawl_kind: str = "full",
+        source_db_path: str | None = None,
     ) -> str:
+        if crawl_kind not in {"full", "pagination_backfill"}:
+            raise ValueError(f"Invalid crawl kind: {crawl_kind}")
+        if crawl_kind == "pagination_backfill":
+            if not source_db_path:
+                raise ValueError("source_db_path is required for pagination_backfill")
+            abs_source = Path(source_db_path).resolve()
+            if not abs_source.exists():
+                raise ValueError(f"Source database does not exist: {abs_source}")
+            import sqlite3
+            try:
+                source_conn = sqlite3.connect(f"file:{abs_source}?mode=ro", uri=True)
+                source_conn.row_factory = sqlite3.Row
+                run_status_row = source_conn.execute("SELECT status FROM crawl_runs ORDER BY started_at DESC LIMIT 1").fetchone()
+                if not run_status_row or run_status_row["status"] != "finished":
+                    source_conn.close()
+                    raise ValueError("Latest crawl run in source database is not finished")
+                source_conn.close()
+            except Exception as e:
+                if "source_conn" in locals():
+                    try:
+                        source_conn.close()
+                    except Exception:
+                        pass
+                raise ValueError(f"Failed to validate source database: {e}")
+
         job_id = str(uuid.uuid4())
         created_at = datetime.now(UTC).isoformat()
         
         self.db.execute(
             """
-            INSERT INTO crawl_jobs (id, name, created_at, rate_limit_seconds, traffic_policy, output_dir, enabled)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO crawl_jobs (id, name, created_at, rate_limit_seconds, traffic_policy, output_dir, enabled, crawl_kind, source_db_path)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
             """,
-            (job_id, name, created_at, rate_limit_seconds, traffic_policy, output_dir),
+            (job_id, name, created_at, rate_limit_seconds, traffic_policy, output_dir, crawl_kind, source_db_path),
         )
         
         for dn in department_dns:
@@ -153,32 +217,107 @@ class ControlStore:
         run_id = str(uuid.uuid4())
         started_at = datetime.now(UTC).isoformat()
         
-        # Retrieve output_dir from job
-        job_row = self.db.execute("SELECT output_dir FROM crawl_jobs WHERE id=?", (job_id,)).fetchone()
+        # Retrieve job details
+        job_row = self.db.execute("SELECT output_dir, crawl_kind, source_db_path FROM crawl_jobs WHERE id=?", (job_id,)).fetchone()
         if job_row is None:
             raise ValueError(f"Job not found: {job_id}")
             
         output_dir = job_row["output_dir"]
+        crawl_kind = job_row["crawl_kind"]
+        source_db_path = job_row["source_db_path"]
+        abs_source_db = None
+
+        if crawl_kind == "pagination_backfill":
+            if not source_db_path:
+                raise ValueError("source_db_path is required for pagination_backfill")
+            abs_source_db = Path(source_db_path).resolve()
+            if not abs_source_db.exists():
+                raise ValueError(f"Source database does not exist: {abs_source_db}")
+            
+            # Validate completed run status
+            import sqlite3
+            try:
+                source_conn = sqlite3.connect(f"file:{abs_source_db}?mode=ro", uri=True)
+                source_conn.row_factory = sqlite3.Row
+                run_status_row = source_conn.execute("SELECT status FROM crawl_runs ORDER BY started_at DESC LIMIT 1").fetchone()
+                if not run_status_row or run_status_row["status"] != "finished":
+                    source_conn.close()
+                    raise ValueError("Latest crawl run in source database is not finished")
+            except Exception as e:
+                if "source_conn" in locals():
+                    source_conn.close()
+                raise ValueError(f"Failed to validate source database: {e}")
         
         self.db.execute(
             """
-            INSERT INTO crawl_runs (id, job_id, started_at, status, output_dir)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO crawl_runs (id, job_id, started_at, status, output_dir, crawl_kind, source_db_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (run_id, job_id, started_at, status, output_dir),
+            (run_id, job_id, started_at, status, output_dir, crawl_kind, str(abs_source_db) if abs_source_db else None),
         )
         
-        # Copy job departments to run departments
-        self.db.execute(
-            """
-            INSERT INTO run_departments (run_id, department_dn)
-            SELECT ?, department_dn FROM job_departments WHERE job_id=?
-            """,
-            (run_id, job_id),
-        )
+        if crawl_kind == "pagination_backfill":
+            # Freeze targets from source DB
+            targets = source_conn.execute(
+                """
+                SELECT
+                  o.dn, o.source_url, o.department_dn, d.name AS department_name,
+                  o.name, o.org_path, COUNT(p.source_url) AS base_people_count
+                FROM org_units o
+                JOIN departments d ON d.dn = o.department_dn
+                LEFT JOIN people_index p ON p.org_dn = o.dn
+                GROUP BY o.dn
+                HAVING COUNT(p.source_url) = 25
+                ORDER BY o.org_path
+                """
+            ).fetchall()
+            source_conn.close()
+
+            seeded_at = datetime.now(UTC).isoformat()
+            for target in targets:
+                self.db.execute(
+                    """
+                    INSERT INTO run_pagination_seeds (
+                        run_id, org_dn, source_url, department_dn, department_name, org_name, org_path, base_db_path, base_people_count, seeded_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        target["dn"],
+                        target["source_url"],
+                        target["department_dn"],
+                        target["department_name"],
+                        target["name"],
+                        target["org_path"],
+                        str(abs_source_db),
+                        target["base_people_count"],
+                        seeded_at,
+                    ),
+                )
+        else:
+            # Copy job departments to run departments
+            self.db.execute(
+                """
+                INSERT INTO run_departments (run_id, department_dn)
+                SELECT ?, department_dn FROM job_departments WHERE job_id=?
+                """,
+                (run_id, job_id),
+            )
         
         self.db.commit()
         return run_id
+
+    def list_pagination_seeds(self, run_id: str) -> list[dict]:
+        rows = self.db.execute(
+            """
+            SELECT * FROM run_pagination_seeds
+            WHERE run_id = ?
+            ORDER BY org_path
+            """,
+            (run_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def list_runs(self) -> list[dict]:
         rows = self.db.execute(
