@@ -54,12 +54,43 @@ class SnapshotReader:
             run = con.execute(
                 "SELECT request_count, status FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
             ).fetchone()
+            
+            # Read status/request_count from latest overlay if present
+            if self.overlay_db_paths:
+                try:
+                    # open read-only
+                    with sqlite3.connect(f"file:{self.overlay_db_paths[-1].as_posix()}?mode=ro", uri=True) as o_con:
+                        o_con.row_factory = sqlite3.Row
+                        o_run = o_con.execute(
+                            "SELECT request_count, status FROM crawl_runs ORDER BY started_at DESC LIMIT 1"
+                        ).fetchone()
+                        if o_run:
+                            run = o_run
+                except Exception:
+                    pass
+
             queue = {
                 str(row["status"]): int(row["count"])
                 for row in con.execute(
                     "SELECT status, COUNT(*) AS count FROM crawl_queue GROUP BY status"
                 )
             }
+            # Also overlay queue status counts if present
+            if self.overlay_db_paths:
+                try:
+                    with sqlite3.connect(f"file:{self.overlay_db_paths[-1].as_posix()}?mode=ro", uri=True) as o_con:
+                        o_con.row_factory = sqlite3.Row
+                        o_queue = {
+                            str(row["status"]): int(row["count"])
+                            for row in o_con.execute(
+                                "SELECT status, COUNT(*) AS count FROM crawl_queue GROUP BY status"
+                            )
+                        }
+                        if o_queue:
+                            queue = o_queue
+                except Exception:
+                    pass
+
             done = queue.get("done", 0)
             pending = queue.get("pending", 0)
             failed = queue.get("error", 0)

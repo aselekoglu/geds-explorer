@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 import pytest
@@ -91,7 +92,8 @@ def test_control_run_mutations(running_control_server):
     job_id = job_resp["job_id"]
     
     # Create a run
-    status, run_resp, _ = _post_json(f"{running_control_server}/api/control/runs", {"job_id": job_id})
+    with patch("geds_crawler.process_manager.ProcessManager.try_start_run", return_value="running"):
+        status, run_resp, _ = _post_json(f"{running_control_server}/api/control/runs", {"job_id": job_id})
     assert status == 200
     run_id = run_resp["run_id"]
     
@@ -99,3 +101,71 @@ def test_control_run_mutations(running_control_server):
     status_stop, stop_resp, _ = _post_json(f"{running_control_server}/api/control/runs/{run_id}/stop", {})
     assert status_stop == 200
     assert stop_resp["status"] == "stopping"
+
+
+def test_control_api_pagination_backfill_contract(running_control_server, tmp_path):
+    # Setup base DB
+    base_db_path = tmp_path / "base_snapshot.sqlite"
+    from geds_crawler.store import SnapshotStore
+    from geds_crawler.models import OrgUnit, PersonIndex
+    with SnapshotStore(base_db_path) as base_store:
+        base_store.init_schema()
+        # Seed run
+        base_store.db.execute(
+            "INSERT INTO crawl_runs (id, started_at, request_count, status) VALUES ('run-base', '2026-07-08T12:00:00+00:00', 10, 'finished')"
+        )
+        base_store.db.execute(
+            "INSERT INTO departments (dn, name, source_url, first_seen, last_seen, crawl_run_id) VALUES ('OU=DEPT,O=GC,C=CA', 'Dept', 'url', 'now', 'now', 'run-base')"
+        )
+        org = OrgUnit("Org1", "OU=ORG1,OU=DEPT,O=GC,C=CA", None, "OU=DEPT,O=GC,C=CA", 1, "Dept / Org1", "url-org1")
+        base_store.upsert_org_unit(org, "run-base", "now")
+        for i in range(25):
+            person = PersonIndex(f"Person {i}", "Title", org.dn, org.department_dn, "Dept", org.name, org.org_path, f"url-person-1-{i}")
+            base_store.upsert_person(person, "run-base", "now")
+        base_store.commit()
+
+    # 1. Create a backfill job
+    job_data = {
+        "name": "Backfill Job",
+        "crawl_kind": "pagination_backfill",
+        "source_db_path": str(base_db_path),
+        "rate_limit_seconds": 1.5,
+        "traffic_policy": "queue",
+        "output_dir": str(tmp_path / "runs" / "backfill")
+    }
+    
+    status, data, headers = _post_json(f"{running_control_server}/api/control/jobs", job_data)
+    assert status == 200
+    assert "job_id" in data
+    assert data["crawl_kind"] == "pagination_backfill"
+    assert data["estimated_targets"] == 1
+
+    # 2. Rejects if source_db_path is invalid/missing
+    bad_job_data = dict(job_data)
+    bad_job_data["source_db_path"] = "missing.sqlite"
+    
+    with pytest.raises(Exception):
+        _post_json(f"{running_control_server}/api/control/jobs", bad_job_data)
+
+    # 3. Create run and verify enriched telemetry
+    job_id = data["job_id"]
+    with patch("geds_crawler.process_manager.ProcessManager.try_start_run", return_value="running"):
+        status_run, run_resp, _ = _post_json(f"{running_control_server}/api/control/runs", {"job_id": job_id})
+    assert status_run == 200
+    run_id = run_resp["run_id"]
+
+    # List runs to check telemetry structures
+    status_list, runs, _ = _get_json(f"{running_control_server}/api/control/runs")
+    assert status_list == 200
+    backfill_run = next(r for r in runs if r["id"] == run_id)
+    assert backfill_run["crawl_kind"] == "pagination_backfill"
+    assert "progress" in backfill_run
+    assert backfill_run["progress"]["total_orgs"] == 1
+    assert "pagination_metrics" in backfill_run
+    assert "eta" in backfill_run
+
+    # 4. Get pagination orgs
+    status_orgs, orgs_data, _ = _get_json(f"{running_control_server}/api/control/runs/{run_id}/pagination-orgs")
+    assert status_orgs == 200
+    assert "items" in orgs_data
+    assert "total" in orgs_data

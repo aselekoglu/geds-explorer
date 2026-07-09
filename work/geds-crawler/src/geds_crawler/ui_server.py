@@ -41,6 +41,7 @@ def create_server(
             while True:
                 try:
                     pm.reconcile()
+                    pm.start_queued_runs()
                     distribute_shared_rate(db_path)
                 except Exception:
                     pass
@@ -93,15 +94,56 @@ def create_server(
                     rate_limit = float(data.get("rate_limit_seconds", 1.0))
                     policy = data.get("traffic_policy", "queue")
                     out_dir = data.get("output_dir", "")
+                    crawl_kind = data.get("crawl_kind", "full")
+                    source_db_path = data.get("source_db_path")
                     
-                    if not name or not dept_dns or not out_dir:
+                    if not name or not out_dir:
                         self._json(HTTPStatus.BAD_REQUEST, {"error": "Missing parameters"})
+                        return
+                    if crawl_kind == "full" and not dept_dns:
+                        self._json(HTTPStatus.BAD_REQUEST, {"error": "Missing department_dns for full crawl"})
+                        return
+                    if crawl_kind == "pagination_backfill" and not source_db_path:
+                        self._json(HTTPStatus.BAD_REQUEST, {"error": "Missing source_db_path for pagination_backfill"})
                         return
                         
                     from .control_store import ControlStore
                     with ControlStore(db_path) as store:
-                        job_id = store.create_job(name, dept_dns, rate_limit, policy, out_dir)
-                    self._json(HTTPStatus.OK, {"job_id": job_id})
+                        job_id = store.create_job(
+                            name, dept_dns, rate_limit, policy, out_dir,
+                            crawl_kind=crawl_kind, source_db_path=source_db_path
+                        )
+                        
+                        estimated_targets = 0
+                        if crawl_kind == "pagination_backfill":
+                            import sqlite3
+                            try:
+                                abs_source = Path(source_db_path).resolve()
+                                source_conn = sqlite3.connect(f"file:{abs_source}?mode=ro", uri=True)
+                                cursor = source_conn.execute(
+                                    """
+                                    SELECT COUNT(DISTINCT o.dn)
+                                    FROM org_units o
+                                    LEFT JOIN people_index p ON p.org_dn = o.dn
+                                    GROUP BY o.dn
+                                    HAVING COUNT(p.source_url) = 25
+                                    """
+                                )
+                                estimated_targets = len(cursor.fetchall())
+                                source_conn.close()
+                            except Exception:
+                                pass
+                        else:
+                            estimated_targets = len(dept_dns)
+                            
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "job_id": job_id,
+                            "crawl_kind": crawl_kind,
+                            "estimated_targets": estimated_targets,
+                        }
+                    )
                     return
                     
                 elif parsed.path == "/api/control/runs":
@@ -116,8 +158,8 @@ def create_server(
                         
                     from .process_manager import ProcessManager
                     pm = ProcessManager(db_path)
-                    pm.start_run(run_id)
-                    self._json(HTTPStatus.OK, {"run_id": run_id, "status": "running"})
+                    status = pm.try_start_run(run_id)
+                    self._json(HTTPStatus.OK, {"run_id": run_id, "status": status})
                     return
                     
                 elif len(path_parts) == 5 and path_parts[0] == "api" and path_parts[1] == "control" and path_parts[2] == "runs" and path_parts[4] == "stop":
@@ -204,8 +246,32 @@ def create_server(
             return json.loads(body.decode("utf-8"))
 
         def _api_payload(self, path: str, query: dict[str, list[str]]):
+            path_parts = path.strip("/").split("/")
+            
             # Control plane GET endpoints
             if is_control_plane:
+                # GET /api/control/runs/<run_id>/pagination-orgs
+                if len(path_parts) == 5 and path_parts[0] == "api" and path_parts[1] == "control" and path_parts[2] == "runs" and path_parts[4] == "pagination-orgs":
+                    run_id = path_parts[3]
+                    status_filter = query.get("status", [""])[0]
+                    limit = int(query.get("limit", [50])[0])
+                    offset = int(query.get("offset", [0])[0])
+                    
+                    from .control_queries import ControlQueries
+                    queries = ControlQueries(db_path)
+                    try:
+                        res = queries.list_run_pagination_orgs(
+                            run_id=run_id,
+                            status=status_filter,
+                            limit=limit,
+                            offset=offset,
+                        )
+                        return res
+                    except ValueError as e:
+                        if "Run not found" in str(e):
+                            return None
+                        raise e
+
                 if path == "/api/control/overview":
                     with sqlite3.connect(db_path) as conn:
                         conn.row_factory = sqlite3.Row
@@ -326,8 +392,20 @@ def create_server(
                         
                 elif path == "/api/control/runs":
                     from .control_store import ControlStore
+                    from .control_queries import ControlQueries
+                    queries = ControlQueries(db_path)
                     with ControlStore(db_path) as store:
                         runs = store.list_runs()
+                        
+                    enriched_runs = []
+                    for run in runs:
+                        rate_limit = 1.0
+                        with sqlite3.connect(db_path) as conn:
+                            conn.row_factory = sqlite3.Row
+                            job_row = conn.execute("SELECT rate_limit_seconds FROM crawl_jobs WHERE id = ?", (run.get("job_id"),)).fetchone()
+                            if job_row:
+                                rate_limit = job_row["rate_limit_seconds"]
+                        enriched_runs.append(queries.enrich_run(run, rate_limit))
                     
                     fb = (db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
                     if not fb.is_file():
@@ -337,7 +415,6 @@ def create_server(
                         try:
                             with sqlite3.connect(fb) as conn:
                                 conn.row_factory = sqlite3.Row
-                                # Inspect actual columns to handle older schema versions gracefully
                                 cursor = conn.execute("PRAGMA table_info(crawl_runs)")
                                 cols = [c[1] for c in cursor.fetchall()]
                                 
@@ -353,8 +430,8 @@ def create_server(
                                 row = conn.execute(sql).fetchone()
                                 if row:
                                     run_id = row["id"]
-                                    if not any(r["id"] == run_id for r in runs):
-                                        runs.append({
+                                    if not any(r["id"] == run_id for r in enriched_runs):
+                                        enriched_runs.append({
                                             "id": run_id,
                                             "job_id": None,
                                             "job_name": "Unmanaged Crawl",
@@ -368,12 +445,14 @@ def create_server(
                                         })
                         except Exception:
                             pass
-                    return runs
+                    return enriched_runs
 
             # Resolve the selected staging database based on the query parameter 'run_id'
             selected_run_id = query.get("run_id", [""])[0]
             
             snap_dbs = []
+            self.overlay_db_paths = []
+            
             if is_control_plane:
                 if selected_run_id == "unmanaged":
                     fb = (db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
@@ -384,38 +463,59 @@ def create_server(
                 elif selected_run_id and selected_run_id != "all":
                     try:
                         with sqlite3.connect(db_path) as conn:
+                            conn.row_factory = sqlite3.Row
                             row = conn.execute(
-                                "SELECT output_dir FROM crawl_runs WHERE id = ?",
+                                "SELECT output_dir, crawl_kind, source_db_path FROM crawl_runs WHERE id = ?",
                                 (selected_run_id,)
                             ).fetchone()
                             if row:
-                                out_dir = Path(row[0])
-                                for name in ("geds.sqlite", "staging.sqlite"):
-                                    p = out_dir / name
-                                    if p.is_file():
-                                        snap_dbs = [p]
-                                        break
+                                if row["crawl_kind"] == "pagination_backfill":
+                                    primary_db = Path(row["source_db_path"]).resolve()
+                                    out_dir = Path(row["output_dir"])
+                                    for name in ("geds.sqlite", "staging.sqlite"):
+                                        p = out_dir / name
+                                        if p.is_file():
+                                            self.overlay_db_paths = [p]
+                                            break
+                                    snap_dbs = [primary_db]
+                                else:
+                                    out_dir = Path(row["output_dir"])
+                                    for name in ("geds.sqlite", "staging.sqlite"):
+                                        p = out_dir / name
+                                        if p.is_file():
+                                            snap_dbs = [p]
+                                            break
                     except Exception:
                         pass
                 else:
-                    # "all" or empty: collect all staging DBs from runs plus unmanaged
-                    try:
-                        with sqlite3.connect(db_path) as conn:
-                            rows = conn.execute("SELECT output_dir FROM crawl_runs").fetchall()
-                            for r in rows:
-                                out_dir = Path(r[0])
-                                for name in ("geds.sqlite", "staging.sqlite"):
-                                    p = out_dir / name
-                                    if p.is_file():
-                                        snap_dbs.append(p)
-                                        break
-                    except Exception:
-                        pass
+                    # "all" or empty: base is unmanaged snapshot DB, overlays are all finished/stopped backfill runs
                     fb = (db_path.parent.parent / "runs" / "2026-07-08" / "unmanaged-crawl" / "geds.sqlite").resolve()
                     if not fb.is_file():
                         fb = (db_path.parent.parent / "geds-snapshot-2026-07-08" / "geds.sqlite").resolve()
-                    if fb.is_file() and fb not in snap_dbs:
-                        snap_dbs.append(fb)
+                    
+                    if fb.is_file():
+                        snap_dbs = [fb]
+                    else:
+                        snap_dbs = [db_path]
+
+                    try:
+                        with sqlite3.connect(db_path) as conn:
+                            conn.row_factory = sqlite3.Row
+                            rows = conn.execute(
+                                """
+                                SELECT output_dir FROM crawl_runs
+                                WHERE crawl_kind = 'pagination_backfill' AND status IN ('finished', 'stopped')
+                                """
+                            ).fetchall()
+                            for r in rows:
+                                out_dir = Path(r["output_dir"])
+                                for name in ("geds.sqlite", "staging.sqlite"):
+                                    p = out_dir / name
+                                    if p.is_file():
+                                        self.overlay_db_paths.append(p)
+                                        break
+                    except Exception:
+                        pass
             else:
                 snap_dbs = [db_path]
 
@@ -489,7 +589,7 @@ def create_server(
             # For tables, query the primary/first DB in the list
             try:
                 primary_db = snap_dbs[0]
-                req_reader = SnapshotReader(primary_db)
+                req_reader = SnapshotReader(primary_db, getattr(self, "overlay_db_paths", []))
                 if path == "/api/departments":
                     return req_reader.departments()
 
