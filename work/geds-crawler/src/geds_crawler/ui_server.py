@@ -63,6 +63,9 @@ def create_server(
                 )
                 self._send(HTTPStatus.OK, html.encode("utf-8"), "text/html; charset=utf-8")
                 return
+            if parsed.path == "/favicon.ico":
+                self._send(HTTPStatus.NO_CONTENT, b"", "image/x-icon")
+                return
                 
             try:
                 payload = self._api_payload(parsed.path, parse_qs(parsed.query))
@@ -1007,6 +1010,38 @@ DASHBOARD_HTML = """<!doctype html>
       display: grid;
       gap: 6px;
     }
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .summary-row span {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      color: var(--muted);
+    }
+    .summary-row strong { display: block; color: var(--text); font-size: 24px; margin-top: 6px; }
+    .filter-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(17, 28, 45, 0.82);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .chip.active {
+      color: var(--text);
+      border-color: rgba(52, 211, 153, 0.55);
+      background: rgba(52, 211, 153, 0.14);
+    }
 
     @media (max-width: 760px) {
       .app-shell { grid-template-columns: 1fr; }
@@ -1191,11 +1226,6 @@ DASHBOARD_HTML = """<!doctype html>
       </header>
 
       <section class="workspace-panel active" id="workspace-operate-overview" data-workspace="#/operate/overview">
-
-    <div id="overview-select-container" style="margin-bottom: 18px; display: flex; align-items: center; gap: 8px;" hidden>
-      <label for="overview-job-select" style="font-weight: bold; font-size: 12px; color: var(--muted); text-transform: uppercase;">Active Database View:</label>
-      <select id="overview-job-select" style="width: auto; min-width: 220px; height: 36px;"></select>
-    </div>
 
     <!-- Top progress and estimation section -->
     <div id="top-progress-section" style="display:none; margin-bottom: 18px; padding: 12px 16px; background: white; border: 1px solid #e1e8ed; border-radius: 6px;">
@@ -1431,9 +1461,29 @@ DASHBOARD_HTML = """<!doctype html>
 
     <!-- COVERAGE TAB -->
     <div class="tab-content" id="tab-coverage">
-      <div class="workspace">
+      <section class="panel-card">
+        <div class="workspace-header-row">
+          <div>
+            <h2 class="panel-title">Coverage</h2>
+            <p class="panel-subtitle">Problem-first view of missing, stale, and overlapping department coverage.</p>
+          </div>
+          <button class="btn" type="button" onclick="refreshCoverage()">Refresh coverage</button>
+        </div>
+        <div class="summary-row coverage-summary">
+          <span>Covered <strong id="plan-covered-count">0</strong></span>
+          <span>Missing <strong id="plan-missing-count">0</strong></span>
+          <span>Overlap <strong id="plan-overlap-count">0</strong></span>
+          <span>Stale <strong id="plan-stale-count">0</strong></span>
+        </div>
+        <div class="filter-chips" role="toolbar" aria-label="Coverage filters">
+          <button class="chip active" type="button" data-coverage-filter="attention">Needs attention</button>
+          <button class="chip" type="button" data-coverage-filter="all">All</button>
+          <button class="chip" type="button" data-coverage-filter="missing">Missing</button>
+          <button class="chip" type="button" data-coverage-filter="overlap">Overlap</button>
+          <button class="chip" type="button" data-coverage-filter="stale">Stale</button>
+        </div>
         <div class="table-wrap">
-          <table>
+          <table class="responsive-table">
             <thead>
               <tr>
                 <th>Institution Name</th>
@@ -1445,7 +1495,7 @@ DASHBOARD_HTML = """<!doctype html>
             <tbody id="coverage-table-body"></tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
       </section>
 
@@ -1460,7 +1510,7 @@ DASHBOARD_HTML = """<!doctype html>
 
     <!-- SCHEDULES TAB -->
     <div class="tab-content" id="tab-schedules">
-      <div class="form-section">
+      <div class="form-section" id="schedule-create-section">
         <h3>Create Persistent Schedule</h3>
         <form id="new-schedule-form">
           <div class="form-grid">
@@ -1508,6 +1558,11 @@ DASHBOARD_HTML = """<!doctype html>
       </section>
 
       <section class="workspace-panel" id="workspace-explore-snapshot" data-workspace="#/explore/snapshot">
+
+    <div id="overview-select-container" class="panel-card" style="margin-bottom: 18px; display: flex; align-items: center; gap: 12px;" hidden>
+      <label for="overview-job-select">Active database view</label>
+      <select id="overview-job-select" style="width: auto; min-width: 220px;"></select>
+    </div>
 
     <section class="metrics" id="legacy-metrics-section">
       <div class="metric"><span class="metric-label">Requests</span><strong id="m-requests" class="metric-value">-</strong></div>
@@ -1587,13 +1642,12 @@ DASHBOARD_HTML = """<!doctype html>
     </ol>
     <div class="drawer-body">
       <div class="drawer-note">
-        The crawler form is preserved on this screen while the guided drawer shell is introduced.
-        Select departments, review the estimate, configure options, then confirm start from the crawler form.
+        Select departments, review the estimate, configure options, then create and start the crawler from this guided flow.
       </div>
       <div id="start-crawler-form-mount"></div>
       <div class="drawer-footer">
         <button type="button" class="btn" data-close-drawer="start-crawler-drawer">Cancel</button>
-        <button type="button" class="btn btn-primary" data-close-drawer="start-crawler-drawer" onclick="document.getElementById('job-name').focus()">Continue to crawler form</button>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('job-name').focus()">Configure crawler</button>
       </div>
     </div>
   </aside>
@@ -1618,6 +1672,11 @@ DASHBOARD_HTML = """<!doctype html>
         Use the schedule form on this screen to choose the target job, cadence or Advanced cron expression,
         overlap policy, and review server-validated next-run behavior.
       </div>
+      <section class="estimate-panel">
+        <h3>Next run preview</h3>
+        <p id="schedule-next-preview" class="muted">Next run preview updates after cadence selection.</p>
+      </section>
+      <div id="new-schedule-form-mount"></div>
       <div class="drawer-footer">
         <button type="button" class="btn" data-close-drawer="new-schedule-drawer">Cancel</button>
         <button type="button" class="btn btn-primary" data-close-drawer="new-schedule-drawer" onclick="document.getElementById('sched-job').focus()">Continue to schedule form</button>
@@ -1663,7 +1722,7 @@ DASHBOARD_HTML = """<!doctype html>
       "#/operate/overview": {
         title: "Operate",
         description: "Live crawler status, attention items, and next actions.",
-        refresh: () => Promise.all([refreshControl(), refreshRuns(), refreshSchedules()])
+        refresh: () => refreshControl()
       },
       "#/operate/crawlers": {
         title: "Crawlers",
@@ -1716,6 +1775,11 @@ DASHBOARD_HTML = """<!doctype html>
       const route = currentRoute();
       activateRoute(route);
       await routes[route].refresh();
+    }
+
+    function setLastUpdated() {
+      const node = el("last-updated");
+      if (node) node.textContent = `Updated ${new Date().toLocaleTimeString()}`;
     }
 
     function escapeHtml(value) {
@@ -1806,6 +1870,10 @@ DASHBOARD_HTML = """<!doctype html>
     let deptSortKey = "age";
     let deptSortAsc = false; // false = descending for age (never crawled first)
     let estimatesData = {};
+    const planState = {
+      coverageFilter: "attention",
+      coverageRows: []
+    };
 
     async function loadControlCatalog() {
       const [depts, cov, est] = await Promise.all([
@@ -2105,21 +2173,56 @@ DASHBOARD_HTML = """<!doctype html>
     async function loadControlCoverage() {
       const cov = await getJson("/api/control/coverage");
       const depts = await getJson("/api/control/catalog");
-      const tbody = el("coverage-table-body");
-      tbody.innerHTML = depts.map(dept => {
+      planState.coverageRows = depts.map(dept => {
         const info = cov[dept.dn] || { status: "unassigned", job_name: null, last_crawled_at: null };
-        const status = info.status;
+        const status = info.status === "covered-current" ? "covered" : (info.status || "missing");
         const jobName = info.job_name || "-";
         const lastCrawled = info.last_crawled_at || "-";
-        return `
+        return {
+          name: dept.name,
+          jobName,
+          lastCrawled,
+          status,
+          source: dept.source_url || ""
+        };
+      });
+      const covered = planState.coverageRows.filter(row => row.status === "covered").length;
+      const missing = planState.coverageRows.filter(row => row.status === "missing" || row.status === "unassigned").length;
+      const overlap = planState.coverageRows.filter(row => row.status === "overlap").length;
+      const stale = planState.coverageRows.filter(row => row.status === "stale").length;
+      setText("plan-covered-count", covered);
+      setText("plan-missing-count", missing);
+      setText("plan-overlap-count", overlap);
+      setText("plan-stale-count", stale);
+      renderCoverageRows(planState.coverageRows);
+    }
+
+    function setText(id, value) {
+      const node = el(id);
+      if (node) node.textContent = String(value);
+    }
+
+    function renderCoverageRows(rows) {
+      const tbody = el("coverage-table-body");
+      if (!tbody) return;
+      const filter = planState.coverageFilter;
+      const filtered = rows.filter(row => {
+        if (filter === "all") return true;
+        if (filter === "attention") return row.status !== "covered";
+        return row.status === filter;
+      });
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No rows match this coverage filter.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtered.map(row => `
           <tr>
-            <td>${escapeHtml(dept.name)}</td>
-            <td>${escapeHtml(jobName)}</td>
-            <td>${escapeHtml(lastCrawled)}</td>
-            <td><span class="badge ${status}">${status}</span></td>
+            <td data-label="Institution Name">${escapeHtml(row.name)}</td>
+            <td data-label="Job Name">${escapeHtml(row.jobName)}</td>
+            <td data-label="Last Crawled">${escapeHtml(row.lastCrawled)}</td>
+            <td data-label="Coverage Status"><span class="status-label ${row.status === "covered" ? "healthy" : "attention"}">${escapeHtml(row.status)}</span></td>
           </tr>
-        `;
-      }).join("");
+        `).join("");
     }
 
     async function loadControlSchedules() {
@@ -2418,35 +2521,13 @@ DASHBOARD_HTML = """<!doctype html>
         if (pagState.runId) {
           await loadPaginationOrgs();
         }
-        el("last-refresh").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        setLastUpdated();
       } catch (err) {
         console.error(err);
       } finally {
         state.loading = false;
       }
     }
-
-    // Tab switching for Control Plane
-    document.querySelectorAll("#control-tabs .nav-tab").forEach(tab => {
-      tab.addEventListener("click", () => {
-        document.querySelectorAll("#control-tabs .nav-tab").forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        
-        const target = tab.dataset.tab;
-        state.activeTab = target;
-        
-        // Hide all tab contents
-        document.querySelectorAll(".tab-content").forEach(tc => tc.style.display = "none");
-        
-        if (target === "legacy") {
-          el("tab-legacy").style.display = "block";
-          refreshLegacy();
-        } else {
-          el(`tab-${target}`).style.display = "block";
-          refreshControl();
-        }
-      });
-    });
 
     // --- Legacy / Snapshot Data view ---
     async function loadStatus() {
@@ -2564,7 +2645,7 @@ DASHBOARD_HTML = """<!doctype html>
         const data = await getJson(queryUrl());
         renderTable(data);
         el("error-banner").style.display = "none";
-        el("last-refresh").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        setLastUpdated();
       } catch (error) {
         el("error-banner").textContent = error.message;
         el("error-banner").style.display = "block";
@@ -2585,22 +2666,14 @@ DASHBOARD_HTML = """<!doctype html>
     // Attach event listeners for legacy view
     document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => setView(tab.dataset.view)));
     el("refresh").addEventListener("click", () => {
-      if (IS_CONTROL_PLANE && state.activeTab !== "legacy") {
-        refreshControl();
-      } else {
-        refreshLegacy();
-      }
+      refreshCurrentRoute().catch(error => console.error(error));
     });
     
     el("search").addEventListener("input", () => {
       state.offset = 0;
       clearTimeout(window.searchTimer);
       window.searchTimer = setTimeout(() => {
-        if (IS_CONTROL_PLANE && state.activeTab !== "legacy") {
-          // Add search filter for control plane views if needed
-        } else {
-          refreshLegacy();
-        }
+        if (currentRoute() === "#/explore/snapshot") refreshLegacy();
       }, 250);
     });
     
@@ -2661,15 +2734,49 @@ DASHBOARD_HTML = """<!doctype html>
     if (crawlerCreateSection && crawlerFormMount) {
       crawlerFormMount.appendChild(crawlerCreateSection);
     }
+    const scheduleCreateSection = el("schedule-create-section");
+    const scheduleFormMount = el("new-schedule-form-mount");
+    if (scheduleCreateSection && scheduleFormMount) {
+      scheduleFormMount.appendChild(scheduleCreateSection);
+    }
+    document.querySelectorAll("[data-coverage-filter]").forEach(button => {
+      button.addEventListener("click", () => {
+        planState.coverageFilter = button.dataset.coverageFilter;
+        document.querySelectorAll("[data-coverage-filter]").forEach(chip => {
+          chip.classList.toggle("active", chip.dataset.coverageFilter === planState.coverageFilter);
+        });
+        renderCoverageRows(planState.coverageRows);
+      });
+    });
+    function updateSchedulePreview() {
+      const cron = el("sched-cron") ? el("sched-cron").value : "";
+      const preview = el("schedule-next-preview");
+      if (preview) preview.textContent = `Next run preview: ${cron || "server default"} in America/Toronto. Server validates the cron expression when saved.`;
+    }
+    if (el("sched-cron")) {
+      el("sched-cron").addEventListener("input", updateSchedulePreview);
+      updateSchedulePreview();
+    }
+
+    document.querySelectorAll("[data-route]").forEach(button => {
+      button.addEventListener("click", () => {
+        window.location.hash = button.dataset.route;
+      });
+    });
+    window.addEventListener("hashchange", () => {
+      refreshCurrentRoute().catch(error => console.error(error));
+    });
+    if (el("mobile-nav-toggle")) {
+      el("mobile-nav-toggle").addEventListener("click", () => {
+        const open = !document.body.classList.contains("nav-open");
+        document.body.classList.toggle("nav-open", open);
+        el("mobile-nav-toggle").setAttribute("aria-expanded", String(open));
+      });
+    }
 
     // Auto-refresh loop
     function autoRefresh() {
-      if (IS_CONTROL_PLANE && state.activeTab !== "legacy") {
-        refreshControl();
-        loadStatus();
-      } else {
-        refreshLegacy();
-      }
+      refreshCurrentRoute().catch(error => console.error(error));
     }
     
     autoRefresh();

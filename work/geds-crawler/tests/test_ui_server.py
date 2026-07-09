@@ -105,14 +105,28 @@ def test_dashboard_isolates_snapshot_data_in_explore_workspace(running_server):
     explore_index = body.index('id="workspace-explore-snapshot"')
     legacy_metrics_index = body.index('id="legacy-metrics-section"')
     active_db_index = body.index('id="active-db"')
+    active_view_index = body.index('id="overview-select-container"')
 
     assert explore_index < legacy_metrics_index
     assert explore_index < active_db_index
+    assert explore_index < active_view_index
     assert 'id="workspace-operate-overview"' in body
     overview_chunk = body[
         body.index('id="workspace-operate-overview"') : body.index('id="workspace-operate-crawlers"')
     ]
     assert 'id="active-db"' not in overview_chunk
+    assert 'id="overview-select-container"' not in overview_chunk
+
+
+def test_dashboard_wires_hash_routes_and_current_refresh_target(running_server):
+    body = _get_root_html(running_server)
+
+    assert 'window.addEventListener("hashchange"' in body
+    assert 'window.location.hash = button.dataset.route' in body
+    assert 'refreshCurrentRoute().catch' in body
+    assert 'function setLastUpdated()' in body
+    assert 'id="last-updated"' in body
+    assert 'last-refresh' not in body
 
 
 def test_dashboard_has_accessibility_and_responsive_hooks(running_server):
