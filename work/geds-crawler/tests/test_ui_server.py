@@ -31,6 +31,12 @@ def _get_json(url):
         return response.status, json.load(response)
 
 
+def _get_root_html(base_url: str) -> str:
+    with urlopen(f"{base_url}/", timeout=2) as response:
+        assert response.status == 200
+        return response.read().decode("utf-8")
+
+
 def test_status_and_people_endpoints(running_server):
     status_code, status = _get_json(f"{running_server}/api/status")
     people_code, people = _get_json(f"{running_server}/api/people?q=developer")
@@ -54,22 +60,83 @@ def test_filters_and_pagination_are_parsed(running_server):
 
 
 def test_root_serves_dashboard_html(running_server):
-    with urlopen(f"{running_server}/", timeout=2) as response:
-        body = response.read().decode("utf-8")
+    body = _get_root_html(running_server)
 
     assert body.lower().startswith("<!doctype html>")
-    assert "GEDS Snapshot Monitor" in body or "GEDS" in body
+    assert "GEDS" in body
     assert "/api/status" in body
 
 
+def test_dashboard_uses_command_center_information_architecture(running_server):
+    body = _get_root_html(running_server)
+
+    assert 'class="app-shell"' in body
+    assert 'aria-label="Primary workspace navigation"' in body
+    assert 'data-route="#/operate/overview"' in body
+    assert 'data-route="#/operate/crawlers"' in body
+    assert 'data-route="#/operate/history"' in body
+    assert 'data-route="#/plan/coverage"' in body
+    assert 'data-route="#/plan/schedules"' in body
+    assert 'data-route="#/explore/snapshot"' in body
+    assert "Operate" in body
+    assert "Plan" in body
+    assert "Explore Data" in body
+
+
+def test_dashboard_contains_guided_creation_flows(running_server):
+    body = _get_root_html(running_server)
+
+    assert 'id="start-crawler-drawer"' in body
+    assert 'aria-modal="true"' in body
+    assert 'id="open-start-crawler"' in body
+    assert "Select target" in body
+    assert "Review estimate" in body
+    assert "Configure options" in body
+    assert "Confirm start" in body
+    assert 'id="new-schedule-drawer"' in body
+    assert 'id="open-new-schedule"' in body
+    assert "Advanced cron" in body
+    assert "Next run preview" in body
+
+
+def test_dashboard_isolates_snapshot_data_in_explore_workspace(running_server):
+    body = _get_root_html(running_server)
+
+    explore_index = body.index('id="workspace-explore-snapshot"')
+    legacy_metrics_index = body.index('id="legacy-metrics-section"')
+    active_db_index = body.index('id="active-db"')
+
+    assert explore_index < legacy_metrics_index
+    assert explore_index < active_db_index
+    assert 'id="workspace-operate-overview"' in body
+    overview_chunk = body[
+        body.index('id="workspace-operate-overview"') : body.index('id="workspace-operate-crawlers"')
+    ]
+    assert 'id="active-db"' not in overview_chunk
+
+
+def test_dashboard_has_accessibility_and_responsive_hooks(running_server):
+    body = _get_root_html(running_server)
+
+    assert ":focus-visible" in body
+    assert "@media (max-width: 760px)" in body
+    assert 'id="mobile-nav-toggle"' in body
+    assert 'aria-expanded="false"' in body
+    assert 'role="status"' in body
+    assert 'aria-live="polite"' in body
+    assert "status-label" in body
+
+
 def test_dashboard_contains_pagination_elements(running_server):
-    with urlopen(f"{running_server}/", timeout=2) as response:
-        body = response.read().decode("utf-8")
+    body = _get_root_html(running_server)
     assert "job-crawl-kind" in body
     assert "job-source-db" in body
     assert "pagination-orgs-panel" in body
     assert "formatDurationRange" in body
     assert "formatRunEta" in body
+    assert "pagination_metrics.known_pending_pages" in body
+    assert "pagination_metrics.active_org" in body
+    assert "pagination_metrics.pages_pending" not in body
 
 
 def test_unknown_route_returns_json_404(running_server):
