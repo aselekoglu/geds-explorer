@@ -584,7 +584,7 @@ git commit -m "feat: add bilingual government career taxonomy"
 - match_entity(entity, interpretation) -> CareerMatch.
 - evaluate_matcher(cases, taxonomy) -> EvaluationReport.
 
-- [ ] **Step 1: Write failing weight and exclusion tests**
+- [x] **Step 1: Write failing weight and exclusion tests**
 
 ~~~python
 def test_direct_title_outranks_ancestor_only(matcher, ai_query):
@@ -610,13 +610,13 @@ def test_exclusion_suppresses_ambiguous_policy_term(matcher, policy_query):
     assert result.exclusions
 ~~~
 
-- [ ] **Step 2: Verify missing-module failure**
+- [x] **Step 2: Verify missing-module failure**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_matcher.py -v
 
 Expected: collection fails with ModuleNotFoundError.
 
-- [ ] **Step 3: Implement explicit scores and evidence**
+- [x] **Step 3: Implement explicit scores and evidence**
 
 ~~~python
 WEIGHTS = {
@@ -640,7 +640,7 @@ def confidence_for(score: int) -> str:
 
 CareerMatch contains entity_id, category_ids, score, confidence, evidence, exclusions, and taxonomy_version. MatchEvidence contains field, matched_phrase, source_text, weight, and category_id. Deduplicate identical evidence before summing. Ancestor-only evidence can never exceed medium confidence.
 
-- [ ] **Step 4: Add a stratified evaluation fixture**
+- [x] **Step 4: Add a stratified evaluation fixture**
 
 Create at least 40 reviewed cases: four per category, with English, French, abbreviation, ambiguous-negative, title, organization, and deep-ancestor coverage distributed across the set.
 
@@ -660,7 +660,7 @@ Create at least 40 reviewed cases: four per category, with English, French, abbr
 }
 ~~~
 
-- [ ] **Step 5: Verify quality gates and commit**
+- [x] **Step 5: Verify quality gates and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_matcher.py -v
 

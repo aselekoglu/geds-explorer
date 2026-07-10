@@ -86,7 +86,7 @@
       "phrases_en": ["legal services", "law enforcement", "criminal investigations", "regulatory enforcement", "litigation support"],
       "phrases_fr": ["services juridiques", "application de la loi", "enquêtes criminelles", "exécution réglementaire", "soutien au contentieux"],
       "abbreviations": ["LE", "JUS"],
-      "synonyms_en": ["legal", "investigator", "counsel", "litigation", "compliance officer"],
+      "synonyms_en": ["legal", "investigator", "investigations", "counsel", "litigation", "compliance officer"],
       "synonyms_fr": ["juridique", "enquêteur", "avocat-conseil", "contentieux", "agent de conformité"],
       "exclusions": ["workplace complaint investigation", "market research investigation"],
       "positive_examples": ["Senior Investigator", "Avocate-conseil"],

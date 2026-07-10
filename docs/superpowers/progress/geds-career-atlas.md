@@ -181,3 +181,33 @@ GREEN evidence:
 Next:
 
 - Task 6: score title, organization, and ancestor evidence with deterministic weights, explicit exclusions, and a fixed bilingual evaluation set.
+
+## Task 6 — Explainable deterministic matcher and fixed evaluation set
+
+Status: verified
+
+Implemented:
+
+- immutable entity, evidence, match, evaluation-case, and evaluation-report models;
+- deterministic weights: title phrase/abbreviation 100, organization phrase/abbreviation 85, title synonym 70, organization synonym 55, and ancestor evidence 25;
+- visible source-field evidence for every score, with duplicate phrase/source evidence counted once;
+- per-category exclusions that suppress ambiguous matches and record the exact excluded phrase and source field;
+- ancestor-only matches capped at score 60 and medium confidence;
+- a checked-in 40-case bilingual fixture: four reviewed cases per taxonomy category covering English, French, abbreviation/deep-ancestor, and ambiguous-negative paths;
+- evaluation report gates expected categories, minimum confidence, forbidden categories, and precision-at-10 where a future fixture has at least ten positives for a category.
+
+RED evidence:
+
+- py -m pytest tests/test_career_matcher.py -v
+- Result: collection failed with ModuleNotFoundError for geds_crawler.career_matcher.
+
+GREEN evidence:
+
+- py -m pytest tests/test_career_matcher.py -v
+- Result: 6 passed in 0.05s; all 40 reviewed fixture cases pass.
+- py -m pytest -q
+- Result: 142 passed in 16.46s.
+
+Next:
+
+- Task 7: build the snapshot-versioned FTS index and explicitly label GEDS vacancy signals as unverified source observations.
