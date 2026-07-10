@@ -7,8 +7,12 @@ from dataclasses import dataclass
 class CanonicalSnapshot:
     snapshot_id: str
     parent_snapshot_id: str | None
-    captured_at: str
-    member_count: int
+    as_of_at: str
+    source_fingerprint: str
+    people_count: int
+    org_units_count: int
+    departments_count: int
+    baseline: bool
 
 
 @dataclass(frozen=True)

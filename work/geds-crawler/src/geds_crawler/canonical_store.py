@@ -40,8 +40,12 @@ class CanonicalStore:
             CREATE TABLE IF NOT EXISTS canonical_snapshots (
               snapshot_id TEXT PRIMARY KEY,
               parent_snapshot_id TEXT,
-              captured_at TEXT NOT NULL,
-              member_count INTEGER NOT NULL CHECK (member_count >= 0),
+              as_of_at TEXT NOT NULL,
+              source_fingerprint TEXT NOT NULL,
+              people_count INTEGER NOT NULL CHECK (people_count >= 0),
+              org_units_count INTEGER NOT NULL CHECK (org_units_count >= 0),
+              departments_count INTEGER NOT NULL CHECK (departments_count >= 0),
+              baseline INTEGER NOT NULL CHECK (baseline IN (0, 1)),
               FOREIGN KEY (parent_snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
             );
 
@@ -119,14 +123,20 @@ class CanonicalStore:
     ) -> None:
         self.db.execute(
             """
-            INSERT INTO canonical_snapshots (snapshot_id, parent_snapshot_id, captured_at, member_count)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO canonical_snapshots
+              (snapshot_id, parent_snapshot_id, as_of_at, source_fingerprint, people_count,
+               org_units_count, departments_count, baseline)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 snapshot.snapshot_id,
                 snapshot.parent_snapshot_id,
-                snapshot.captured_at,
-                snapshot.member_count,
+                snapshot.as_of_at,
+                snapshot.source_fingerprint,
+                snapshot.people_count,
+                snapshot.org_units_count,
+                snapshot.departments_count,
+                snapshot.baseline,
             ),
         )
         rows = []

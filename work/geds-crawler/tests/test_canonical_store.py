@@ -15,8 +15,12 @@ def _snapshot(snapshot_id: str, parent_snapshot_id: str | None) -> CanonicalSnap
     return CanonicalSnapshot(
         snapshot_id=snapshot_id,
         parent_snapshot_id=parent_snapshot_id,
-        captured_at="2026-07-09T00:00:00+00:00",
-        member_count=0,
+        as_of_at="2026-07-09T00:00:00+00:00",
+        source_fingerprint="sha256:empty",
+        people_count=0,
+        org_units_count=0,
+        departments_count=0,
+        baseline=False,
     )
 
 
@@ -112,3 +116,46 @@ def test_appending_events_preserves_person_timeline(tmp_path):
             event.occurred_at,
             event.details_json,
         )
+
+
+def test_full_snapshot_manifest_round_trips_through_storage(tmp_path):
+    snapshot = CanonicalSnapshot(
+        snapshot_id="s1",
+        parent_snapshot_id=None,
+        as_of_at="2026-07-09T00:00:00+00:00",
+        source_fingerprint="sha256:abc123",
+        people_count=11,
+        org_units_count=4,
+        departments_count=2,
+        baseline=True,
+    )
+    db_path = tmp_path / "master.sqlite"
+
+    with CanonicalStore(db_path) as store:
+        store.init_schema()
+        with store.transaction():
+            store.insert_snapshot(snapshot)
+
+    with CanonicalStore(db_path) as store:
+        row = store.db.execute(
+            """
+            SELECT snapshot_id, parent_snapshot_id, as_of_at, source_fingerprint,
+                   people_count, org_units_count, departments_count, baseline
+            FROM canonical_snapshots
+            WHERE snapshot_id = ?
+            """,
+            (snapshot.snapshot_id,),
+        ).fetchone()
+
+    reloaded = CanonicalSnapshot(
+        snapshot_id=row["snapshot_id"],
+        parent_snapshot_id=row["parent_snapshot_id"],
+        as_of_at=row["as_of_at"],
+        source_fingerprint=row["source_fingerprint"],
+        people_count=row["people_count"],
+        org_units_count=row["org_units_count"],
+        departments_count=row["departments_count"],
+        baseline=bool(row["baseline"]),
+    )
+
+    assert reloaded == snapshot
