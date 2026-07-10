@@ -4,9 +4,9 @@ Date: 2026-07-10
 
 ## Status
 
-Product direction approved. This document is the reviewable design contract for
-the public-facing explorer. Product implementation starts only after this
-written specification is approved and converted into an implementation plan.
+Written specification approved by the user on 2026-07-10. This document is the
+design contract for the public-facing explorer and is implemented through
+docs/superpowers/plans/2026-07-10-geds-career-atlas-constellation.md.
 
 ## Vision
 
