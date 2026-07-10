@@ -454,7 +454,7 @@ class SnapshotStore:
         self.db.execute(
             """
             UPDATE pagination_orgs
-            SET status = 'finished',
+            SET status = 'completed',
                 terminal_reason = ?,
                 finished_at = ?,
                 heartbeat_at = ?
@@ -481,7 +481,7 @@ class SnapshotStore:
             """
             SELECT
                 COUNT(*) as total,
-                SUM(CASE WHEN status = 'finished' THEN 1 ELSE 0 END) as finished,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as finished,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
             FROM pagination_orgs
             """
@@ -540,7 +540,7 @@ class SnapshotStore:
             """
             SELECT pages_fetched, started_at, finished_at
             FROM pagination_orgs
-            WHERE status = 'finished' AND finished_at IS NOT NULL
+            WHERE status = 'completed' AND finished_at IS NOT NULL
             ORDER BY finished_at ASC
             """
         )

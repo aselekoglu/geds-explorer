@@ -3,12 +3,26 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 from .ui_queries import SnapshotReader
 
 
 class CanonicalValidationError(ValueError):
     """Raised when a completed run cannot be promoted to a canonical snapshot."""
+
+
+_BASE_REQUIRED_TABLES = frozenset(
+    {
+        "crawl_runs",
+        "departments",
+        "org_units",
+        "people_index",
+        "crawl_queue",
+        "crawl_errors",
+    }
+)
+_OVERLAY_REQUIRED_TABLES = _BASE_REQUIRED_TABLES | {"pagination_orgs"}
 
 
 @dataclass(frozen=True)
@@ -42,6 +56,11 @@ def resolve_completed_run(control_db: Path, run_id: str) -> ResolvedSnapshot:
 
     try:
         with _open_read_only(resolved_control_db) as con:
+            _require_tables(
+                con,
+                {"crawl_runs", "run_pagination_seeds"},
+                "control database",
+            )
             run = con.execute(
                 """
                 SELECT status, crawl_kind, output_dir
@@ -62,7 +81,10 @@ def resolve_completed_run(control_db: Path, run_id: str) -> ResolvedSnapshot:
                 )
 
             base_paths = _resolve_base_paths(con, run_id)
-            overlay_path = _resolve_overlay_path(Path(run["output_dir"]))
+            overlay_path = _resolve_overlay_path(
+                resolved_control_db,
+                Path(run["output_dir"]),
+            )
     except sqlite3.Error as exc:
         raise CanonicalValidationError(
             f"Could not read canonical lineage for run {run_id}: {exc}"
@@ -97,11 +119,20 @@ def _resolve_base_paths(con: sqlite3.Connection, run_id: str) -> tuple[Path, ...
     if missing:
         paths = ", ".join(str(path) for path in missing)
         raise CanonicalValidationError(f"Seed base database does not exist: {paths}")
+    for base_path in base_paths:
+        _validate_database_schema(
+            base_path,
+            "base database",
+            _BASE_REQUIRED_TABLES,
+        )
     return base_paths
 
 
-def _resolve_overlay_path(output_dir: Path) -> Path:
-    resolved_output_dir = output_dir.resolve()
+def _resolve_overlay_path(control_db: Path, output_dir: Path) -> Path:
+    if output_dir.is_absolute():
+        resolved_output_dir = output_dir.resolve()
+    else:
+        resolved_output_dir = (control_db.parents[2] / output_dir).resolve()
     for name in ("geds.sqlite", "staging.sqlite"):
         candidate = resolved_output_dir / name
         if candidate.is_file():
@@ -114,20 +145,56 @@ def _resolve_overlay_path(output_dir: Path) -> Path:
 def _validate_overlay_complete(overlay_path: Path) -> None:
     try:
         with _open_read_only(overlay_path) as con:
+            _require_tables(con, _OVERLAY_REQUIRED_TABLES, "output database")
             statuses = [
                 row["status"]
                 for row in con.execute("SELECT status FROM pagination_orgs")
             ]
     except sqlite3.Error as exc:
         raise CanonicalValidationError(
-            f"Could not validate backfill overlay {overlay_path}: {exc}"
+            f"invalid output database {overlay_path}: {exc}"
         ) from exc
+
+    if not statuses:
+        raise CanonicalValidationError(
+            f"Backfill overlay has no pagination organizations: {overlay_path}"
+        )
 
     incomplete = [status for status in statuses if status != "completed"]
     if incomplete:
         status_values = ", ".join(sorted({str(status) for status in incomplete}))
         raise CanonicalValidationError(
             f"Backfill overlay is not complete; non-completed organization statuses: {status_values}"
+        )
+
+
+def _validate_database_schema(
+    db_path: Path,
+    label: str,
+    required_tables: Iterable[str],
+) -> None:
+    try:
+        with _open_read_only(db_path) as con:
+            _require_tables(con, required_tables, label)
+    except sqlite3.Error as exc:
+        raise CanonicalValidationError(
+            f"invalid {label} {db_path}: {exc}"
+        ) from exc
+
+
+def _require_tables(
+    con: sqlite3.Connection,
+    required_tables: Iterable[str],
+    label: str,
+) -> None:
+    actual_tables = {
+        row["name"]
+        for row in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    missing = sorted(set(required_tables) - actual_tables)
+    if missing:
+        raise CanonicalValidationError(
+            f"{label} is missing required tables: {', '.join(missing)}"
         )
 
 

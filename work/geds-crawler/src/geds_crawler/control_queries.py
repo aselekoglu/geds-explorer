@@ -74,7 +74,7 @@ class ControlQueries:
                 incomplete_rows = stage_store.db.execute(
                     """
                     SELECT org_dn FROM pagination_orgs
-                    WHERE status NOT IN ('finished', 'failed')
+                    WHERE status NOT IN ('completed', 'failed')
                     """
                 ).fetchall()
                 incomplete_org_dns = {r[0] for r in incomplete_rows}

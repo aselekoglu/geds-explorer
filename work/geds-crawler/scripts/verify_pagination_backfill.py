@@ -93,7 +93,7 @@ def main():
             except Exception:
                 pass
 
-        if status not in ("finished", "failed"):
+        if status not in ("completed", "failed"):
             all_terminal = False
 
         unique_people = 0

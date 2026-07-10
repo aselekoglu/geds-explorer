@@ -127,6 +127,10 @@ def test_page_completion_and_next_enqueue_are_atomic_and_idempotent(tmp_path):
 
         # Test terminal success/error increments organization numerator only once
         store.mark_pagination_org_success(target.org.dn, "done", now)
+        status = store.db.execute(
+            "SELECT status FROM pagination_orgs WHERE org_dn = ?", (target.org.dn,)
+        ).fetchone()[0]
+        assert status == "completed"
         progress1 = store.pagination_progress()
         assert progress1["completed_orgs"] == 1
         assert progress1["failed_orgs"] == 0

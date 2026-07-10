@@ -46,7 +46,13 @@ def _create_snapshot(path: Path, person_name: str, source_suffix: str) -> None:
         store.commit()
 
 
-def _create_control_run(control_db: Path, run_id: str, output_dir: Path, base_paths: list[Path]) -> None:
+def _create_control_run(
+    control_db: Path,
+    run_id: str,
+    output_dir: Path | str,
+    base_paths: list[Path],
+) -> None:
+    control_db.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(control_db) as con:
         con.executescript(
             """
@@ -141,3 +147,87 @@ def test_resolver_rejects_incomplete_backfill(tmp_path):
     control_db, run_id = _backfill_with_pending_page(tmp_path)
     with pytest.raises(CanonicalValidationError, match="not complete"):
         resolve_completed_run(control_db, run_id)
+
+
+def test_resolver_rejects_failed_backfill(tmp_path):
+    control_db, run_id = _backfill_with_pending_page(tmp_path)
+    with sqlite3.connect(tmp_path / "output" / "staging.sqlite") as con:
+        con.execute("UPDATE pagination_orgs SET status = 'failed'")
+
+    with pytest.raises(CanonicalValidationError, match="not complete"):
+        resolve_completed_run(control_db, run_id)
+
+
+def test_resolver_rejects_backfill_without_pagination_organizations(tmp_path):
+    control_db = tmp_path / "control.sqlite"
+    base = tmp_path / "base.sqlite"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    _create_snapshot(base, "Base", "base")
+    _create_snapshot(output_dir / "geds.sqlite", "Overlay", "overlay")
+    _create_control_run(control_db, "backfill-run", output_dir, [base])
+
+    with pytest.raises(CanonicalValidationError, match="no pagination organizations"):
+        resolve_completed_run(control_db, "backfill-run")
+
+
+def test_resolver_rejects_base_without_required_snapshot_tables(tmp_path):
+    control_db = tmp_path / "control.sqlite"
+    base = tmp_path / "base.sqlite"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    with sqlite3.connect(base) as con:
+        con.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
+    _create_snapshot(output_dir / "geds.sqlite", "Overlay", "overlay")
+    _insert_pagination_org(output_dir / "geds.sqlite", "completed")
+    _create_control_run(control_db, "backfill-run", output_dir, [base])
+
+    with pytest.raises(CanonicalValidationError, match="missing required tables"):
+        resolve_completed_run(control_db, "backfill-run")
+
+
+def test_resolver_rejects_zero_byte_base_database(tmp_path):
+    control_db = tmp_path / "control.sqlite"
+    base = tmp_path / "base.sqlite"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    base.touch()
+    _create_snapshot(output_dir / "geds.sqlite", "Overlay", "overlay")
+    _insert_pagination_org(output_dir / "geds.sqlite", "completed")
+    _create_control_run(control_db, "backfill-run", output_dir, [base])
+
+    with pytest.raises(CanonicalValidationError, match="missing required tables"):
+        resolve_completed_run(control_db, "backfill-run")
+
+
+def test_resolver_rejects_invalid_preferred_output_database(tmp_path):
+    control_db = tmp_path / "control.sqlite"
+    base = tmp_path / "base.sqlite"
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    _create_snapshot(base, "Base", "base")
+    (output_dir / "geds.sqlite").write_text("not a sqlite database", encoding="utf-8")
+    _create_snapshot(output_dir / "staging.sqlite", "Fallback", "fallback")
+    _insert_pagination_org(output_dir / "staging.sqlite", "completed")
+    _create_control_run(control_db, "backfill-run", output_dir, [base])
+
+    with pytest.raises(CanonicalValidationError, match="invalid output database"):
+        resolve_completed_run(control_db, "backfill-run")
+
+
+def test_resolver_resolves_relative_output_from_project_root_not_cwd(tmp_path, monkeypatch):
+    project_root = tmp_path / "project"
+    control_db = project_root / "control" / "state" / "control.sqlite"
+    base = project_root / "snapshots" / "base.sqlite"
+    output_dir = project_root / "outputs" / "backfill"
+    output_dir.mkdir(parents=True)
+    _create_snapshot(base, "Base", "base")
+    overlay = output_dir / "geds.sqlite"
+    _create_snapshot(overlay, "Overlay", "overlay")
+    _insert_pagination_org(overlay, "completed")
+    _create_control_run(control_db, "backfill-run", Path("outputs") / "backfill", [base])
+    monkeypatch.chdir(tmp_path)
+
+    resolved = resolve_completed_run(control_db, "backfill-run")
+
+    assert resolved.overlay_db_paths == (overlay.resolve(),)
