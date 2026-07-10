@@ -781,7 +781,7 @@ git commit -m "feat: build snapshot career index and vacancy signals"
 - CareerRepository.meta(), search(), departments(), children(), ancestors(), team_profile(), roles(), constellation(), tours().
 - SQLite connections use mode=ro and query_only=ON.
 
-- [ ] **Step 1: Write failing ranking, bounds, and privacy tests**
+- [x] **Step 1: Write failing ranking, bounds, and privacy tests**
 
 ~~~python
 def test_search_returns_explainable_ranked_results(repository):
@@ -801,13 +801,13 @@ def test_team_profile_has_no_contact_fields(repository):
     assert not {"email", "phone", "fax", "address"} & set(payload)
 ~~~
 
-- [ ] **Step 2: Verify missing-module failure**
+- [x] **Step 2: Verify missing-module failure**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_repository.py -v
 
 Expected: collection fails with ModuleNotFoundError.
 
-- [ ] **Step 3: Implement read-only boundaries**
+- [x] **Step 3: Implement read-only boundaries**
 
 ~~~python
 class CareerRepository:
@@ -828,7 +828,7 @@ class CareerRepository:
 
 Rank stored category evidence first, FTS phrase score second, stable entity_id last. Include snapshot_id and quality status in every response. Cap ordinary pages at 200 and constellation slices at 2000; aggregate deeper children instead of returning the complete graph. Generate deterministic ETags from snapshot_id plus normalized query arguments so immutable snapshot-versioned reads can be cached without hiding a snapshot change.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_repository.py -v
 

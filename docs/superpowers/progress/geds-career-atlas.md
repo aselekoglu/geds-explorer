@@ -250,3 +250,32 @@ Real index build:
 Next:
 
 - Task 8: implement bounded, read-only repository queries over the indexed canonical snapshot.
+
+## Task 8 — Bounded read-only repository queries
+
+Status: verified
+
+Implemented:
+
+- mode=ro SQLite connections with query_only and bounded busy timeout;
+- snapshot-aware meta, explainable category search, department list, child navigation, ancestor lineage, safe team profile, roles, constellation, and tour queries;
+- ordinary pages capped at 200 and constellation slices capped at 2000;
+- every response carries current snapshot ID, quality status, and deterministic ETag derived from snapshot plus normalized arguments;
+- only role/title, organization, hierarchy, category-evidence, and aggregate fields cross the boundary; contact, source URL, and crawler-control fields do not;
+- stable tie ordering by score then entity ID.
+
+RED evidence:
+
+- py -m pytest tests/test_career_repository.py -v
+- Result: collection failed with ModuleNotFoundError for geds_crawler.career_repository; later navigation tests failed while the planned query methods were absent.
+
+GREEN evidence:
+
+- py -m pytest tests/test_career_repository.py -v
+- Result: 6 passed in 0.57s, covering ranking, caps, read-only connection enforcement, navigation, and privacy.
+- py -m pytest -q
+- Result: 157 passed in 15.60s.
+
+Next:
+
+- Task 9: expose only this repository through a separate FastAPI public application.
