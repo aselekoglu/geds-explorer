@@ -358,13 +358,15 @@ Next:
 
 ## Task 12 — Discover and explainable ranked results
 
-Status: in progress
+Status: verified
 
 Implemented and verified vertical slice:
 
 - Discover result surface renders interpreted AI interest language, accessible result articles, confidence, and the first explainable evidence records;
 - vacancy language is exactly "Recorded as vacant in GEDS — unverified" and no application action is present.
 - npm.cmd test -- --run src/features/discover/DiscoverPage.test.tsx: 1 passed.
+- npm.cmd test: 4 passed; npm.cmd run typecheck and npm.cmd run build: passed.
+- Debounced query state updates the browser URL and uses one memoized public API client.
 
 Next:
 

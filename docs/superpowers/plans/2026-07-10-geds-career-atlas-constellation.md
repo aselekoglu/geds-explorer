@@ -1083,7 +1083,7 @@ git commit -m "feat: synchronize Career Atlas state with URLs"
 - Consumes CareerApiClient.search and ExplorerSearch.
 - Produces query interpretation, facets, and accessible ranked results.
 
-- [ ] **Step 1: Write a failing broad-interest journey**
+- [x] **Step 1: Write a failing broad-interest journey**
 
 ~~~tsx
 it("explains why an AI team matched", async () => {
@@ -1095,15 +1095,15 @@ it("explains why an AI team matched", async () => {
 })
 ~~~
 
-- [ ] **Step 2: Implement progressive disclosure**
+- [x] **Step 2: Implement progressive disclosure**
 
 InterestSearch updates URL state after 250 ms. InterpretationChips make expansions removable. FilterRail exposes domain, institution, confidence, vacancy, and quality. MatchCard shows confidence text and the first three evidence records with an expandable complete list.
 
-- [ ] **Step 3: Implement trust states**
+- [x] **Step 3: Implement trust states**
 
 No-match displays interpreted concepts, related terms, and removable constraints. Partial data names fallback organizations. Stale state shows canonical as-of time. Loading reserves card space and preserves prior interpretation. Vacancy copy is exactly “Recorded as vacant in GEDS”; no apply action exists.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test -- src/features/discover/DiscoverPage.test.tsx
 
