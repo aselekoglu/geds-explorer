@@ -1,0 +1,1 @@
+export function Constellation({nodes,focus}:{nodes:{id:string;name:string}[];focus?:string}){return <section aria-label="Government constellation"><div role="listbox" aria-label="Constellation organizations">{nodes.map(node=><button key={node.id} role="option" aria-selected={node.id===focus}>{node.name}</button>)}</div></section>}
