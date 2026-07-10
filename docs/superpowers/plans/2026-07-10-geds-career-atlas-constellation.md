@@ -491,7 +491,7 @@ git commit -m "feat: publish canonical GEDS baseline"
 - normalize_text(value) and tokenize(value).
 - CareerTaxonomy.interpret(query) -> QueryInterpretation.
 
-- [ ] **Step 1: Write failing bilingual interpretation tests**
+- [x] **Step 1: Write failing bilingual interpretation tests**
 
 ~~~python
 @pytest.mark.parametrize(
@@ -514,13 +514,13 @@ def test_normalization_is_diacritic_aware():
     assert normalize_text("Cybersécurité") == "cybersecurite"
 ~~~
 
-- [ ] **Step 2: Verify missing-module failure**
+- [x] **Step 2: Verify missing-module failure**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_taxonomy.py -v
 
 Expected: collection fails with ModuleNotFoundError.
 
-- [ ] **Step 3: Create all ten initial categories**
+- [x] **Step 3: Create all ten initial categories**
 
 The JSON schema requires version, unique id, bilingual labels, bilingual phrases, abbreviations, bilingual synonyms, exclusions, positive_examples, and negative_examples. Required IDs:
 
@@ -541,7 +541,7 @@ The JSON schema requires version, unique id, bilingual labels, bilingual phrases
 
 Validate bilingual labels, normalized phrase collisions, duplicate IDs, empty phrase sets, and exclusion collisions during load.
 
-- [ ] **Step 4: Implement deterministic query interpretation**
+- [x] **Step 4: Implement deterministic query interpretation**
 
 ~~~python
 @dataclass(frozen=True)
@@ -562,7 +562,7 @@ def normalize_text(value: str) -> str:
 
 Original source strings are never overwritten. Interpretation sorts category IDs and expanded terms for reproducibility.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_taxonomy.py -v
 

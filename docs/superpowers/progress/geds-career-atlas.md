@@ -148,3 +148,36 @@ Real baseline publication:
 Next:
 
 - Task 5: implement the versioned bilingual taxonomy and noisy-text normalization with explainable category evidence.
+
+## Task 5 — Versioned bilingual taxonomy and normalization
+
+Status: verified
+
+Implemented:
+
+- versioned 1.0.0 taxonomy with all ten approved career-category IDs;
+- English and French labels, phrases, synonyms, abbreviations, exclusions, and reviewed positive/negative examples for every category;
+- Unicode NFKD, casefold, diacritic, whitespace, and punctuation normalization used only for comparison;
+- deterministic bilingual query interpretation with sorted category IDs, expanded related terms, and human-readable match evidence;
+- load-time guards for duplicate IDs, empty bilingual fields, normalized positive collisions, and positive/exclusion collisions;
+- immutable taxonomy and interpretation models so repeated queries produce reproducible outputs.
+
+Data-preservation rule:
+
+- crawled titles and organization names remain unchanged; normalization creates comparison keys and never overwrites source strings.
+
+RED evidence:
+
+- py -m pytest tests/test_career_taxonomy.py -v
+- Result: collection failed with ModuleNotFoundError for geds_crawler.career_taxonomy.
+
+GREEN evidence:
+
+- py -m pytest tests/test_career_taxonomy.py -v
+- Result: 15 passed in 0.16s.
+- py -m pytest -q
+- Result: 136 passed in 15.97s.
+
+Next:
+
+- Task 6: score title, organization, and ancestor evidence with deterministic weights, explicit exclusions, and a fixed bilingual evaluation set.
