@@ -143,19 +143,40 @@ def test_resolve_completed_backfill_uses_every_distinct_seed_base(tmp_path):
     assert resolved.reader().people(limit=10)["total"] == 3
 
 
+def test_resolver_accepts_historical_finished_org_status(tmp_path):
+    control_db, run_id, *_rest, overlay = _completed_backfill_with_two_bases(tmp_path)
+    with sqlite3.connect(overlay) as con:
+        con.execute("UPDATE pagination_orgs SET status = 'finished'")
+
+    resolved = resolve_completed_run(control_db, run_id)
+
+    assert resolved.quality.successful_org_dns == frozenset(
+        {"ou=organization,dc=department"}
+    )
+    assert resolved.quality.fallback_org_dns == frozenset()
+    assert resolved.quality.warnings == ()
+
+
 def test_resolver_rejects_incomplete_backfill(tmp_path):
     control_db, run_id = _backfill_with_pending_page(tmp_path)
     with pytest.raises(CanonicalValidationError, match="not complete"):
         resolve_completed_run(control_db, run_id)
 
 
-def test_resolver_rejects_failed_backfill(tmp_path):
+def test_resolver_uses_base_fallback_for_failed_org(tmp_path):
     control_db, run_id = _backfill_with_pending_page(tmp_path)
     with sqlite3.connect(tmp_path / "output" / "staging.sqlite") as con:
         con.execute("UPDATE pagination_orgs SET status = 'failed'")
 
-    with pytest.raises(CanonicalValidationError, match="not complete"):
-        resolve_completed_run(control_db, run_id)
+    resolved = resolve_completed_run(control_db, run_id)
+
+    assert resolved.quality.successful_org_dns == frozenset()
+    assert resolved.quality.fallback_org_dns == frozenset(
+        {"ou=organization,dc=department"}
+    )
+    assert resolved.quality.warnings == (
+        "partial_overlay_base_fallback:ou=organization,dc=department",
+    )
 
 
 def test_resolver_rejects_backfill_without_pagination_organizations(tmp_path):

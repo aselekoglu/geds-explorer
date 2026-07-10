@@ -23,6 +23,15 @@ _BASE_REQUIRED_TABLES = frozenset(
     }
 )
 _OVERLAY_REQUIRED_TABLES = _BASE_REQUIRED_TABLES | {"pagination_orgs"}
+_SUCCESS_ORG_STATUSES = frozenset({"completed", "finished"})
+_FALLBACK_ORG_STATUSES = frozenset({"failed"})
+
+
+@dataclass(frozen=True)
+class OverlayQuality:
+    successful_org_dns: frozenset[str]
+    fallback_org_dns: frozenset[str]
+    warnings: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -32,6 +41,7 @@ class ResolvedSnapshot:
     base_db_paths: tuple[Path, ...]
     overlay_db_paths: tuple[Path, ...]
     members: tuple[Path, ...]
+    quality: OverlayQuality = OverlayQuality(frozenset(), frozenset(), ())
 
     def reader(self) -> SnapshotReader:
         return SnapshotReader(
@@ -39,6 +49,21 @@ class ResolvedSnapshot:
             self.overlay_db_paths,
             additional_base_db_paths=self.base_db_paths[1:],
         )
+
+    def iter_people(self):
+        from .canonical_projection import iter_projected_people
+
+        return iter_projected_people(self)
+
+    def iter_orgs(self):
+        from .canonical_projection import iter_projected_orgs
+
+        return iter_projected_orgs(self)
+
+    def iter_departments(self):
+        from .canonical_projection import iter_projected_departments
+
+        return iter_projected_departments(self)
 
 
 def resolve_completed_run(control_db: Path, run_id: str) -> ResolvedSnapshot:
@@ -90,12 +115,13 @@ def resolve_completed_run(control_db: Path, run_id: str) -> ResolvedSnapshot:
             f"Could not read canonical lineage for run {run_id}: {exc}"
         ) from exc
 
-    _validate_overlay_complete(overlay_path)
+    quality = _read_overlay_quality(overlay_path)
     overlay_paths = (overlay_path,)
     return ResolvedSnapshot(
         base_db_paths=base_paths,
         overlay_db_paths=overlay_paths,
         members=(*base_paths, *overlay_paths),
+        quality=quality,
     )
 
 
@@ -142,30 +168,53 @@ def _resolve_overlay_path(control_db: Path, output_dir: Path) -> Path:
     )
 
 
-def _validate_overlay_complete(overlay_path: Path) -> None:
+def _read_overlay_quality(overlay_path: Path) -> OverlayQuality:
     try:
         with _open_read_only(overlay_path) as con:
             _require_tables(con, _OVERLAY_REQUIRED_TABLES, "output database")
-            statuses = [
-                row["status"]
-                for row in con.execute("SELECT status FROM pagination_orgs")
-            ]
+            rows = con.execute(
+                "SELECT org_dn, status FROM pagination_orgs ORDER BY org_dn"
+            ).fetchall()
     except sqlite3.Error as exc:
         raise CanonicalValidationError(
             f"invalid output database {overlay_path}: {exc}"
         ) from exc
 
-    if not statuses:
+    if not rows:
         raise CanonicalValidationError(
             f"Backfill overlay has no pagination organizations: {overlay_path}"
         )
 
-    incomplete = [status for status in statuses if status != "completed"]
-    if incomplete:
-        status_values = ", ".join(sorted({str(status) for status in incomplete}))
+    non_terminal = [
+        str(row["status"])
+        for row in rows
+        if row["status"] not in _SUCCESS_ORG_STATUSES | _FALLBACK_ORG_STATUSES
+    ]
+    if non_terminal:
+        status_values = ", ".join(sorted(set(non_terminal)))
         raise CanonicalValidationError(
-            f"Backfill overlay is not complete; non-completed organization statuses: {status_values}"
+            "Backfill overlay is not complete; "
+            f"non-terminal organization statuses: {status_values}"
         )
+
+    successful = frozenset(
+        str(row["org_dn"])
+        for row in rows
+        if row["status"] in _SUCCESS_ORG_STATUSES
+    )
+    fallback = frozenset(
+        str(row["org_dn"])
+        for row in rows
+        if row["status"] in _FALLBACK_ORG_STATUSES
+    )
+    return OverlayQuality(
+        successful_org_dns=successful,
+        fallback_org_dns=fallback,
+        warnings=tuple(
+            f"partial_overlay_base_fallback:{org_dn}"
+            for org_dn in sorted(fallback)
+        ),
+    )
 
 
 def _validate_database_schema(

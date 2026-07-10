@@ -56,7 +56,7 @@ After each task, check its boxes here, append exact command/results to docs/supe
 - OverlayQuality(successful_org_dns, fallback_org_dns, warnings).
 - ResolvedSnapshot.quality, iter_people(), iter_orgs(), and iter_departments().
 
-- [ ] **Step 1: Write failing resolver tests**
+- [x] **Step 1: Write failing resolver tests**
 
 ~~~python
 def test_resolver_accepts_historical_finished_status(tmp_path):
@@ -84,13 +84,13 @@ def test_failed_org_is_terminal_with_base_fallback(tmp_path):
     )
 ~~~
 
-- [ ] **Step 2: Verify the tests fail under the strict old check**
+- [x] **Step 2: Verify the tests fail under the strict old check**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_canonical_resolver.py -v
 
 Expected: the new tests fail because only completed is accepted and failed is rejected.
 
-- [ ] **Step 3: Classify statuses**
+- [x] **Step 3: Classify statuses**
 
 ~~~python
 @dataclass(frozen=True)
@@ -135,7 +135,7 @@ def read_overlay_quality(con: sqlite3.Connection) -> OverlayQuality:
     )
 ~~~
 
-- [ ] **Step 4: Write failing projection replacement tests**
+- [x] **Step 4: Write failing projection replacement tests**
 
 ~~~python
 def test_success_overlay_replaces_base_people_for_target_org(snapshot_set):
@@ -154,7 +154,7 @@ def test_failed_overlay_discards_partial_rows_and_keeps_base(snapshot_set):
     assert people == {"base-person", "untargeted-base-person"}
 ~~~
 
-- [ ] **Step 5: Implement deterministic projection**
+- [x] **Step 5: Implement deterministic projection**
 
 ~~~python
 def iter_projected_people(resolved: ResolvedSnapshot) -> Iterator[dict[str, object]]:
@@ -176,7 +176,7 @@ def iter_projected_people(resolved: ResolvedSnapshot) -> Iterator[dict[str, obje
 
 Implement organization and department projections with deterministic source-path ordering and DN deduplication. Failed-org partial overlay people never enter the result.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_canonical_resolver.py tests/test_canonical_projection.py -v
 
