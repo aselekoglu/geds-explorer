@@ -309,3 +309,29 @@ GREEN evidence:
 Next:
 
 - Task 10: create the separate public React application and visual system.
+
+## Task 10 — Separate React application and visual system
+
+Status: verified
+
+Implemented:
+
+- separate React 19 + Vite public application, with a committed dependency lockfile;
+- accessible public shell with skip link and no crawler-control actions;
+- dark civic-tech visual system: navy surface tokens, cyan focus/selection, star-field constellation canvas, responsive sidebar, filter rail, and detail inspector;
+- selected constellation node is interactive and updates the public inspector state;
+- responsive collapse preserves the public explorer surface without exposing admin UI.
+
+Visual reference:
+
+- generated and inspected a full-screen Constellation concept before implementation; its navigation hierarchy, central constellation, filter rail, and right-side hierarchy/detail inspector informed the shell.
+
+Verification:
+
+- npm.cmd test -- --run src/app/App.test.tsx: 1 passed.
+- npm.cmd run typecheck: passed.
+- npm.cmd run build: passed; dist includes index.html and hashed CSS/JS assets.
+
+Next:
+
+- Task 11: add typed public API client and shareable explorer URL state.

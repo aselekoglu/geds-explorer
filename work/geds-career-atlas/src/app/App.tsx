@@ -1,0 +1,14 @@
+import { useState } from "react"
+
+const clusters = ["Canada Revenue Agency", "National Defence", "Health Canada", "Environment and Climate Change Canada", "Employment and Social Development Canada", "Innovation, Science and Economic Development Canada"]
+
+export function App() {
+  const [selected, setSelected] = useState("Privy Council Office")
+  return <div className="app-shell">
+    <a className="skip-link" href="#main">Skip to content</a>
+    <aside className="side-nav" aria-label="Primary navigation"><div className="brand"><span className="brand-mark">✦</span><span>GEDS <b>Career Atlas</b></span></div><nav><a href="#discover" className="active">Discover</a><a href="#explorer">Government Explorer</a><a href="#constellation">Constellation</a><a href="#tours">Tours</a></nav><div className="nav-footer">Source: GEDS snapshot<br/>Public, read-only explorer</div></aside>
+    <main id="main"><header className="command-bar"><label><span className="sr-only">Career interest</span><input placeholder="AI, cybersecurity, policy" /></label><button>Filters</button><button className="language">FR</button></header><div className="filter-rail"><button>Organizations</button><button>All levels</button><button>All Canada</button><button>All work types</button></div>
+      <section className="atlas" aria-label="Government constellation"><div className="atlas-heading"><h1>Government at a glance</h1><p>Explore organizations and discover where your interests connect to Canada’s public service.</p></div><div className="constellation">{clusters.map((name, index) => <button key={name} className={`orbit orbit-${index}`} onClick={() => setSelected(name)}><span>✦</span>{name}</button>)}<button className="core" onClick={() => setSelected("Privy Council Office")} aria-pressed={selected === "Privy Council Office"}>⌂<small>Privy Council Office</small></button></div><p className="legend">● Selected &nbsp; ● Organization &nbsp; — reports to / relationship</p></section>
+    </main><aside className="detail-panel"><button className="close" aria-label="Close detail panel">×</button><p className="breadcrumb">Government of Canada / Core Public Administration</p><h2>{selected}</h2><p className="role-count">486 roles · vacancy status unverified</p><p>Explore its hierarchy, current roles, and why this organization may match your interests.</p><section><h3>Explore hierarchy</h3><ol><li>Government of Canada</li><li>Core Public Administration</li><li><strong>{selected}</strong></li></ol></section><section><h3>Examples of current roles</h3><ul className="role-list"><li>Policy Analyst</li><li>Cybersecurity Advisor</li><li>Data Scientist</li></ul></section><section><h3>Why you might be a good match</h3><p><b>Security & trust</b><br/>Matched organization evidence and related roles.</p></section><footer>Recorded as vacant in GEDS — unverified</footer></aside>
+  </div>
+}

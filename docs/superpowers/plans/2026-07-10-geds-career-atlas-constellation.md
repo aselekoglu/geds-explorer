@@ -970,7 +970,7 @@ git commit -m "feat: expose read-only Career Atlas API"
 
 Add compatible current patches of Testing Library, jest-dom, jsdom, and axe-core, then commit the generated lockfile. The lockfile is the transitive dependency authority.
 
-- [ ] **Step 2: Write a failing public-shell test**
+- [x] **Step 2: Write a failing public-shell test**
 
 ~~~tsx
 it("renders public navigation without crawler actions", () => {
@@ -981,7 +981,7 @@ it("renders public navigation without crawler actions", () => {
 })
 ~~~
 
-- [ ] **Step 3: Install, observe failure, and implement shell**
+- [x] **Step 3: Install, observe failure, and implement shell**
 
 Run: cd work/geds-career-atlas; npm.cmd install; npm.cmd test
 
@@ -989,7 +989,7 @@ Expected before implementation: App/navigation test fails.
 
 Implement a skip link, landmark navigation, snapshot/quality status slot, responsive outlet, and error boundary. Tokens cover surfaces, stable institution palette, career overlays, focus ring, typography, spacing, status, motion, and prefers-reduced-motion.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test; npm.cmd run typecheck; npm.cmd run build
 
