@@ -41,3 +41,34 @@ Implementation note:
 Next:
 
 - Task 2: derive and validate the canonical LDAP hierarchy.
+
+## Task 2 — DN-derived canonical hierarchy
+
+Status: verified
+
+Implemented:
+
+- parses DN suffixes without splitting escaped commas;
+- handles even/odd backslash escaping at separators;
+- assigns the nearest known suffix as parent and ignores stored parent/path;
+- skips absent intermediate DNs without inventing nodes;
+- generates stable case-insensitive URL-safe organization IDs;
+- derives canonical paths and depths through memoized parent traversal;
+- reports roots, missing parents, cycles, and maximum depth.
+
+RED evidence:
+
+- py -m pytest tests/test_canonical_hierarchy.py -v
+- Result: collection failed because canonical_hierarchy did not exist.
+
+GREEN evidence:
+
+- py -m pytest tests/test_canonical_hierarchy.py -v
+- Result: 7 passed in 1.59s
+- Real lineage: 26421 organizations, 156 roots, 0 missing parents, 0 cycle nodes, maximum depth 12.
+- py -m pytest -q
+- Result: 110 passed in 14.16s
+
+Next:
+
+- Task 3: materialize canonical current departments, organizations, people, source lineage, and quality.

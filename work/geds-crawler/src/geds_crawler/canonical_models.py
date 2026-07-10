@@ -40,3 +40,23 @@ class PersonChangeEvent:
     event_type: str
     occurred_at: str
     details_json: str
+
+
+@dataclass(frozen=True)
+class CanonicalOrganization:
+    org_id: str
+    dn: str
+    name: str
+    parent_dn: str | None
+    department_dn: str
+    depth: int
+    canonical_path: tuple[str, ...]
+    source_url: str
+
+
+@dataclass(frozen=True)
+class HierarchyQuality:
+    root_count: int
+    missing_parent_count: int
+    cycle_count: int
+    max_depth: int

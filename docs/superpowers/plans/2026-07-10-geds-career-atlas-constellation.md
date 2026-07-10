@@ -203,7 +203,7 @@ git commit -m "fix: build safe canonical overlay projection"
 - derive_hierarchy(rows) -> tuple[CanonicalOrganization, ...].
 - validate_hierarchy(orgs) -> HierarchyQuality.
 
-- [ ] **Step 1: Write failing escaped-DN and parent/path tests**
+- [x] **Step 1: Write failing escaped-DN and parent/path tests**
 
 ~~~python
 def test_dn_suffixes_preserve_escaped_commas():
@@ -228,13 +228,13 @@ def test_parent_and_path_ignore_stored_corruption():
     assert orgs[1].canonical_path == ("Dept", "Team")
 ~~~
 
-- [ ] **Step 2: Verify the missing module failure**
+- [x] **Step 2: Verify the missing module failure**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_canonical_hierarchy.py -v
 
 Expected: collection fails with ModuleNotFoundError.
 
-- [ ] **Step 3: Implement immutable hierarchy types and DN parsing**
+- [x] **Step 3: Implement immutable hierarchy types and DN parsing**
 
 ~~~python
 @dataclass(frozen=True)
@@ -256,7 +256,7 @@ def stable_org_id(dn: str) -> str:
 
 Parse unescaped commas, choose the nearest suffix present in the known-DN set, calculate paths through memoized parent traversal, and raise CanonicalValidationError on cycles or missing roots.
 
-- [ ] **Step 4: Add real-data invariants**
+- [x] **Step 4: Add real-data invariants**
 
 ~~~python
 def test_current_lineage_has_expected_cycle_free_shape(real_projected_orgs):
@@ -269,7 +269,7 @@ def test_current_lineage_has_expected_cycle_free_shape(real_projected_orgs):
 
 Skip this integration test only when real output DBs are absent. It must run during final acceptance in this workspace.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_canonical_hierarchy.py -v
 
