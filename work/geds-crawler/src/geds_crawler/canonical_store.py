@@ -65,6 +65,8 @@ class CanonicalStore:
               title TEXT,
               org_path TEXT NOT NULL,
               snapshot_id TEXT NOT NULL,
+              missing_streak INTEGER NOT NULL DEFAULT 0,
+              presence_status TEXT NOT NULL DEFAULT 'present',
               FOREIGN KEY (snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
             );
 
@@ -90,6 +92,11 @@ class CanonicalStore:
               ON person_change_events (snapshot_id, event_type);
             """
         )
+        for column, definition in (("missing_streak", "INTEGER NOT NULL DEFAULT 0"), ("presence_status", "TEXT NOT NULL DEFAULT 'present'")):
+            try:
+                self.db.execute(f"ALTER TABLE people_current ADD COLUMN {column} {definition}")
+            except sqlite3.OperationalError:
+                pass
         self.db.execute(
             "INSERT INTO canonical_state (singleton, current_snapshot_id) VALUES (1, NULL) "
             "ON CONFLICT(singleton) DO NOTHING"

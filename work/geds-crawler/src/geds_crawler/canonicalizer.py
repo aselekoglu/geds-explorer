@@ -34,6 +34,8 @@ def promote_canonical_snapshot(
         offset += len(page["items"])
     if int(status["people"]) != len(people_rows):
         raise ValueError(f"people count mismatch: status={status['people']} rows={len(people_rows)}")
+    org_count = int(reader.orgs(limit=1, offset=0)["total"])
+    dept_count = len(reader.departments())
 
     normalized = []
     for row in people_rows:
@@ -58,8 +60,8 @@ def promote_canonical_snapshot(
             as_of_at=as_of,
             source_fingerprint=fingerprint,
             people_count=len(normalized),
-            org_units_count=int(status["org_units"]),
-            departments_count=int(status["departments"]),
+            org_units_count=org_count,
+            departments_count=dept_count,
             baseline=parent_id is None,
         )
         members = [SnapshotMember(snapshot_id, p["source_url"], p["display_name"], p["title"], p["org_path"]) for p in normalized]
@@ -67,21 +69,15 @@ def promote_canonical_snapshot(
         events: list[PersonChangeEvent] = []
         counts: dict[str, int] = {}
         with store.transaction():
-            previous_rows = store.db.execute("SELECT source_url, display_name, title, org_path FROM people_current").fetchall()
+            previous_rows = store.db.execute("SELECT source_url, display_name, title, org_path, missing_streak, presence_status FROM people_current").fetchall()
             previous = {r["source_url"]: dict(r) for r in previous_rows}
             if parent_id is not None:
-                historical_rows = store.db.execute(
-                    "SELECT source_url, display_name, title, org_path FROM canonical_snapshot_members GROUP BY source_url",
-                ).fetchall()
-                for row in historical_rows:
-                    previous.setdefault(row["source_url"], dict(row))
                 for key, person in current.items():
                     old = previous.get(key)
                     event_type = None
                     if old is None:
                         # A person seen before but absent in the immediate projection has reappeared.
-                        prior = store.db.execute("SELECT 1 FROM person_change_events WHERE person_key=? AND event_type IN ('missing_once','departed') LIMIT 1", (key,)).fetchone()
-                        event_type = "reappeared" if prior else "joined"
+                        event_type = "reappeared" if old is not None and old.get("presence_status") == "missing" else "joined"
                         details = json.dumps({"before": None, "after": person}, sort_keys=True)
                         events.append(PersonChangeEvent(snapshot_id, key, event_type, as_of, details))
                         counts[event_type] = counts.get(event_type, 0) + 1
@@ -105,13 +101,16 @@ def promote_canonical_snapshot(
                             counts["possible_move"] = counts.get("possible_move", 0) + 1
                 for key, old in previous.items():
                     if key not in current:
-                        prior = store.db.execute("SELECT event_type FROM person_change_events WHERE person_key=? ORDER BY id DESC LIMIT 1", (key,)).fetchone()
-                        event_type = "departed" if prior and prior["event_type"] == "missing_once" else "missing_once"
+                        streak = int(old.get("missing_streak") or 0)
+                        event_type = "departed" if streak >= 1 else "missing_once"
                         details = json.dumps({"before": old, "after": None}, sort_keys=True)
                         events.append(PersonChangeEvent(snapshot_id, key, event_type, as_of, details))
                         counts[event_type] = counts.get(event_type, 0) + 1
             store.insert_snapshot(snapshot, members)
             store.replace_current_people(CurrentPerson(p["source_url"], p["display_name"], p["title"], p["org_path"], snapshot_id) for p in normalized)
+            for key, old in previous.items():
+                if key not in current:
+                    store.db.execute("INSERT OR REPLACE INTO people_current(source_url,display_name,title,org_path,snapshot_id,missing_streak,presence_status) VALUES(?,?,?,?,?,?,?)", (key, old["display_name"], old["title"], old["org_path"], snapshot_id, int(old.get("missing_streak") or 0)+1, "missing"))
             store.append_events(events)
             store.set_current_snapshot(snapshot_id)
         return PromotionResult(snapshot, counts)
