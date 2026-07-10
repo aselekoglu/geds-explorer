@@ -1,0 +1,1 @@
+export function OrgWalk({path}:{path:string[]}){return <section className="org-walk"><nav aria-label="Organization path">{path.join(" / ")}</nav><div role="tree">{path.map((name,index)=><button key={name} role="treeitem" aria-level={index+1} aria-current={index===path.length-1?"true":undefined}>{name}</button>)}</div></section>}
