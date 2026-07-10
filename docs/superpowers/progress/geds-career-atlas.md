@@ -72,3 +72,40 @@ GREEN evidence:
 Next:
 
 - Task 3: materialize canonical current departments, organizations, people, source lineage, and quality.
+
+## Task 3 — Canonical current projection and source lineage schema
+
+Status: verified
+
+Implemented:
+
+- immutable canonical source, department, organization, person, and quality types;
+- snapshot quality status, warnings, fallback count, and hierarchy metrics;
+- true canonical_snapshot_sources lineage records;
+- departments_current and organizations_current projections;
+- expanded people_current organization, department, canonical path, and freshness fields;
+- transactional replace_current_projection and pointer rollback;
+- read-only current manifest and decoded quality warnings;
+- parent/name, department/depth, org/title, and department indexes;
+- legacy people_current column migration before index creation.
+
+RED evidence:
+
+- initial canonical-store collection failed because new immutable types were absent;
+- after adding types, five tests failed for missing schema/store methods;
+- the legacy upgrade test failed with sqlite3.OperationalError because indexes were created before migrated columns.
+
+GREEN evidence:
+
+- py -m pytest tests/test_canonical_store.py -v
+- Result: 13 passed in 0.34s
+- py -m pytest -q
+- Result: 117 passed in 15.89s
+
+Compatibility note:
+
+- canonical_snapshot_members and replace_current_people remain temporarily for the pre-Task-4 canonicalizer tests. Task 4 moves publication to canonical_snapshot_sources plus replace_current_projection before legacy cleanup.
+
+Next:
+
+- Task 4: publish the real canonical baseline atomically through the new projection.

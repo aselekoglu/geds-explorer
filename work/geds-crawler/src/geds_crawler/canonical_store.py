@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from .canonical_models import CanonicalSnapshot, CurrentPerson, PersonChangeEvent, SnapshotMember
+from .canonical_models import (
+    CanonicalDepartment,
+    CanonicalOrganization,
+    CanonicalPerson,
+    CanonicalSnapshot,
+    CanonicalSource,
+    CurrentPerson,
+    PersonChangeEvent,
+    SnapshotMember,
+)
 
 
 class CanonicalStore:
@@ -46,6 +56,13 @@ class CanonicalStore:
               org_units_count INTEGER NOT NULL CHECK (org_units_count >= 0),
               departments_count INTEGER NOT NULL CHECK (departments_count >= 0),
               baseline INTEGER NOT NULL CHECK (baseline IN (0, 1)),
+              quality_status TEXT NOT NULL DEFAULT 'complete',
+              quality_warnings_json TEXT NOT NULL DEFAULT '[]',
+              fallback_org_count INTEGER NOT NULL DEFAULT 0,
+              root_count INTEGER NOT NULL DEFAULT 0,
+              missing_parent_count INTEGER NOT NULL DEFAULT 0,
+              cycle_count INTEGER NOT NULL DEFAULT 0,
+              max_depth INTEGER NOT NULL DEFAULT 0,
               FOREIGN KEY (parent_snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
             );
 
@@ -64,9 +81,51 @@ class CanonicalStore:
               display_name TEXT NOT NULL,
               title TEXT,
               org_path TEXT NOT NULL,
+              org_dn TEXT NOT NULL DEFAULT '',
+              department_dn TEXT NOT NULL DEFAULT '',
+              department_name TEXT NOT NULL DEFAULT '',
+              org_unit TEXT NOT NULL DEFAULT '',
+              canonical_path_json TEXT NOT NULL DEFAULT '[]',
+              last_seen_at TEXT NOT NULL DEFAULT '',
               snapshot_id TEXT NOT NULL,
               missing_streak INTEGER NOT NULL DEFAULT 0,
               presence_status TEXT NOT NULL DEFAULT 'present',
+              FOREIGN KEY (snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS canonical_snapshot_sources (
+              snapshot_id TEXT NOT NULL,
+              source_path TEXT NOT NULL,
+              source_role TEXT NOT NULL CHECK (source_role IN ('base', 'overlay')),
+              precedence INTEGER NOT NULL,
+              source_sha256 TEXT NOT NULL,
+              PRIMARY KEY (snapshot_id, source_path),
+              FOREIGN KEY (snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS departments_current (
+              department_dn TEXT PRIMARY KEY,
+              department_id TEXT NOT NULL UNIQUE,
+              name TEXT NOT NULL,
+              source_url TEXT NOT NULL,
+              snapshot_id TEXT NOT NULL,
+              FOREIGN KEY (snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS organizations_current (
+              org_dn TEXT PRIMARY KEY,
+              org_id TEXT NOT NULL UNIQUE,
+              name TEXT NOT NULL,
+              parent_dn TEXT,
+              department_dn TEXT NOT NULL,
+              depth INTEGER NOT NULL,
+              canonical_path_json TEXT NOT NULL,
+              source_url TEXT NOT NULL,
+              direct_people_count INTEGER NOT NULL,
+              descendant_people_count INTEGER NOT NULL,
+              child_count INTEGER NOT NULL,
+              descendant_org_count INTEGER NOT NULL,
+              snapshot_id TEXT NOT NULL,
               FOREIGN KEY (snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
             );
 
@@ -92,11 +151,39 @@ class CanonicalStore:
               ON person_change_events (snapshot_id, event_type);
             """
         )
-        for column, definition in (("missing_streak", "INTEGER NOT NULL DEFAULT 0"), ("presence_status", "TEXT NOT NULL DEFAULT 'present'")):
-            try:
-                self.db.execute(f"ALTER TABLE people_current ADD COLUMN {column} {definition}")
-            except sqlite3.OperationalError:
-                pass
+        for column, definition in (
+            ("missing_streak", "INTEGER NOT NULL DEFAULT 0"),
+            ("presence_status", "TEXT NOT NULL DEFAULT 'present'"),
+            ("org_dn", "TEXT NOT NULL DEFAULT ''"),
+            ("department_dn", "TEXT NOT NULL DEFAULT ''"),
+            ("department_name", "TEXT NOT NULL DEFAULT ''"),
+            ("org_unit", "TEXT NOT NULL DEFAULT ''"),
+            ("canonical_path_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ("last_seen_at", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            self._ensure_column("people_current", column, definition)
+        for column, definition in (
+            ("quality_status", "TEXT NOT NULL DEFAULT 'complete'"),
+            ("quality_warnings_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ("fallback_org_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("root_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("missing_parent_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("cycle_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("max_depth", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            self._ensure_column("canonical_snapshots", column, definition)
+        self.db.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_org_current_parent_name
+              ON organizations_current (parent_dn, name COLLATE NOCASE);
+            CREATE INDEX IF NOT EXISTS idx_org_current_department_depth
+              ON organizations_current (department_dn, depth);
+            CREATE INDEX IF NOT EXISTS idx_people_current_org_title
+              ON people_current (org_dn, title COLLATE NOCASE);
+            CREATE INDEX IF NOT EXISTS idx_people_current_department
+              ON people_current (department_dn);
+            """
+        )
         self.db.execute(
             "INSERT INTO canonical_state (singleton, current_snapshot_id) VALUES (1, NULL) "
             "ON CONFLICT(singleton) DO NOTHING"
@@ -123,6 +210,23 @@ class CanonicalStore:
         ).fetchone()
         return None if row is None else row["current_snapshot_id"]
 
+    def current_manifest(self) -> dict | None:
+        snapshot_id = self.current_snapshot()
+        if snapshot_id is None:
+            return None
+        row = self.db.execute(
+            "SELECT * FROM canonical_snapshots WHERE snapshot_id = ?",
+            (snapshot_id,),
+        ).fetchone()
+        return None if row is None else dict(row)
+
+    def quality_warnings(self) -> tuple[str, ...]:
+        manifest = self.current_manifest()
+        if manifest is None:
+            return ()
+        values = json.loads(str(manifest["quality_warnings_json"]))
+        return tuple(str(value) for value in values)
+
     def insert_snapshot(
         self,
         snapshot: CanonicalSnapshot,
@@ -132,8 +236,10 @@ class CanonicalStore:
             """
             INSERT INTO canonical_snapshots
               (snapshot_id, parent_snapshot_id, as_of_at, source_fingerprint, people_count,
-               org_units_count, departments_count, baseline)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               org_units_count, departments_count, baseline, quality_status,
+               quality_warnings_json, fallback_org_count, root_count,
+               missing_parent_count, cycle_count, max_depth)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 snapshot.snapshot_id,
@@ -144,6 +250,17 @@ class CanonicalStore:
                 snapshot.org_units_count,
                 snapshot.departments_count,
                 snapshot.baseline,
+                snapshot.quality_status,
+                json.dumps(
+                    snapshot.quality_warnings,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                snapshot.fallback_org_count,
+                snapshot.root_count,
+                snapshot.missing_parent_count,
+                snapshot.cycle_count,
+                snapshot.max_depth,
             ),
         )
         rows = []
@@ -166,6 +283,25 @@ class CanonicalStore:
             VALUES (?, ?, ?, ?, ?)
             """,
             rows,
+        )
+
+    def insert_sources(self, sources: Iterable[CanonicalSource]) -> None:
+        self.db.executemany(
+            """
+            INSERT INTO canonical_snapshot_sources
+              (snapshot_id, source_path, source_role, precedence, source_sha256)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    source.snapshot_id,
+                    source.source_path,
+                    source.source_role,
+                    source.precedence,
+                    source.source_sha256,
+                )
+                for source in sources
+            ],
         )
 
     def set_current_snapshot(self, snapshot_id: str) -> None:
@@ -194,6 +330,94 @@ class CanonicalStore:
             rows,
         )
 
+    def replace_current_projection(
+        self,
+        departments: Iterable[CanonicalDepartment],
+        organizations: Iterable[CanonicalOrganization],
+        people: Iterable[CanonicalPerson],
+    ) -> None:
+        self.db.execute("DELETE FROM people_current")
+        self.db.execute("DELETE FROM organizations_current")
+        self.db.execute("DELETE FROM departments_current")
+        self.db.executemany(
+            """
+            INSERT INTO departments_current
+              (department_dn, department_id, name, source_url, snapshot_id)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    department.dn,
+                    department.department_id,
+                    department.name,
+                    department.source_url,
+                    department.snapshot_id,
+                )
+                for department in departments
+            ],
+        )
+        self.db.executemany(
+            """
+            INSERT INTO organizations_current
+              (org_dn, org_id, name, parent_dn, department_dn, depth,
+               canonical_path_json, source_url, direct_people_count,
+               descendant_people_count, child_count, descendant_org_count,
+               snapshot_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    organization.dn,
+                    organization.org_id,
+                    organization.name,
+                    organization.parent_dn,
+                    organization.department_dn,
+                    organization.depth,
+                    json.dumps(
+                        organization.canonical_path,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    organization.source_url,
+                    organization.direct_people_count,
+                    organization.descendant_people_count,
+                    organization.child_count,
+                    organization.descendant_org_count,
+                    organization.snapshot_id,
+                )
+                for organization in organizations
+            ],
+        )
+        self.db.executemany(
+            """
+            INSERT INTO people_current
+              (source_url, display_name, title, org_path, org_dn, department_dn,
+               department_name, org_unit, canonical_path_json, last_seen_at,
+               snapshot_id, missing_streak, presence_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'present')
+            """,
+            [
+                (
+                    person.source_url,
+                    person.display_name,
+                    person.title,
+                    " / ".join(person.canonical_path),
+                    person.org_dn,
+                    person.department_dn,
+                    person.department_name,
+                    person.org_unit,
+                    json.dumps(
+                        person.canonical_path,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    person.last_seen_at,
+                    person.snapshot_id,
+                )
+                for person in people
+            ],
+        )
+
     def append_events(self, events: Iterable[PersonChangeEvent]) -> None:
         self.db.executemany(
             """
@@ -220,3 +444,21 @@ class CanonicalStore:
                 "SELECT name FROM sqlite_master WHERE type = 'index' AND name IS NOT NULL"
             )
         }
+
+    def table_names(self) -> set[str]:
+        return {
+            row["name"]
+            for row in self.db.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+
+    def _ensure_column(self, table: str, column: str, definition: str) -> None:
+        columns = {
+            row["name"]
+            for row in self.db.execute(f"PRAGMA table_info({table})")
+        }
+        if column not in columns:
+            self.db.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
+            )

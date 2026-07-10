@@ -292,7 +292,7 @@ git commit -m "feat: derive canonical GEDS hierarchy from DNs"
 - CanonicalStore.replace_current_projection(departments, organizations, people).
 - CanonicalStore.current_manifest() and quality_warnings().
 
-- [ ] **Step 1: Add failing schema and rollback tests**
+- [x] **Step 1: Add failing schema and rollback tests**
 
 ~~~python
 def test_store_has_source_and_current_entity_tables(tmp_path):
@@ -320,13 +320,13 @@ def test_projection_and_pointer_rollback_together(tmp_path, projection):
         assert count == 0
 ~~~
 
-- [ ] **Step 2: Verify the schema tests fail**
+- [x] **Step 2: Verify the schema tests fail**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_canonical_store.py -v
 
 Expected: new table and method assertions fail.
 
-- [ ] **Step 3: Store true source lineage and current entities**
+- [x] **Step 3: Store true source lineage and current entities**
 
 ~~~sql
 CREATE TABLE canonical_snapshot_sources (
@@ -365,7 +365,7 @@ CREATE TABLE organizations_current (
 
 Extend people_current with org_dn, department_dn, department_name, org_unit, canonical_path_json, last_seen_at, and source_url. Add indexes on organization parent/name, department/depth, people org/title, and people department. Replace the old person-shaped canonical_snapshot_members behavior with source lineage; current entities provide the projection.
 
-- [ ] **Step 4: Verify atomicity and commit**
+- [x] **Step 4: Verify atomicity and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_canonical_store.py -v
 
