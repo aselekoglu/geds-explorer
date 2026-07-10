@@ -43,6 +43,10 @@ def create_career_app(master_db: Path | str, frontend_dir: Path | str | None = N
     def departments(request: Request):
         return payload(repository(request).departments())
 
+    @app.get("/api/orgs/root/children")
+    def root_children(request: Request, limit: int = Query(50, ge=1, le=200)):
+        return payload(repository(request).children(parent_id=None, limit=limit))
+
     @app.get("/api/orgs/{org_id}/children")
     def children(request: Request, org_id: str, limit: int = Query(50, ge=1, le=200)):
         return payload(repository(request).children(parent_id=org_id, limit=limit))

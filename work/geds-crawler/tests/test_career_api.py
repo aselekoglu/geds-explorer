@@ -39,6 +39,16 @@ def test_meta_and_search_contract(career_client):
     assert search.headers["etag"]
 
 
+def test_org_root_and_child_contract(career_client):
+    roots = career_client.get("/api/orgs/root/children", params={"limit": 200})
+    assert roots.status_code == 200
+    assert roots.json()["items"]
+    assert roots.headers["etag"]
+
+    children = career_client.get(f"/api/orgs/{roots.json()['items'][0]['org_id']}/children")
+    assert children.status_code == 200
+
+
 @pytest.mark.parametrize("path", ["/api/crawlers", "/api/jobs", "/api/schedules"])
 def test_public_app_has_no_control_routes(career_client, path):
     assert career_client.get(path).status_code == 404
