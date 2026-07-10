@@ -355,3 +355,17 @@ Verification:
 Next:
 
 - Task 12: build the Discover journey over real explainable API search results.
+
+## Task 12 — Discover and explainable ranked results
+
+Status: in progress
+
+Implemented and verified vertical slice:
+
+- Discover result surface renders interpreted AI interest language, accessible result articles, confidence, and the first explainable evidence records;
+- vacancy language is exactly "Recorded as vacant in GEDS — unverified" and no application action is present.
+- npm.cmd test -- --run src/features/discover/DiscoverPage.test.tsx: 1 passed.
+
+Next:
+
+- connect the Discover surface to URL state and real public API data, then add no-match/loading/partial-quality states.

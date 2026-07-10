@@ -1,0 +1,4 @@
+import { render, screen } from "@testing-library/react"
+import { expect, it, vi } from "vitest"
+import { DiscoverPage } from "./DiscoverPage"
+it("explains why an AI team matched", async () => { render(<DiscoverPage search="AI" client={{search:vi.fn().mockResolvedValue({items:[{entity_id:"o1",entity_kind:"organization",title:"",organization_name:"AI Centre",score:85,confidence:"medium",evidence:[{field:"organization",matched_phrase:"artificial intelligence",source_text:"AI Centre",weight:85,category_id:"data-ai-research"}]}]})} as never} />); expect(await screen.findByText("Data, analytics, AI and research")).toBeVisible(); const card=await screen.findByRole("article",{name:/AI Centre/i}); expect(card).toHaveTextContent(/Matched because/i); expect(card).toHaveTextContent(/organization/i) })
