@@ -1,1 +1,2 @@
-export function OrgWalk({path}:{path:string[]}){return <section className="org-walk"><nav aria-label="Organization path">{path.join(" / ")}</nav><div role="tree">{path.map((name,index)=><button key={name} role="treeitem" aria-level={index+1} aria-current={index===path.length-1?"true":undefined}>{name}</button>)}</div></section>}
+import { visibleWindow } from "./virtualization"
+export function OrgWalk({path}:{path:string[]}){const rendered=visibleWindow(path,0,60);return <section className="org-walk"><nav aria-label="Organization path">{path.join(" / ")}</nav><div role="tree">{rendered.map((name,index)=><button key={name} role="treeitem" aria-level={index+1} aria-current={index===path.length-1?"true":undefined}>{name}</button>)}</div></section>}
