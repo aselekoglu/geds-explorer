@@ -211,3 +211,42 @@ GREEN evidence:
 Next:
 
 - Task 7: build the snapshot-versioned FTS index and explicitly label GEDS vacancy signals as unverified source observations.
+
+## Task 7 — Snapshot-versioned FTS index and recorded vacancy signals
+
+Status: verified
+
+Implemented:
+
+- atomic FTS5 index build for current organizations and present people, with normalized comparison fields retained alongside source display fields;
+- career entity, FTS, per-category explainable match, vacancy signal, and singleton index-state tables;
+- transactional next-table validation and swap so a failed rebuild leaves the previous public index state usable;
+- career index state bound to one canonical snapshot and taxonomy version;
+- CLI index command with a machine-readable build manifest;
+- conservative vacancy parser accepting only placeholder-shaped names, not job titles such as Vacancy Planning Officer;
+- vacancy rows hold source text, role title, organization ID, snapshot ID, confidence, and reasons only: no contact, application-status, or application-URL fields.
+
+RED evidence:
+
+- py -m pytest tests/test_career_index.py -v
+- Result: collection failed with ModuleNotFoundError for geds_crawler.career_index.
+
+GREEN evidence:
+
+- py -m pytest tests/test_career_index.py -v
+- Result: 9 passed in 0.53s, including CLI output, failed-rebuild preservation, and conservative vacancy tests.
+- py -m pytest -q
+- Result: 150 passed in 17.51s before the final CLI assertion was added.
+
+Real index build:
+
+- Snapshot edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5, taxonomy 1.0.0.
+- 219584 entities: 26421 organizations and 193163 people.
+- 170415 persisted explainable category matches and 18 high-confidence GEDS vacancy signals.
+- Independent read-only verification: integrity_check ok, 0 foreign-key violations, 219584 FTS rows, and no contact/application columns in vacancy_signals.
+- The earlier 17-signal expectation was a pre-build estimate. Source-lineage inspection found 18 distinct person source URLs/DNs; similar titles remain separate when GEDS exposes distinct records.
+- Full production indexing duration was 167.6 seconds; it is a refresh-time offline job, never a public request-path operation.
+
+Next:
+
+- Task 8: implement bounded, read-only repository queries over the indexed canonical snapshot.

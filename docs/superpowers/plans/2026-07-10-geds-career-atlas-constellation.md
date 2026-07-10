@@ -684,7 +684,7 @@ git commit -m "feat: rank career matches with explainable evidence"
 - geds-career index --master-db PATH --taxonomy PATH.
 - career_entities, career_entities_fts, career_matches, vacancy_signals, career_index_state.
 
-- [ ] **Step 1: Write failing rebuild and vacancy tests**
+- [x] **Step 1: Write failing rebuild and vacancy tests**
 
 ~~~python
 def test_index_is_bound_to_current_snapshot(canonical_master, taxonomy_path):
@@ -707,13 +707,13 @@ def test_vacancy_requires_placeholder_shaped_name(name, confidence):
     assert parse_vacancy_signal(name, "Analyst").confidence == confidence
 ~~~
 
-- [ ] **Step 2: Verify missing-module failure**
+- [x] **Step 2: Verify missing-module failure**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_index.py -v
 
 Expected: collection fails with ModuleNotFoundError.
 
-- [ ] **Step 3: Build transactional FTS and match tables**
+- [x] **Step 3: Build transactional FTS and match tables**
 
 ~~~sql
 CREATE TABLE career_entities (
@@ -750,17 +750,17 @@ CREATE TABLE career_matches (
 
 Build temporary tables, validate row counts and foreign keys, then swap in one transaction. A failed rebuild leaves the previous career_index_state usable.
 
-- [ ] **Step 4: Parse vacancy markers conservatively**
+- [x] **Step 4: Parse vacancy markers conservatively**
 
 Recognize placeholder-shaped names using normalized vacant, vacancy, inoccupe, inoccupee, inoccupé, and known misspelling inocuppé only when remaining tokens are numeric, position, poste, or repeated markers. Store exact source text, title, org_id, snapshot_id, confidence, and reasons. Store no application status or URL.
 
-- [ ] **Step 5: Run the real index build**
+- [x] **Step 5: Run the real index build**
 
 Run: cd work/geds-crawler; py -m geds_crawler.career_cli index --master-db ../../outputs/master/geds-master.sqlite --taxonomy src/geds_crawler/data/career_taxonomy.v1.json
 
-Expected: 26421 organizations, 193163 people, and 17 recorded vacancy signals for the current baseline; snapshot_id equals the current manifest; career tables have no contact columns.
+Observed baseline: 26421 organizations, 193163 people, and 18 recorded vacancy signals; snapshot_id equals the current manifest; career tables have no contact columns. The original 17-signal estimate was reconciled against source lineage: all 18 rows have distinct GEDS source URLs/DNs, including separately recorded Vacancy/Vacant records with similar role titles.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_index.py -v
 

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
 from .canonical_resolver import CanonicalValidationError
 from .canonicalizer import publish_canonical
+from .career_index import build_career_index
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -17,6 +19,9 @@ def main(argv: list[str] | None = None) -> int:
     publish_parser.add_argument("--run-id", required=True)
     publish_parser.add_argument("--master-db", type=Path, required=True)
     publish_parser.add_argument("--as-of", required=True)
+    index_parser = subparsers.add_parser("index")
+    index_parser.add_argument("--master-db", type=Path, required=True)
+    index_parser.add_argument("--taxonomy", type=Path, required=True)
     args = parser.parse_args(argv)
 
     if args.command == "publish":
@@ -51,6 +56,14 @@ def main(argv: list[str] | None = None) -> int:
                 sort_keys=True,
             )
         )
+        return 0
+    if args.command == "index":
+        try:
+            report = build_career_index(args.master_db, args.taxonomy)
+        except (FileNotFoundError, ValueError, sqlite3.Error) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(report.__dict__, ensure_ascii=False, sort_keys=True))
         return 0
     return 1
 
