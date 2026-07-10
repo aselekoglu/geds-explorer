@@ -279,3 +279,33 @@ GREEN evidence:
 Next:
 
 - Task 9: expose only this repository through a separate FastAPI public application.
+
+## Task 9 — Separate read-only FastAPI application
+
+Status: verified
+
+Implemented:
+
+- separate GEDS Career Atlas FastAPI app factory backed only by CareerRepository;
+- public meta, search, department, org-walk, role, constellation, and tour routes;
+- no crawler, job, schedule, or control-plane routes;
+- same-origin Content-Security-Policy, nosniff, and strict referrer headers without wildcard CORS;
+- response ETags forwarded from immutable snapshot-aware repository results;
+- pinned FastAPI, Uvicorn, and HTTPX dependencies;
+- geds-career serve defaults to 127.0.0.1:8780 and refuses missing master/index state with exit code 2.
+
+RED evidence:
+
+- py -m pytest tests/test_career_api.py -v
+- Result: collection failed with ModuleNotFoundError for geds_crawler.career_api.
+
+GREEN evidence:
+
+- py -m pytest tests/test_career_api.py -v
+- Result: 6 passed in 0.77s, including control-route isolation, headers, caps, and missing-master refusal.
+- py -m pytest -q
+- Result: 163 passed in 16.62s.
+
+Next:
+
+- Task 10: create the separate public React application and visual system.

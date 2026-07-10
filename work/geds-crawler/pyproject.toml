@@ -6,12 +6,15 @@ requires-python = ">=3.11"
 dependencies = [
   "beautifulsoup4>=4.12",
   "croniter>=2.0.0",
+  "fastapi>=0.139,<0.140",
+  "uvicorn>=0.50,<0.51",
   "tzdata; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
+  "httpx>=0.28",
 ]
 
 [project.scripts]

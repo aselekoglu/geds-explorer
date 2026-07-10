@@ -852,7 +852,7 @@ git commit -m "feat: query the canonical career atlas"
 - create_career_app(master_db, frontend_dir=None) -> FastAPI.
 - geds-career serve --master-db PATH --frontend-dir PATH --host HOST --port PORT.
 
-- [ ] **Step 1: Write failing API isolation tests**
+- [x] **Step 1: Write failing API isolation tests**
 
 ~~~python
 def test_meta_and_search_contract(career_client):
@@ -870,7 +870,7 @@ def test_public_app_has_no_control_routes(career_client, path):
     assert career_client.post(path).status_code in {404, 405}
 ~~~
 
-- [ ] **Step 2: Add pinned API dependencies**
+- [x] **Step 2: Add pinned API dependencies**
 
 ~~~toml
 dependencies = [
@@ -885,7 +885,7 @@ dependencies = [
 dev = ["pytest>=8.0", "httpx>=0.28"]
 ~~~
 
-- [ ] **Step 3: Implement app factory and response security**
+- [x] **Step 3: Implement app factory and response security**
 
 ~~~python
 def create_career_app(master_db: Path, frontend_dir: Path | None = None) -> FastAPI:
@@ -901,11 +901,11 @@ Add middleware headers: Content-Security-Policy with same-origin scripts/styles/
 
 Routes: GET /api/meta, /api/search, /api/departments, /api/orgs/{org_id}/children, /ancestors, /profile, /api/roles, /api/constellation, and /api/tours. Validate and bound every query.
 
-- [ ] **Step 4: Add safe server defaults**
+- [x] **Step 4: Add safe server defaults**
 
 Default host 127.0.0.1, port 8780. Refuse a missing master DB, absent current snapshot, or stale career index with stderr explanation and exit code 2.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_api.py -v
 

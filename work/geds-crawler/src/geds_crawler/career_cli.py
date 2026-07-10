@@ -9,6 +9,8 @@ from pathlib import Path
 from .canonical_resolver import CanonicalValidationError
 from .canonicalizer import publish_canonical
 from .career_index import build_career_index
+from .career_api import create_career_app
+from .career_index import current_index_state
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,6 +24,11 @@ def main(argv: list[str] | None = None) -> int:
     index_parser = subparsers.add_parser("index")
     index_parser.add_argument("--master-db", type=Path, required=True)
     index_parser.add_argument("--taxonomy", type=Path, required=True)
+    serve_parser = subparsers.add_parser("serve")
+    serve_parser.add_argument("--master-db", type=Path, required=True)
+    serve_parser.add_argument("--frontend-dir", type=Path)
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8780)
     args = parser.parse_args(argv)
 
     if args.command == "publish":
@@ -64,6 +71,18 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc), file=sys.stderr)
             return 2
         print(json.dumps(report.__dict__, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "serve":
+        try:
+            if not args.master_db.exists():
+                raise ValueError(f"canonical master database does not exist: {args.master_db}")
+            current_index_state(args.master_db)
+            import uvicorn
+
+            uvicorn.run(create_career_app(args.master_db, args.frontend_dir), host=args.host, port=args.port)
+        except (FileNotFoundError, ValueError, sqlite3.Error) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
         return 0
     return 1
 
