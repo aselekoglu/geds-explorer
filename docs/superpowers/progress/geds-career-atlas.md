@@ -109,3 +109,42 @@ Compatibility note:
 Next:
 
 - Task 4: publish the real canonical baseline atomically through the new projection.
+
+## Task 4 — Real canonical publication command and baseline
+
+Status: verified
+
+Implemented:
+
+- publish_canonical resolves one terminal run, applies safe per-organization overlay fallback, derives and validates hierarchy, and promotes one atomic current projection;
+- canonical source files are recorded with roles, precedence, and SHA-256 checksums;
+- normalized source lineage and projected entities contribute to a deterministic snapshot fingerprint;
+- promotion records joined, changed, possible-move, missing, departed, and reappeared person events while retaining stable source-url identity;
+- failed partial overlays remain visible as partial_overlay warnings instead of silently replacing good base rows;
+- geds-career publish CLI emits a machine-readable canonical manifest and returns a nonzero code for invalid input;
+- generated master databases and future frontend build/test artifacts are ignored.
+
+RED evidence:
+
+- focused canonicalizer tests initially had three failures for absent source lineage, absent partial-overlay quality, and missing reappeared-person restoration;
+- test_career_cli.py initially failed during collection because geds_crawler.career_cli did not exist.
+
+GREEN evidence:
+
+- py -m pytest tests/test_canonicalizer.py tests/test_career_cli.py -v
+- Result: 7 passed in 0.73s.
+- py -m pytest -q
+- Result: 121 passed in 18.65s.
+
+Real baseline publication:
+
+- Source run: 769b7b73-dc8e-4911-b1d5-80cbe07e34f8 at 2026-07-09T07:05:04.674049+00:00.
+- Snapshot: edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5.
+- 193163 unique people, 26421 organizations, 156 departments, and 6 recorded source databases.
+- 156 roots, maximum depth 12, 0 missing parents, and 0 cycles.
+- Quality partial_overlay with 4 named fallback organizations.
+- Independent read-only verification: PRAGMA integrity_check returned ok, foreign_key_check returned 0 violations, and people_current contained 193163 distinct source URLs with 0 empty organization DNs.
+
+Next:
+
+- Task 5: implement the versioned bilingual taxonomy and noisy-text normalization with explainable category evidence.

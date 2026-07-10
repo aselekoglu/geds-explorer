@@ -11,3 +11,9 @@ __pycache__/
 *.egg-info/
 .worktrees/
 .superpowers/
+outputs/master/
+work/geds-career-atlas/node_modules/
+work/geds-career-atlas/dist/
+work/geds-career-atlas/coverage/
+work/geds-career-atlas/test-results/
+work/geds-career-atlas/playwright-report/

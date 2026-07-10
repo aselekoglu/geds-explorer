@@ -390,7 +390,7 @@ git commit -m "feat: store canonical organization projection"
 - publish_canonical(control_db, run_id, master_db, as_of_at) -> PromotionResult.
 - geds-career publish --control-db PATH --run-id ID --master-db PATH --as-of ISO8601.
 
-- [ ] **Step 1: Add failing quality and CLI tests**
+- [x] **Step 1: Add failing quality and CLI tests**
 
 ~~~python
 def test_promotion_records_fallback_quality(tmp_path, resolved_with_fallback):
@@ -415,13 +415,13 @@ def test_publish_command_prints_manifest_json(tmp_path, capsys, lineage):
     assert json.loads(capsys.readouterr().out)["snapshot_id"]
 ~~~
 
-- [ ] **Step 2: Verify tests fail**
+- [x] **Step 2: Verify tests fail**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_canonicalizer.py tests/test_career_cli.py -v
 
 Expected: quality fields and career CLI are absent.
 
-- [ ] **Step 3: Publish one atomic projection**
+- [x] **Step 3: Publish one atomic projection**
 
 ~~~python
 def publish_canonical(
@@ -448,7 +448,7 @@ def publish_canonical(
 
 Fingerprint normalized current entities and source checksums. Write manifest, true sources, current projection, history events, and pointer inside one transaction.
 
-- [ ] **Step 4: Add CLI entry point and ignores**
+- [x] **Step 4: Add CLI entry point and ignores**
 
 ~~~toml
 [project.scripts]
@@ -458,19 +458,19 @@ geds-career = "geds_crawler.career_cli:main"
 
 Ignore outputs/master/*.sqlite plus WAL/SHM, work/geds-career-atlas/node_modules, dist, coverage, and Playwright artifacts.
 
-- [ ] **Step 5: Run all Python tests**
+- [x] **Step 5: Run all Python tests**
 
 Run: cd work/geds-crawler; py -m pytest -q
 
 Expected: all tests pass.
 
-- [ ] **Step 6: Publish the real baseline**
+- [x] **Step 6: Publish the real baseline**
 
-Run: cd work/geds-crawler; py -m geds_crawler.career_cli publish --control-db ../../outputs/control/control.sqlite --run-id 769b7b73-dc8e-4911-b1d5-80cbe07e34f8 --master-db ../../outputs/master/geds-master.sqlite --as-of 2026-07-09T07:05:04.674049+00:00
+Run in this isolated worktree: cd work/geds-crawler; py -m geds_crawler.career_cli publish --control-db C:/Users/asele/Documents/geds-explorer/outputs/control/control.sqlite --run-id 769b7b73-dc8e-4911-b1d5-80cbe07e34f8 --master-db C:/Users/asele/Documents/geds-explorer/outputs/master/geds-master.sqlite --as-of 2026-07-09T07:05:04.674049+00:00
 
 Expected: departments 156, organizations 26421, people 193163, roots 156, cycles 0, missing parents 0, max depth 12, fallback organizations 4, quality partial_overlay. If a count differs, reconcile source lineage rather than editing expected values to pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ~~~powershell
 git add .gitignore work/geds-crawler/pyproject.toml work/geds-crawler/src/geds_crawler/canonicalizer.py work/geds-crawler/src/geds_crawler/career_cli.py work/geds-crawler/tests/test_canonicalizer.py work/geds-crawler/tests/test_career_cli.py docs/superpowers/progress/geds-career-atlas.md
