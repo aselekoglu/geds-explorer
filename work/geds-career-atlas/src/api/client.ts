@@ -1,0 +1,3 @@
+import type { SearchResult } from "./types"
+export class CareerApiError extends Error { constructor(public status:number, public detail:string){super(detail)} }
+export class CareerApiClient { constructor(private base="/api"){} private async request<T>(path:string,signal?:AbortSignal):Promise<T>{const response=await fetch(`${this.base}${path}`,{signal});if(!response.ok){const body=await response.json().catch(()=>({}));throw new CareerApiError(response.status,body.detail??response.statusText)}return response.json() as Promise<T>} meta(signal?:AbortSignal){return this.request<{snapshot_id:string}>("/meta",signal)} search(q:string,signal?:AbortSignal){return this.request<SearchResult>(`/search?q=${encodeURIComponent(q)}`,signal)} }

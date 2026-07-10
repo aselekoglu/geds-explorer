@@ -335,3 +335,23 @@ Verification:
 Next:
 
 - Task 11: add typed public API client and shareable explorer URL state.
+
+## Task 11 — Typed API client and shareable URL state
+
+Status: verified
+
+Implemented:
+
+- strict Zod schema for query, categories, department, organization, confidence, vacancy, language, mode, and focus;
+- deterministic/default-safe parsing for incomplete URL state;
+- typed client with encoded query parameters, AbortSignal support, and typed non-2xx errors;
+- minimum validated public response contracts for snapshot-aware meta and explainable search.
+
+Verification:
+
+- npm.cmd test -- --run src/api/client.test.ts src/state/explorerSearch.test.ts: 2 passed.
+- npm.cmd run typecheck: passed.
+
+Next:
+
+- Task 12: build the Discover journey over real explainable API search results.

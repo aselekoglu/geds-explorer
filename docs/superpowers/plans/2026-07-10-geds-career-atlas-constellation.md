@@ -1012,7 +1012,7 @@ git commit -m "feat: scaffold Career Atlas web application"
 - CareerApiClient.
 - ExplorerSearch and explorerSearchSchema.
 
-- [ ] **Step 1: Write failing round-trip and error tests**
+- [x] **Step 1: Write failing round-trip and error tests**
 
 ~~~typescript
 it("round-trips shareable explorer state", () => {
@@ -1039,7 +1039,7 @@ it("raises typed API errors", async () => {
 })
 ~~~
 
-- [ ] **Step 2: Implement strict state and API types**
+- [x] **Step 2: Implement strict state and API types**
 
 ~~~typescript
 export const explorerSearchSchema = z.object({
@@ -1057,7 +1057,7 @@ export const explorerSearchSchema = z.object({
 
 The client accepts AbortSignal, encodes every query parameter, rejects non-2xx responses, and validates snapshot_id/evidence fields before returning data. TanStack Router validates and serializes search state.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test -- src/api/client.test.ts src/state/explorerSearch.test.ts
 
