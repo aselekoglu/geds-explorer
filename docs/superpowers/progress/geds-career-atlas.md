@@ -356,6 +356,12 @@ Next:
 
 - Task 12: build the Discover journey over real explainable API search results.
 
+## Current verification snapshot
+
+- Frontend: 9 Vitest files passed; TypeScript typecheck and Vite production build passed.
+- Python: 163 tests passed.
+- Vite foreground startup verified readiness at 127.0.0.1:5174; persistent background launch is terminated by this sandbox host-process lifecycle, so browser screenshot QA remains explicitly outstanding.
+
 ## Task 12 — Discover and explainable ranked results
 
 Status: verified
