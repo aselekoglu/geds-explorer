@@ -82,20 +82,24 @@ def promote_canonical_snapshot(
                         # A person seen before but absent in the immediate projection has reappeared.
                         prior = store.db.execute("SELECT 1 FROM person_change_events WHERE person_key=? AND event_type IN ('missing_once','departed') LIMIT 1", (key,)).fetchone()
                         event_type = "reappeared" if prior else "joined"
-                    elif old["title"] != person["title"]:
-                        event_type = "title_changed"
-                    elif old["org_path"] != person["org_path"]:
-                        event_type = "org_changed"
-                    if event_type:
-                        before = old
-                        after = person
-                        details = json.dumps({"before": before, "after": after}, sort_keys=True)
+                        details = json.dumps({"before": None, "after": person}, sort_keys=True)
                         events.append(PersonChangeEvent(snapshot_id, key, event_type, as_of, details))
                         counts[event_type] = counts.get(event_type, 0) + 1
-                        if old and old["org_path"] != person["org_path"] and _department(old["org_path"]) != _department(person["org_path"]):
-                            dept_details = json.dumps({"before": before, "after": after}, sort_keys=True)
-                            events.append(PersonChangeEvent(snapshot_id, key, "department_changed", as_of, dept_details))
-                            counts["department_changed"] = counts.get("department_changed", 0) + 1
+                    elif old["title"] != person["title"] or old["org_path"] != person["org_path"]:
+                        before = old
+                        after = person
+                        changed = []
+                        if old["title"] != person["title"]:
+                            changed.append("title_changed")
+                        if old["org_path"] != person["org_path"]:
+                            changed.append("org_changed")
+                        if old["org_path"] != person["org_path"] and _department(old["org_path"]) != _department(person["org_path"]):
+                            changed.append("department_changed")
+                        details = json.dumps({"before": before, "after": after}, sort_keys=True)
+                        for event_type in changed:
+                            events.append(PersonChangeEvent(snapshot_id, key, event_type, as_of, details))
+                            counts[event_type] = counts.get(event_type, 0) + 1
+                        if "department_changed" in changed:
                             details = json.dumps({"before": before, "after": after, "uncertain": True}, sort_keys=True)
                             events.append(PersonChangeEvent(snapshot_id, key, "possible_move", as_of, details))
                             counts["possible_move"] = counts.get("possible_move", 0) + 1
