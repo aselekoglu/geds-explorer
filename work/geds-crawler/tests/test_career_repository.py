@@ -78,6 +78,15 @@ def test_navigation_queries_are_snapshot_bound_and_capped(repository):
     assert constellation.items
 
 
+def test_root_constellation_returns_only_root_organizations(repository):
+    result = repository.constellation_slice(root_id=None, max_depth=1, limit=2000)
+
+    assert result.nodes
+    assert all(node.parent_id is None for node in result.nodes)
+    assert result.truncated is False
+    assert result.limit == 2000
+
+
 def test_tours_are_deterministic_and_have_no_personal_data(repository):
     first = repository.tours()
     second = repository.tours()

@@ -7,7 +7,7 @@ type RootClient = {
 }
 type Column = { parent?: OrgNode; items: OrgNode[] }
 
-export function OrganizationExplorer({ client }: { client: RootClient }) {
+export function OrganizationExplorer({ client, onSelect }: { client: RootClient; onSelect?: (orgId: string) => void }) {
   const [columns, setColumns] = useState<Column[]>([])
   const [error, setError] = useState(false)
   useEffect(() => {
@@ -27,7 +27,7 @@ export function OrganizationExplorer({ client }: { client: RootClient }) {
     {selectedPath && <nav aria-label="Selected organization path">{selectedPath}</nav>}
     <div className="org-columns">
       {columns.map((column, columnIndex) => <div key={column.parent?.org_id ?? "root"} className="org-root-list" role="tree" aria-label={column.parent ? `${column.parent.name} teams` : "Top-level government organizations"}>
-        {column.items.map(node => <button key={node.org_id} role="treeitem" aria-level={node.depth + 1} aria-expanded={node.child_count > 0 ? columns[columnIndex + 1]?.parent?.org_id === node.org_id : undefined} onClick={() => open(node, columnIndex)} onKeyDown={event => { if ((event.key === "ArrowRight" || event.key === "Enter") && node.child_count) { event.preventDefault(); void open(node, columnIndex) } if (event.key === "ArrowLeft" && columnIndex) { event.preventDefault(); setColumns(current => current.slice(0, columnIndex)) } }}><span>{node.name}</span><small>{node.child_count} teams · {node.descendant_people_count.toLocaleString()} people indexed</small></button>)}
+        {column.items.map(node => <button key={node.org_id} role="treeitem" aria-level={node.depth + 1} aria-expanded={node.child_count > 0 ? columns[columnIndex + 1]?.parent?.org_id === node.org_id : undefined} onClick={() => { onSelect?.(node.org_id); void open(node, columnIndex) }} onKeyDown={event => { if ((event.key === "ArrowRight" || event.key === "Enter") && node.child_count) { event.preventDefault(); onSelect?.(node.org_id); void open(node, columnIndex) } if (event.key === "ArrowLeft" && columnIndex) { event.preventDefault(); setColumns(current => current.slice(0, columnIndex)) } }}><span>{node.name}</span><small>{node.child_count} teams · {node.descendant_people_count.toLocaleString()} people indexed</small></button>)}
       </div>)}
     </div>
   </section>

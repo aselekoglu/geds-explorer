@@ -54,6 +54,16 @@ class OrgPage:
 
 
 @dataclass(frozen=True)
+class ConstellationSlice:
+    nodes: tuple[OrgNode, ...]
+    limit: int
+    truncated: bool
+    snapshot_id: str
+    quality_status: str
+    etag: str
+
+
+@dataclass(frozen=True)
 class TeamProfile:
     org_id: str
     name: str
@@ -206,6 +216,41 @@ class CareerRepository:
             rows = con.execute(f"SELECT e.entity_id,e.entity_kind,e.org_id,e.title,e.organization_name,m.score,m.confidence,m.evidence_json FROM career_matches m JOIN career_entities e ON e.entity_id=m.entity_id WHERE m.category_id IN ({placeholders}) ORDER BY m.score DESC,e.entity_id LIMIT ?", (*interpretation.category_ids, limit)).fetchall()
         items = tuple(SearchItem(str(r["entity_id"]), str(r["entity_kind"]), r["org_id"], str(r["title"]), str(r["organization_name"]), int(r["score"]), str(r["confidence"]), tuple(json.loads(r["evidence_json"]))) for r in rows)
         return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "constellation", query, limit))
+
+    def constellation_slice(self, *, root_id: str | None, max_depth: int = 1, limit: int = 200) -> ConstellationSlice:
+        """Return a bounded organization slice for spatial exploration, never the full graph."""
+        limit = _bounded(limit, MAX_CONSTELLATION_SIZE)
+        max_depth = _bounded(max_depth, 12)
+        with self.connect() as con:
+            meta = self._meta(con)
+            snapshot_id = str(meta["snapshot_id"])
+            if root_id is None:
+                rows = con.execute(
+                    """SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.descendant_people_count
+                       FROM organizations_current o
+                       WHERE o.snapshot_id=? AND o.parent_dn IS NULL
+                       ORDER BY o.name,o.org_id LIMIT ?""",
+                    (snapshot_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = con.execute(
+                    """WITH RECURSIVE slice(org_dn, level) AS (
+                           SELECT org_dn, 0 FROM organizations_current WHERE snapshot_id=? AND org_id=?
+                           UNION ALL
+                           SELECT child.org_dn, slice.level + 1
+                           FROM organizations_current child JOIN slice ON child.parent_dn=slice.org_dn
+                           WHERE child.snapshot_id=? AND slice.level < ?
+                       )
+                       SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.descendant_people_count
+                       FROM slice JOIN organizations_current o ON o.org_dn=slice.org_dn
+                       LEFT JOIN organizations_current p ON p.org_dn=o.parent_dn
+                       ORDER BY o.depth,o.name,o.org_id LIMIT ?""",
+                    (snapshot_id, root_id, snapshot_id, max_depth, limit + 1),
+                ).fetchall()
+        truncated = len(rows) > limit
+        rows = rows[:limit]
+        nodes = tuple(OrgNode(str(row["org_id"]), str(row["name"]), row["parent_id"], int(row["depth"]), int(row["child_count"]), int(row["descendant_people_count"])) for row in rows)
+        return ConstellationSlice(nodes, limit, truncated, snapshot_id, str(meta["quality_status"]), _etag(meta, "constellation-slice", root_id or "root", max_depth, limit))
 
     def tours(self) -> TourResult:
         departments = self.departments()

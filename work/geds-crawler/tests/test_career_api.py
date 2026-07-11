@@ -63,6 +63,13 @@ def test_security_headers_and_bounded_input(career_client):
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
+def test_constellation_slice_contract(career_client):
+    response = career_client.get("/api/constellation/slice", params={"max_depth": 1, "limit": 2000})
+    assert response.status_code == 200
+    assert response.json()["nodes"]
+    assert response.json()["truncated"] is False
+
+
 def test_serve_refuses_a_missing_master(tmp_path, capsys):
     assert main(["serve", "--master-db", str(tmp_path / "missing.sqlite")]) == 2
     assert "does not exist" in capsys.readouterr().err
