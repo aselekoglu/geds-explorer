@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { en } from "./en"
 import { fr } from "./fr"
 
@@ -30,6 +30,7 @@ const getInitialLanguage = (): Language => new URLSearchParams(location.search).
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, updateLanguage] = useState<Language>(getInitialLanguage)
+  useEffect(() => { document.documentElement.lang = language }, [language])
   const value = useMemo<LanguageContextValue>(() => {
     const messages = flatten(dictionaries[language])
     return {

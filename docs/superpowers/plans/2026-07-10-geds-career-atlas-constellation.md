@@ -1530,7 +1530,7 @@ git commit -m "feat: complete bilingual responsive Career Atlas UX"
 **Interfaces:**
 - Repeatable browser/API release gate against real canonical data.
 
-- [ ] **Step 1: Write four core browser journeys**
+- [x] **Step 1: Write four core browser journeys**
 
 ~~~typescript
 test("broad interest to government map", async ({ page }) => {
@@ -1544,19 +1544,19 @@ test("broad interest to government map", async ({ page }) => {
 
 Add precise Org Walk, career-conversation research, and recorded-vacancy discovery journeys with assertions from the design.
 
-- [ ] **Step 2: Add automated and keyboard accessibility gates**
+- [x] **Step 2: Add automated and keyboard accessibility gates**
 
 Run axe on Discover, Organizations, Constellation, Roles, and Team routes and reject critical/serious violations. Assert skip link, visible focus, semantic canvas alternative, tree state, reduced-motion duration zero, and keyboard-only completion. Record manual screen-reader checks separately because automation is incomplete by nature.
 
-- [ ] **Step 3: Add performance budgets**
+- [x] **Step 3: Add performance budgets**
 
 Against real data and cached assets: initial useful Discover under 2.5 seconds; filter feedback or pending state under 150 ms; root layout under 50 ms; 2000-node layout under 150 ms; bounded API responses; no complete-person-dataset request. Run five times and assert median, while recording all samples.
 
-- [ ] **Step 4: Add public security and resilience tests**
+- [x] **Step 4: Add public security and resilience tests**
 
 Verify CSP, nosniff, referrer policy, no wildcard CORS, GET-only surface, path traversal rejection, bounded parameters, escaped FTS input, no contacts, no control routes, and useful no-match, partial, stale, source-unavailable, and canvas-failure states.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd run build; npm.cmd run test:e2e
 

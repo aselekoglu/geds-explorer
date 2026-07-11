@@ -500,3 +500,42 @@ Rendered browser verification:
 Next:
 
 - implement Task 20 automated E2E accessibility, performance, resilience, and security gates.
+
+## Task 20 — E2E accessibility, performance, resilience, and security gates
+
+Status: implemented and verified
+
+Implemented:
+
+- Playwright release gate using the installed Chrome channel and the real canonical master database;
+- 18 deterministic, single-worker E2E tests covering interest discovery, bilingual state preservation, Organization Walk keyboard drill-down, synchronized Constellation selection, mobile list-first rendering, career conversation research, bounded vacancy discovery, no-match, partial quality, source/API failures, axe, reduced motion, performance, and bounded API behavior;
+- axe serious/critical gates across Discover, Organization Walk, Constellation, and About, plus skip-link, visible-focus, tree semantics, semantic map alternative, and keyboard completion checks;
+- public API security gates for CSP, nosniff, strict referrer policy, no wildcard CORS, GET-only methods, bounded parameters, untrusted query syntax, path traversal rejection, no contacts/person names, no control routes, and no complete-person-dataset endpoint;
+- bounded `/api/vacancy-signals` discovery returning at most 200 source-derived markers, organization/title/date/source evidence, no personal fields, and `live_competition_verified: false` for every item;
+- immediate pending feedback on interest changes so user feedback is rendered inside the 150ms budget;
+- accessibility fixes discovered by axe: dynamic `<html lang>`, non-nested SVG group semantics, and preserved synchronized list alternative;
+- Vitest include boundary prevents Playwright suites from being collected by the unit runner.
+
+Performance samples (milliseconds, five runs each):
+
+- 156-root layout: `8.7121, 0.8986, 0.5646, 0.5427, 0.4566` (median `0.5646`, budget `<50`);
+- 2,000-node layout: `13.5374, 11.3644, 7.5950, 7.4249, 7.4643` (median `7.5950`, budget `<150`);
+- cached useful Discover: `1080.2536, 916.4005, 914.9605, 965.1343, 939.0288` (median `939.0288`, budget `<2500`);
+- input-to-pending feedback: `8.4, 9.0, 8.1, 11.9, 6.9` (median `8.4`, budget `<150`).
+
+Verification:
+
+- backend full suite: `199 passed`;
+- frontend unit suite: `19` files / `30` tests passed;
+- TypeScript typecheck and Vite production build passed;
+- Playwright full release gate: `18 passed`;
+- npm dependency audit: `0 vulnerabilities`;
+- Browser plugin rendered QA from Task 19 remains clean with no console warnings/errors.
+
+Manual assistive-technology note:
+
+- automated axe, accessibility-tree, keyboard-only, reduced-motion, focus, and semantic-alternative checks are recorded above; an actual NVDA/JAWS/VoiceOver listening session is inherently manual and is listed separately as a recommended human release check rather than represented as automated proof.
+
+Next:
+
+- complete Task 21 operator documentation, requirement-by-requirement acceptance ledger, rendered-state inspection, and final completion audit.

@@ -93,6 +93,28 @@ class VacancySignal:
 
 
 @dataclass(frozen=True)
+class VacancyDiscovery:
+    marker: str
+    title: str
+    org_id: str
+    organization_name: str
+    observed_at: str
+    source_url: str
+    confidence: str
+    reasons: tuple[str, ...]
+    live_competition_verified: bool = False
+
+
+@dataclass(frozen=True)
+class VacancyDiscoveryResult:
+    items: tuple[VacancyDiscovery, ...]
+    limit: int
+    snapshot_id: str
+    quality_status: str
+    etag: str
+
+
+@dataclass(frozen=True)
 class DepartmentItem:
     department_id: str
     name: str
@@ -267,6 +289,35 @@ class CareerRepository:
             rows = con.execute(sql, params).fetchall()
         items = tuple(SearchItem(str(r["entity_id"]), str(r["entity_kind"]), r["org_id"], str(r["title"]), str(r["organization_name"]), 0, "none", ()) for r in rows)
         return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "roles", org_id or "all", limit))
+
+    def vacancy_signals(self, *, limit: int = 50) -> VacancyDiscoveryResult:
+        limit = _bounded(limit, MAX_PAGE_SIZE)
+        with self.connect() as con:
+            meta = self._meta(con)
+            rows = con.execute(
+                """SELECT v.source_text,v.title,v.org_id,o.name organization_name,
+                          p.last_seen_at,p.source_url,v.confidence,v.reasons_json
+                   FROM vacancy_signals v
+                   JOIN organizations_current o ON o.org_id=v.org_id AND o.snapshot_id=v.snapshot_id
+                   JOIN people_current p ON v.entity_id='person:' || p.source_url AND p.snapshot_id=v.snapshot_id
+                   WHERE v.snapshot_id=?
+                   ORDER BY o.name,v.title,v.entity_id LIMIT ?""",
+                (meta["snapshot_id"], limit),
+            ).fetchall()
+        items = tuple(
+            VacancyDiscovery(
+                marker=str(row["source_text"]),
+                title=str(row["title"]),
+                org_id=str(row["org_id"]),
+                organization_name=str(row["organization_name"]),
+                observed_at=str(row["last_seen_at"]),
+                source_url=str(row["source_url"]),
+                confidence=str(row["confidence"]),
+                reasons=tuple(json.loads(row["reasons_json"])),
+            )
+            for row in rows
+        )
+        return VacancyDiscoveryResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "vacancy-signals", limit))
 
     def constellation(self, *, query: str, limit: int = 200) -> SearchResult:
         limit = _bounded(limit, MAX_CONSTELLATION_SIZE)

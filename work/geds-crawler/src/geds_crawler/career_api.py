@@ -66,6 +66,10 @@ def create_career_app(master_db: Path | str, frontend_dir: Path | str | None = N
     def roles(request: Request, org_id: str | None = None, limit: int = Query(50, ge=1, le=200)):
         return payload(repository(request).roles(org_id=org_id, limit=limit))
 
+    @app.get("/api/vacancy-signals")
+    def vacancy_signals(request: Request, limit: int = Query(50, ge=1)):
+        return payload(repository(request).vacancy_signals(limit=limit))
+
     @app.get("/api/constellation/slice")
     def constellation_slice(request: Request, root_id: str | None = None, max_depth: int = Query(1, ge=1, le=12), limit: int = Query(200, ge=1, le=2000)):
         return payload(repository(request).constellation_slice(root_id=root_id, max_depth=max_depth, limit=limit))

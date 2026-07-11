@@ -11,8 +11,9 @@ export function DiscoverPage({ search, client }: { search: string; client: Clien
   const { t } = useLanguage()
   useEffect(() => {
     if (!search) { setItems([]); return }
+    setLoading(true)
     const timer = setTimeout(() => {
-      setLoading(true); setError("")
+      setError("")
       client.search(search).then(result => setItems(result.items)).catch(() => setError(t("discover.error"))).finally(() => setLoading(false))
     }, 250)
     return () => clearTimeout(timer)
