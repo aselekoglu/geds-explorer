@@ -31,7 +31,14 @@ def repository(tmp_path):
     con.execute("INSERT INTO crawl_runs VALUES (0,'finished','full','2026-07-09')")
     con.execute("INSERT INTO departments VALUES (?,?)", (dept, "Digital Services"))
     con.execute("INSERT INTO org_units VALUES (?,?,?,?,?,?)", (org, "AI Centre", dept, 1, "Digital Services / AI Centre", "org"))
-    con.execute("INSERT INTO people_index VALUES (?,?,?,?,?,?,?,?,?)", ("Ada", "Machine Learning Engineer", "Digital Services", "AI Centre", "", "ada", "", org, dept))
+    con.executemany(
+        "INSERT INTO people_index VALUES (?,?,?,?,?,?,?,?,?)",
+        [
+            ("Ada", "Machine Learning Engineer", "Digital Services", "AI Centre", "", "https://geds.example/ada", "2026-07-09", org, dept),
+            ("Morgan", "Manager, Data Platforms", "Digital Services", "AI Centre", "", "https://geds.example/morgan", "2026-07-09", org, dept),
+            ("VACANT, VACANT", "Data Scientist", "Digital Services", "AI Centre", "", "https://geds.example/vacant", "2026-07-09", org, dept),
+        ],
+    )
     con.commit(); con.close()
     promote_canonical_snapshot(master, ResolvedSnapshot((source,), (), (source,)), "2026-07-09T00:00:00+00:00")
     build_career_index(master, TAXONOMY_PATH)
@@ -56,6 +63,30 @@ def test_team_profile_has_no_contact_fields(repository):
     org_id = repository.children(parent_id=None, limit=20).items[0].org_id
     payload = dataclasses.asdict(repository.team_profile(org_id))
     assert not {"email", "phone", "fax", "address"} & set(payload)
+
+
+def test_team_profile_exposes_non_claiming_leads_and_unverified_vacancy_signals(repository):
+    org_id = repository.children(parent_id=None, limit=20).items[0].org_id
+
+    profile = dataclasses.asdict(repository.team_profile(org_id))
+
+    assert profile["conversation_leads"][0]["title"] == "Manager, Data Platforms"
+    assert profile["conversation_leads"][0]["kind"] == "possible_team_lead"
+    assert profile["conversation_leads"][0]["source_url"] == "https://geds.example/morgan"
+    assert profile["vacancy_signals"] == (
+        {
+            "marker": "VACANT, VACANT",
+            "title": "Data Scientist",
+            "org_id": org_id,
+            "observed_at": "2026-07-09",
+            "source_url": "https://geds.example/vacant",
+            "confidence": "high",
+            "reasons": ("placeholder_marker:vacant",),
+            "live_competition_verified": False,
+        },
+    )
+    assert "display_name" not in str(profile["conversation_leads"])
+    assert all(signal["live_competition_verified"] is False for signal in profile["vacancy_signals"])
 
 
 def test_repository_connection_is_query_only(repository):

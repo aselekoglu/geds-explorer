@@ -1408,7 +1408,7 @@ git commit -m "feat: add shareable career tours and saved maps"
 - infer_leads(org_id, people, rules) -> tuple[LeadSuggestion, ...].
 - LeadSuggestion(kind, confidence, title, org_id, source_url, reasons).
 
-- [ ] **Step 1: Write failing inference-boundary tests**
+- [x] **Step 1: Write failing inference-boundary tests**
 
 ~~~python
 def test_manager_can_be_possible_team_lead(rules):
@@ -1430,11 +1430,11 @@ def test_assistants_and_advisors_are_excluded(title, rules):
     assert infer_lead(title, "team", "team", rules) is None
 ~~~
 
-- [ ] **Step 2: Implement bilingual rules**
+- [x] **Step 2: Implement bilingual rules**
 
 Include manager/gestionnaire, director/directeur/directrice, chief/chef, head/responsable, commissioner/commissaire, and executive variants. Exclude assistant, advisor to, conseiller auprès, support, office, and administrative roles. Direct-org leads outrank parent-org leads. Return at most three.
 
-- [ ] **Step 3: Implement non-claiming UI**
+- [x] **Step 3: Implement non-claiming UI**
 
 ~~~tsx
 <section aria-labelledby="career-conversation-heading">
@@ -1448,7 +1448,7 @@ Include manager/gestionnaire, director/directeur/directrice, chief/chef, head/re
 
 Cards say “Possible team lead” or “Career conversation lead”, show reasons, confidence, snapshot date, and official GEDS. Vacancy cards show the exact marker, observed title, org, date, and “No live competition verified.” No application action exists.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_leads.py -v
 

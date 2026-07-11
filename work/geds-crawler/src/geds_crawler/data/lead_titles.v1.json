@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "possible_team_lead": [
+    "manager",
+    "gestionnaire",
+    "team lead",
+    "team leader",
+    "chef d'equipe",
+    "chef d equipe"
+  ],
+  "career_conversation_lead": [
+    "director",
+    "directeur",
+    "directrice",
+    "chief",
+    "chef",
+    "head",
+    "responsable",
+    "commissioner",
+    "commissaire",
+    "executive",
+    "dirigeant",
+    "dirigeante"
+  ],
+  "exclude": [
+    "assistant",
+    "advisor to",
+    "adviser to",
+    "conseiller aupres",
+    "conseillere aupres",
+    "support",
+    "office of",
+    "bureau du",
+    "bureau de la",
+    "administrative",
+    "administratif",
+    "administrative"
+  ]
+}

@@ -415,7 +415,7 @@ Next:
 
 ## Task 17 â€” Curated tours and saved local maps
 
-Status: verified in source and tests; running server restart pending quota renewal
+Status: verified in source, tests, and live runtime
 
 Implemented:
 
@@ -430,8 +430,40 @@ Verification:
 
 - frontend: 16 Vitest files / 23 tests passed; TypeScript typecheck and Vite production build passed;
 - focused backend repository/API suite: 16 tests passed;
-- server restart was requested after the build but process-control approval was denied by the current usage quota. The static frontend is current; the live Python process continues serving the previous Tours response, which the compatibility path renders safely. A restart is required to expose the five editorial tours live.
+- the server was restarted against the real master database after quota renewal; `/api/tours` and the current production build are live on port 8780.
 
 Next:
 
-- restart the local Career Atlas process after quota renewal, verify the five editorial tours against the real master snapshot, then continue Task 18 conservative career-conversation lead inference.
+- continue Task 18 conservative career-conversation lead inference.
+
+## Task 18 — Conservative career-conversation leads and vacancy signals
+
+Status: implemented and verified
+
+Implemented:
+
+- versioned bilingual leadership-title rules for manager, gestionnaire, director/directeur/directrice, chief/chef, head/responsable, commissioner/commissaire, and executive variants;
+- explicit assistant, advisor-to, support, office, and administrative exclusions;
+- deterministic inference with direct-team leads ranked before parent-organization leads, high/medium explainable confidence, and a maximum of three suggestions;
+- a privacy-bounded `LeadSuggestion` contract containing only kind, confidence, observed title, organization ID, official source URL, and reasons—no person name or contact fields;
+- profile payloads now include snapshot date, conservative conversation leads, and source-derived vacancy markers with `live_competition_verified: false`;
+- non-claiming UI cards distinguish “Possible team lead” and “Career conversation lead,” explain why each was suggested, link to the official GEDS record, and never call anyone a hiring manager;
+- vacancy cards preserve the exact GEDS marker, observed title/date/source, state “No live competition verified,” and expose no Apply action.
+
+TDD evidence:
+
+- backend RED: `ModuleNotFoundError: No module named 'geds_crawler.career_leads'`;
+- repository RED: `KeyError: 'conversation_leads'`;
+- frontend RED: unresolved `./CareerConversationLeads` module;
+- backend GREEN: `31 passed` across lead, repository, and API tests;
+- frontend GREEN: `17` Vitest files / `25` tests passed; TypeScript typecheck and Vite production build passed.
+
+Live verification:
+
+- server listens on `0.0.0.0:8780`, `/api/meta` returns HTTP 200, and the refreshed production build is active;
+- real master snapshot profile “Agriculture and Food Inspection Legal Services - AAFC” returned three observed manager-title suggestions and snapshot time `2026-07-09T07:05:04.674049+00:00`;
+- no personal name/contact field is added to the public lead contract; vacancy state remains explicitly unverified.
+
+Next:
+
+- implement Task 19 complete bilingual and responsive experience, including real language switching and the remaining true-mobile verification gate.

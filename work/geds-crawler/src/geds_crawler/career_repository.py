@@ -6,6 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from .career_leads import LeadSuggestion, infer_leads, load_lead_rules
 from .career_taxonomy import load_taxonomy, normalize_text
 
 
@@ -73,7 +74,22 @@ class TeamProfile:
     descendant_people_count: int
     child_count: int
     snapshot_id: str
+    snapshot_as_of: str
     quality_status: str
+    conversation_leads: tuple[LeadSuggestion, ...]
+    vacancy_signals: tuple["VacancySignal", ...]
+
+
+@dataclass(frozen=True)
+class VacancySignal:
+    marker: str
+    title: str
+    org_id: str
+    observed_at: str
+    source_url: str
+    confidence: str
+    reasons: tuple[str, ...]
+    live_competition_verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -103,6 +119,7 @@ class CareerRepository:
         self.master_db = Path(master_db).resolve()
         self.taxonomy_path = Path(taxonomy_path) if taxonomy_path else Path(__file__).parent / "data" / "career_taxonomy.v1.json"
         self.tours_path = Path(__file__).parent / "data" / "career_tours.v1.json"
+        self.lead_rules_path = Path(__file__).parent / "data" / "lead_titles.v1.json"
 
     def connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(f"file:{self.master_db.as_posix()}?mode=ro", uri=True, timeout=2)
@@ -170,9 +187,55 @@ class CareerRepository:
         with self.connect() as con:
             meta = self._meta(con)
             row = con.execute("""SELECT o.*,d.name department_name FROM organizations_current o JOIN departments_current d ON d.department_dn=o.department_dn WHERE o.snapshot_id=? AND o.org_id=?""", (meta["snapshot_id"], org_id)).fetchone()
+            people = con.execute(
+                """WITH RECURSIVE lineage(org_dn,parent_dn,org_id,level) AS (
+                       SELECT org_dn,parent_dn,org_id,0 FROM organizations_current
+                       WHERE snapshot_id=? AND org_id=?
+                       UNION ALL
+                       SELECT parent.org_dn,parent.parent_dn,parent.org_id,lineage.level+1
+                       FROM organizations_current parent JOIN lineage ON parent.org_dn=lineage.parent_dn
+                       WHERE parent.snapshot_id=?
+                   )
+                   SELECT p.title,lineage.org_id,p.source_url,lineage.level
+                   FROM lineage JOIN people_current p ON p.org_dn=lineage.org_dn
+                   WHERE p.snapshot_id=? AND p.presence_status='present'
+                   ORDER BY lineage.level,p.title,p.source_url""",
+                (meta["snapshot_id"], org_id, meta["snapshot_id"], meta["snapshot_id"]),
+            ).fetchall()
+            vacancy_rows = con.execute(
+                """SELECT v.source_text,v.title,v.org_id,p.last_seen_at,p.source_url,
+                          v.confidence,v.reasons_json
+                   FROM vacancy_signals v
+                   JOIN people_current p ON v.entity_id='person:' || p.source_url
+                   WHERE v.snapshot_id=? AND v.org_id=? AND p.snapshot_id=?
+                   ORDER BY v.title,v.entity_id""",
+                (meta["snapshot_id"], org_id, meta["snapshot_id"]),
+            ).fetchall()
         if row is None:
             raise KeyError(org_id)
-        return TeamProfile(org_id, str(row["name"]), str(row["department_name"]), tuple(json.loads(row["canonical_path_json"])), int(row["direct_people_count"]), int(row["descendant_people_count"]), int(row["child_count"]), str(meta["snapshot_id"]), str(meta["quality_status"]))
+        parent_org_ids = tuple(str(person["org_id"]) for person in people if int(person["level"]) > 0)
+        leads = infer_leads(
+            org_id,
+            (
+                {"title": person["title"], "org_id": person["org_id"], "source_url": person["source_url"]}
+                for person in people
+            ),
+            load_lead_rules(self.lead_rules_path),
+            parent_org_ids=parent_org_ids,
+        )
+        vacancy_signals = tuple(
+            VacancySignal(
+                marker=str(vacancy["source_text"]),
+                title=str(vacancy["title"]),
+                org_id=str(vacancy["org_id"]),
+                observed_at=str(vacancy["last_seen_at"]),
+                source_url=str(vacancy["source_url"]),
+                confidence=str(vacancy["confidence"]),
+                reasons=tuple(json.loads(vacancy["reasons_json"])),
+            )
+            for vacancy in vacancy_rows
+        )
+        return TeamProfile(org_id, str(row["name"]), str(row["department_name"]), tuple(json.loads(row["canonical_path_json"])), int(row["direct_people_count"]), int(row["descendant_people_count"]), int(row["child_count"]), str(meta["snapshot_id"]), str(meta["as_of_at"]), str(meta["quality_status"]), leads, vacancy_signals)
 
     def departments(self) -> DepartmentResult:
         with self.connect() as con:
