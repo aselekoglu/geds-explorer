@@ -102,6 +102,7 @@ class CareerRepository:
     def __init__(self, master_db: Path | str, taxonomy_path: Path | str | None = None):
         self.master_db = Path(master_db).resolve()
         self.taxonomy_path = Path(taxonomy_path) if taxonomy_path else Path(__file__).parent / "data" / "career_taxonomy.v1.json"
+        self.tours_path = Path(__file__).parent / "data" / "career_tours.v1.json"
 
     def connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(f"file:{self.master_db.as_posix()}?mode=ro", uri=True, timeout=2)
@@ -253,9 +254,16 @@ class CareerRepository:
         return ConstellationSlice(nodes, limit, truncated, snapshot_id, str(meta["quality_status"]), _etag(meta, "constellation-slice", root_id or "root", max_depth, limit))
 
     def tours(self) -> TourResult:
-        departments = self.departments()
-        items = tuple({"id": f"department:{item.department_id}", "label": item.name, "kind": "department"} for item in departments.items[:12])
-        return TourResult(items, departments.snapshot_id, departments.quality_status, _etag({"snapshot_id": departments.snapshot_id}, "tours"))
+        document = json.loads(self.tours_path.read_text(encoding="utf-8"))
+        with self.connect() as con:
+            meta = self._meta(con)
+            available_ids = {str(row[0]) for row in con.execute("SELECT org_id FROM organizations_current WHERE snapshot_id=?", (meta["snapshot_id"],)).fetchall()}
+        items = []
+        for configured in document["tours"]:
+            tour = dict(configured)
+            tour["stops"] = tuple({**stop, "available": stop["org_id"] in available_ids} for stop in configured["stops"])
+            items.append(tour)
+        return TourResult(tuple(items), str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "tours", document["version"]))
 
     def _meta(self, con: sqlite3.Connection) -> dict[str, object]:
         row = con.execute("""SELECT state.snapshot_id,state.taxonomy_version,s.quality_status,s.as_of_at,s.people_count,s.org_units_count,s.departments_count FROM career_index_state state JOIN canonical_snapshots s ON s.snapshot_id=state.snapshot_id WHERE state.singleton=1""").fetchone()

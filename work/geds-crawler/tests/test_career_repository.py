@@ -94,3 +94,13 @@ def test_tours_are_deterministic_and_have_no_personal_data(repository):
     assert first == second
     assert first.snapshot_id
     assert all("email" not in str(tour).lower() for tour in first.items)
+
+
+def test_editorial_tours_are_bilingual_and_never_retarget_missing_stops(repository):
+    result = repository.tours()
+
+    assert {tour["id"] for tour in result.items} == {"ai", "software", "cybersecurity", "policy", "data"}
+    assert all(tour["title"]["en"] and tour["title"]["fr"] for tour in result.items)
+    assert all(tour["categories"] and tour["stops"] for tour in result.items)
+    assert all("org_id" in stop and "available" in stop for tour in result.items for stop in tour["stops"])
+    assert all(stop["available"] is False for tour in result.items for stop in tour["stops"])

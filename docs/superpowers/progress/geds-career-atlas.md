@@ -412,3 +412,26 @@ Remaining for Tasks 13â€“16:
 Next:
 
 - implement category-aware Constellation lighting over explainable match evidence, then complete tours/saved views and bilingual/responsive polish.
+
+## Task 17 â€” Curated tours and saved local maps
+
+Status: verified in source and tests; running server restart pending quota renewal
+
+Implemented:
+
+- versioned bilingual AI, software, cybersecurity, policy, and data tour definitions;
+- stable organization stop IDs validated against the current snapshot, with missing stops explicitly marked unavailable and never silently retargeted;
+- public Tours API now returns editorial titles, descriptions, taxonomy categories, initial focus, ordered evidence notes, and stop availability;
+- tour actions produce shareable constellation query/category/focus state;
+- local-only saved maps persist aggregate explorer state, cap comparisons at four, cap notes at 2,000 characters, and redact contact/person field names;
+- rolling compatibility for the previous department-tour response prevents the already-running server from crashing before its next restart.
+
+Verification:
+
+- frontend: 16 Vitest files / 23 tests passed; TypeScript typecheck and Vite production build passed;
+- focused backend repository/API suite: 16 tests passed;
+- server restart was requested after the build but process-control approval was denied by the current usage quota. The static frontend is current; the live Python process continues serving the previous Tours response, which the compatibility path renders safely. A restart is required to expose the five editorial tours live.
+
+Next:
+
+- restart the local Career Atlas process after quota renewal, verify the five editorial tours against the real master snapshot, then continue Task 18 conservative career-conversation lead inference.

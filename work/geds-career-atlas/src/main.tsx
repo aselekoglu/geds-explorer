@@ -6,4 +6,5 @@ import "./styles/global.css"
 import "./styles/constellation.css"
 import "./styles/org-walk.css"
 import "./styles/polish.css"
+import "./styles/saved-map.css"
 createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>)

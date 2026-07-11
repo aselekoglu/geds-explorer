@@ -5,3 +5,5 @@ export type OrgPage={items:OrgNode[];snapshot_id:string;etag:string}
 export type ConstellationSlice={nodes:OrgNode[];limit:number;truncated:boolean;snapshot_id:string;etag:string}
 export type DepartmentPage={items:Array<{department_id:string;name:string}>;snapshot_id:string;etag:string}
 export type TeamProfile={org_id:string;name:string;department_name:string;canonical_path:string[];direct_people_count:number;descendant_people_count:number;child_count:number;snapshot_id:string}
+export type Tour={id:string;title:{en:string;fr:string};description:{en:string;fr:string};categories:string[];initial_focus?:string;stops:Array<{org_id:string;available:boolean;note:{en:string;fr:string}}>} 
+export type TourResult={items:Tour[];snapshot_id:string;etag:string}

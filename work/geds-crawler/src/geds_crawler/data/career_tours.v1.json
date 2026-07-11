@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "tours": [
+    {
+      "id": "ai",
+      "title": {"en": "Explore AI in government", "fr": "Explorer l'IA au gouvernement"},
+      "description": {"en": "Follow observed data-science and artificial-intelligence teams.", "fr": "Suivez les equipes observees de science des donnees et d'intelligence artificielle."},
+      "categories": ["data-ai-research"],
+      "initial_focus": "QJ_S2gMb4E6L-xwExLbMoQ",
+      "stops": [{"org_id": "QJ_S2gMb4E6L-xwExLbMoQ", "note": {"en": "Observed analytics and data-science titles.", "fr": "Titres observes en analytique et science des donnees."}}]
+    },
+    {
+      "id": "software",
+      "title": {"en": "Find software delivery teams", "fr": "Trouver les equipes de livraison logicielle"},
+      "description": {"en": "Trace product, engineering, platform, and delivery work.", "fr": "Parcourez le travail lie aux produits, a l'ingenierie, aux plateformes et a la livraison."},
+      "categories": ["software-digital"],
+      "initial_focus": "WtHHBZIPdvfAB4oMthqmtA",
+      "stops": [{"org_id": "WtHHBZIPdvfAB4oMthqmtA", "note": {"en": "Observed product-delivery and support titles.", "fr": "Titres observes en livraison de produits et soutien."}}]
+    },
+    {
+      "id": "cybersecurity",
+      "title": {"en": "Navigate cybersecurity", "fr": "Naviguer la cybersecurite"},
+      "description": {"en": "Explore security operations, infrastructure, and trust teams.", "fr": "Explorez les equipes d'operations de securite, d'infrastructure et de confiance."},
+      "categories": ["cybersecurity-security"],
+      "initial_focus": "9KfFy5Stq9melrsWhybJ6g",
+      "stops": [{"org_id": "9KfFy5Stq9melrsWhybJ6g", "note": {"en": "Observed cyber-security operations organization.", "fr": "Organisation observee des operations de cybersecurite."}}]
+    },
+    {
+      "id": "policy",
+      "title": {"en": "Walk public-policy pathways", "fr": "Parcourir les voies des politiques publiques"},
+      "description": {"en": "See where policy, regulation, legislation, and programs appear.", "fr": "Voyez ou apparaissent les politiques, la reglementation, la legislation et les programmes."},
+      "categories": ["policy-programs-regulation"],
+      "initial_focus": "3YEszULIIk7_gEhiki4NvQ",
+      "stops": [{"org_id": "3YEszULIIk7_gEhiki4NvQ", "note": {"en": "Observed legislative and regulatory organization names.", "fr": "Noms d'organisations observes en legislation et reglementation."}}]
+    },
+    {
+      "id": "data",
+      "title": {"en": "Discover data careers", "fr": "Decouvrir les carrieres en donnees"},
+      "description": {"en": "Follow analytics, measurement, business-intelligence, and data teams.", "fr": "Suivez les equipes d'analytique, de mesure, d'intelligence d'affaires et de donnees."},
+      "categories": ["data-ai-research"],
+      "initial_focus": "QJ_S2gMb4E6L-xwExLbMoQ",
+      "stops": [{"org_id": "QJ_S2gMb4E6L-xwExLbMoQ", "note": {"en": "Observed analytics-services organization.", "fr": "Organisation observee de services analytiques."}}]
+    }
+  ]
+}
