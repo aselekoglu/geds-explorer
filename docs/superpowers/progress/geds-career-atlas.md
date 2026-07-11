@@ -467,3 +467,36 @@ Live verification:
 Next:
 
 - implement Task 19 complete bilingual and responsive experience, including real language switching and the remaining true-mobile verification gate.
+
+## Task 19 — Complete bilingual and responsive experience
+
+Status: implemented and verified
+
+Implemented:
+
+- typed EN/FR dictionaries with a test-enforced identical flattened key set;
+- `LanguageProvider`, `t(key, params)`, language-aware date/number formatting, and URL-preserving language state;
+- live English/French switching that keeps query, focus, categories, and the rest of the explorer URL state;
+- centralized product-owned copy across navigation, filters, search states, Organization Walk, Constellation, tours/saved maps, profiles, lead/vacancy disclaimers, and accessibility labels while leaving source institution/title text unchanged;
+- a bilingual About the Data surface showing canonical snapshot/as-of, counts, source lineage, taxonomy version and deterministic weights, partial/fallback quality warning, privacy boundaries, vacancy semantics, lead-inference limits, known limitations, no protected-trait inference, and official GEDS link;
+- responsive navigation at phone/tablet sizes, list-first mobile Constellation, single-column Org Walk drilling, hidden internal filter scrollbar, and minimum 44px visible interactive targets;
+- explicit document title `GEDS Career Atlas`.
+
+TDD evidence:
+
+- i18n RED: unresolved `./fr` module;
+- methodology RED: unresolved `./DataMethodology` module;
+- GREEN: `19` Vitest files / `30` tests passed; TypeScript typecheck and Vite production build passed.
+
+Rendered browser verification:
+
+- Browser plugin target flow: app load → AI interest state → switch English to French → verify translated navigation and preserved `q=AI`, `focus`, `categories`, and `lang=fr` URL state;
+- page identity: `GEDS Career Atlas`; meaningful DOM present; no framework overlay; no console warnings or errors;
+- 360, 768, 1280, and 1600 CSS-pixel measurements all reported no page-level horizontal overflow and visible navigation;
+- 360px reported Constellation list before graphic; 768px and larger retain graphic-first exploration;
+- all visible controls at the measured viewports met the 44×44 target after the final correction;
+- final 360px French viewport reported hidden filter scrollbar, visible navigation, no page-level overflow, and list-first Constellation.
+
+Next:
+
+- implement Task 20 automated E2E accessibility, performance, resilience, and security gates.

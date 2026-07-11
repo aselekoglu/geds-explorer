@@ -1476,7 +1476,7 @@ git commit -m "feat: suggest evidence-based career conversation leads"
 **Interfaces:**
 - t(key, params), LanguageProvider, language-preserving navigation.
 
-- [ ] **Step 1: Write failing copy-completeness and state tests**
+- [x] **Step 1: Write failing copy-completeness and state tests**
 
 ~~~tsx
 it("has identical English and French key sets", () => {
@@ -1494,17 +1494,17 @@ it("preserves filters when language changes", async () => {
 })
 ~~~
 
-- [ ] **Step 2: Centralize product copy**
+- [x] **Step 2: Centralize product copy**
 
 Source names/titles remain unchanged. Navigation, states, filters, methodology, inference disclaimers, vacancy warnings, dates, and number formats use the language provider. The task fails if either language lacks a key.
 
 About the Data shows canonical snapshot/as-of, source lineage summary, taxonomy version and weights, quality/fallback warnings, privacy limits, vacancy semantics, contact-inference rules, known limitations, and a link back to official GEDS. It describes deterministic matching in plain language and states that no protected traits are inferred.
 
-- [ ] **Step 3: Verify responsive journeys**
+- [x] **Step 3: Verify responsive journeys**
 
 At 360, 768, 1280, and 1600 CSS pixels: no clipped navigation or page-level horizontal scroll; Org Walk drills in below 760; Constellation is list-first on small screens; evidence/warnings precede long lists; touch targets are at least 44 by 44.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test -- src/i18n/i18n.test.tsx; npm.cmd run typecheck; npm.cmd run build
 

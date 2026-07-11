@@ -20,7 +20,7 @@
 .signal-card ul { margin: 0; padding-left: 18px; color: #bcd0e2; font-size: 12px; line-height: 1.6; }
 .signal-label { margin: 0; color: var(--cyan); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .signal-date { color: var(--muted); font-size: 11px; }
-.signal-card a { color: var(--cyan); font-size: 12px; }
+.signal-card a { display: inline-flex; align-items: center; color: var(--cyan); font-size: 12px; }
 .vacancy-card { border-color: #8a6c31; background: linear-gradient(145deg, #2c2615, #111b27); }
 .vacancy-card .signal-label, .vacancy-card strong { color: #ffd269; }
 .vacancy-card strong { font-size: 12px; }
