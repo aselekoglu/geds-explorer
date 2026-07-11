@@ -377,3 +377,38 @@ Implemented and verified vertical slice:
 Next:
 
 - connect the Discover surface to URL state and real public API data, then add no-match/loading/partial-quality states.
+
+## Tasks 13â€“16 â€” Org Walk, team evidence, and required Constellation
+
+Status: in progress; functional vertical slice verified
+
+Implemented:
+
+- bounded `/api/constellation/slice` contract with root/focused hierarchy reads, depth validation, a 2,000-node cap, truncation status, snapshot binding, and deterministic ETags;
+- API-backed multi-column Organization Walk with keyboard traversal and responsive one-column fallback;
+- API-backed team profile and observed-title surface with explicit non-job language and no Apply action;
+- deterministic D3 circle-pack layout sized by descendant people indexed, stable ordering, cyan selected state, keyboard-selectable SVG nodes, and a synchronized accessible list;
+- URL-backed `q` and `focus` state shared by search, Constellation, Org Walk, and the right-side profile inspector;
+- Constellation overview preserves all 156 root institutions as marks while directly labeling only sufficiently large circles; focus and branch drill-down are separate actions;
+- interest queries switch the Constellation to a bounded, deduplicated set of matching teams, size circles by accumulated explainable match score, and expose the first observed evidence string in the inspector;
+- desktop and mobile-responsive styling for the central map, evidence overlay, filter rail, inspector, and Org Walk.
+
+Verification:
+
+- frontend: 20 Vitest tests passed; TypeScript typecheck passed; Vite production build passed;
+- backend: 166 pytest tests passed;
+- real canonical master API returned snapshot `edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5`;
+- headless Chrome desktop render at 1487x1058 verified the real 156-institution circle pack, automatic largest-institution selection, matched-evidence overlay, and API-backed team inspector;
+- accepted concept and current desktop render were inspected together; palette, three-column shell, central constellation, selected cyan state, search/filter rail, and right inspector align semantically;
+- headless Chrome on Windows enforces a layout viewport wider than the requested 390px screenshot, so the 390x844 capture is cropped horizontally and is not accepted as final mobile fidelity evidence. Responsive CSS is present, but true 390px browser emulation remains a final QA gate.
+
+Remaining for Tasks 13â€“16:
+
+- add full URL/back-button navigation semantics for drill-down rather than replace-only history;
+- extend interest lighting from matching teams to optional parent-institution rollups and confidence filters;
+- record measured real-data layout timings and the circle-pack/partition/treemap evaluation artifact;
+- complete true mobile viewport/browser verification and final visual-fidelity ledger.
+
+Next:
+
+- implement category-aware Constellation lighting over explainable match evidence, then complete tours/saved views and bilingual/responsive polish.
