@@ -1,7 +1,7 @@
 # GEDS Crawler
 
 > [!WARNING]
-> **Development only**: This repository contains an unauthenticated crawl control plane interface. Do not expose this service to an untrusted local area network (LAN) or the public internet.
+> **Private operator surface**: The control plane binds to loopback by default. A non-loopback bind is refused unless `GEDS_ADMIN_USERNAME` and `GEDS_ADMIN_PASSWORD` are configured. Basic Auth protects HTML and API routes, but TLS is still required before using it across an untrusted network.
 
 Privacy-preserving snapshot crawler for Government of Canada Electronic Directory Services.
 
@@ -59,7 +59,7 @@ while ($true) {
 
 ## Live Snapshot UI
 
-The UI opens the running SQLite snapshot in read-only mode and refreshes every three seconds. It binds to `0.0.0.0` so another device on the same local network can browse it.
+The UI opens the running SQLite snapshot in read-only mode and refreshes every three seconds. It binds to `127.0.0.1` by default.
 
 From the repository root:
 
@@ -71,6 +71,16 @@ From `work\geds-crawler`:
 
 ```powershell
 py -m geds_crawler.cli ui --db ..\..\outputs\geds-snapshot-2026-07-08\geds.sqlite
+
+To bind to a LAN interface, configure credentials in the process environment first:
+
+```powershell
+$env:GEDS_ADMIN_USERNAME = "owner"
+$env:GEDS_ADMIN_PASSWORD = Read-Host "Admin password"
+py -m geds_crawler.cli ui --db ..\..\outputs\control\control.sqlite --host 0.0.0.0 --port 8756
+```
+
+The browser will request HTTP Basic credentials. Use HTTPS through a trusted reverse proxy before crossing an untrusted network; Basic Auth alone does not encrypt credentials.
 ```
 
 The command prints both `127.0.0.1` and detected LAN URLs. The default port is `8765`; override it with `--port`. Because the server is visible on the local network and has no authentication, use it only on a trusted network.

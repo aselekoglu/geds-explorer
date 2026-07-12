@@ -65,6 +65,30 @@ def create_career_app(master_db: Path | str, frontend_dir: Path | str | None = N
         except KeyError as exc:
             raise HTTPException(404, "organization not found") from exc
 
+    @app.get("/api/orgs/{org_id}/people")
+    def people(
+        request: Request,
+        org_id: str,
+        q: str = Query("", max_length=160),
+        classification: str | None = Query(None, pattern=r"^(?:EC|CO|IT|CS)-\d{2}$"),
+        sort: str = Query("name", pattern=r"^(?:name|title)$"),
+        limit: int = Query(50, ge=1, le=200),
+        offset: int = Query(0, ge=0, le=1000000),
+    ):
+        try:
+            return payload(
+                repository(request).people(
+                    org_id=org_id,
+                    query=q,
+                    classification=classification,
+                    sort=sort,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        except KeyError as exc:
+            raise HTTPException(404, "organization not found") from exc
+
     @app.get("/api/roles")
     def roles(request: Request, org_id: str | None = None, limit: int = Query(50, ge=1, le=200)):
         return payload(repository(request).roles(org_id=org_id, limit=limit))

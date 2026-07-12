@@ -10,6 +10,7 @@ import { useLanguage } from "../i18n/i18n"
 import { AboutPage } from "../routes/about"
 import type { DepartmentPage } from "../api/types"
 import type { AtlasMeta } from "../features/about/DataMethodology"
+import { ThemeControl } from "../theme/ThemeControl"
 
 function initialState() {
   const params = new URLSearchParams(location.search)
@@ -56,7 +57,7 @@ export function App() {
       <div className="nav-footer">{t("app.source")}<br />{t("app.publicReadOnly")}</div>
     </aside>
     <main id="main">
-      <header className="command-bar" id="discover"><label><span className="sr-only">{t("app.interest")}</span><input value={query} onChange={event => { setQuery(event.target.value); replaceUrl({ query: event.target.value }) }} placeholder={t("app.placeholder")} /></label><button type="button">{t("app.filters")}</button><button type="button" className="language" onClick={() => setLanguage(language === "en" ? "fr" : "en")}>{language === "en" ? "Français" : "English"}</button></header>
+      <header className="command-bar" id="discover"><label><span className="sr-only">{t("app.interest")}</span><input value={query} onChange={event => { setQuery(event.target.value); replaceUrl({ query: event.target.value }) }} placeholder={t("app.placeholder")} /></label><button type="button">{t("app.filters")}</button><ThemeControl/><button type="button" className="language" onClick={() => setLanguage(language === "en" ? "fr" : "en")}>{language === "en" ? "Français" : "English"}</button></header>
       <FilterRail departments={departments} value={filters} qualityStatus={meta?.quality_status??"loading"} onChange={setFilters}/>
       {query && <DiscoverPage search={query} client={client} filters={filters} onFiltersChange={setFilters} />}
       <ConstellationPage client={client} query={query} focus={selectedOrgId ?? undefined} onFocus={selectOrg} filters={filters} />
@@ -64,6 +65,6 @@ export function App() {
       <SavedMap client={client} lang={language} onOpen={openTour} current={{ q: query, categories: filters.domain?[filters.domain]:[], department:filters.department||undefined, confidence: filters.confidence, vacancy: filters.vacancy, lang: language, mode: "constellation", focus: selectedOrgId ?? undefined }} />
       <AboutPage client={client} />
     </main>
-    <aside className="detail-panel"><button className="close" aria-label={t("app.close")} onClick={clearOrg}>×</button>{selectedOrgId ? <TeamProfileLoader orgId={selectedOrgId} client={client} /> : <><p className="breadcrumb">{t("app.government")}</p><h2>{t("app.selectOrg")}</h2><p className="role-count">{t("app.selectHint")}</p><p>{t("app.sourceSignals")}</p></>}</aside>
+    <aside className={`detail-panel${selectedOrgId?" detail-panel--open":""}`}><button className="close" aria-label={t("app.close")} onClick={clearOrg}>×</button>{selectedOrgId ? <TeamProfileLoader orgId={selectedOrgId} client={client} /> : <><p className="breadcrumb">{t("app.government")}</p><h2>{t("app.selectOrg")}</h2><p className="role-count">{t("app.selectHint")}</p><p>{t("app.sourceSignals")}</p></>}</aside>
   </div>
 }

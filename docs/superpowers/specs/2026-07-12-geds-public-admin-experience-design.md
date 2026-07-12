@@ -1,7 +1,7 @@
 # GEDS Public Career Atlas and Private Admin Experience Design
 
 **Date:** 2026-07-12
-**Status:** Approved design; awaiting written-spec review
+**Status:** Implemented and verified on `codex/public-admin-experience`
 **Replaces:** `2026-07-12-geds-career-atlas-stitch-audit-redesign-design.md`
 **Public surface:** `work/geds-career-atlas`
 **Private surface:** `work/geds-crawler`

@@ -23,7 +23,7 @@ def career_client(tmp_path):
     con = sqlite3.connect(source)
     con.executescript("""CREATE TABLE crawl_runs(request_count INTEGER,status TEXT,crawl_kind TEXT,started_at TEXT); CREATE TABLE departments(dn TEXT,name TEXT); CREATE TABLE org_units(dn TEXT,name TEXT,department_dn TEXT,depth INTEGER,org_path TEXT,source_url TEXT); CREATE TABLE people_index(display_name TEXT,title TEXT,department_name TEXT,org_unit TEXT,org_path TEXT,source_url TEXT,last_seen TEXT,org_dn TEXT,department_dn TEXT); CREATE TABLE crawl_queue(status TEXT); CREATE TABLE crawl_errors(id INTEGER);""")
     dept = "OU=Dept,O=GC,C=CA"; org = f"OU=AI Centre,{dept}"
-    con.execute("INSERT INTO crawl_runs VALUES (0,'finished','full','2026-07-09')"); con.execute("INSERT INTO departments VALUES (?,?)", (dept,"Digital Services")); con.execute("INSERT INTO org_units VALUES (?,?,?,?,?,?)", (org,"AI Centre",dept,1,"Digital Services / AI Centre","org")); con.executemany("INSERT INTO people_index VALUES (?,?,?,?,?,?,?,?,?)", [("Ada","Machine Learning Engineer","Digital Services","AI Centre","","ada","2026-07-09",org,dept), ("VACANT, VACANT","Data Scientist","Digital Services","AI Centre","","vacant","2026-07-09",org,dept)]); con.commit(); con.close()
+    con.execute("INSERT INTO crawl_runs VALUES (0,'finished','full','2026-07-09')"); con.execute("INSERT INTO departments VALUES (?,?)", (dept,"Digital Services")); con.execute("INSERT INTO org_units VALUES (?,?,?,?,?,?)", (org,"AI Centre",dept,1,"Digital Services / AI Centre","org")); con.executemany("INSERT INTO people_index VALUES (?,?,?,?,?,?,?,?,?)", [("Ada","IT02 Machine Learning Engineer","Digital Services","AI Centre","","https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=ada","2026-07-09",org,dept), ("VACANT, VACANT","Data Scientist","Digital Services","AI Centre","","vacant","2026-07-09",org,dept)]); con.commit(); con.close()
     promote_canonical_snapshot(master, ResolvedSnapshot((source,), (), (source,)), "2026-07-09T00:00:00+00:00")
     build_career_index(master, TAXONOMY_PATH)
     return TestClient(create_career_app(master))
@@ -52,6 +52,23 @@ def test_org_root_and_child_contract(career_client):
 def test_unknown_organization_ancestors_returns_404(career_client):
     response=career_client.get("/api/orgs/unavailable-source/ancestors")
     assert response.status_code==404
+
+
+def test_direct_team_people_contract_is_privacy_safe_and_get_only(career_client):
+    root = career_client.get("/api/orgs/root/children").json()["items"][0]
+
+    response = career_client.get(
+        f"/api/orgs/{root['org_id']}/people",
+        params={"q": "ada", "classification": "IT-02", "sort": "name"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["etag"]
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["observed_classifications"] == ["IT-02"]
+    assert response.json()["items"][0]["source_url"].startswith("https://geds-sage.gc.ca/")
+    assert not {"email", "phone", "fax", "address"} & set(response.json()["items"][0])
+    assert career_client.post(f"/api/orgs/{root['org_id']}/people").status_code == 405
 
 
 @pytest.mark.parametrize("path", ["/api/crawlers", "/api/jobs", "/api/schedules"])

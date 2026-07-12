@@ -42,6 +42,7 @@ def repository(tmp_path):
         [
             ("Ada", "Machine Learning Engineer", "Digital Services", "AI Centre", "", "https://geds.example/ada", "2026-07-09", org, dept),
             ("Morgan", "Manager, Data Platforms", "Digital Services", "AI Centre", "", "https://geds.example/morgan", "2026-07-09", org, dept),
+            ("Taylor", "IT02 Support Analyst", "Digital Services", "AI Centre", "", "https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=taylor", "2026-07-09", org, dept),
             ("VACANT, VACANT", "Data Scientist", "Digital Services", "AI Centre", "", "https://geds.example/vacant", "2026-07-09", org, dept),
         ],
     )
@@ -88,6 +89,35 @@ def test_team_profile_has_no_contact_fields(repository):
     org_id = repository.children(parent_id=None, limit=20).items[0].org_id
     payload = dataclasses.asdict(repository.team_profile(org_id))
     assert not {"email", "phone", "fax", "address"} & set(payload)
+
+
+def test_people_returns_direct_privacy_safe_rows_with_observed_classification(repository):
+    org_id = repository.children(parent_id=None, limit=20).items[0].org_id
+
+    page = repository.people(
+        org_id=org_id,
+        query="taylor",
+        classification="IT-02",
+        sort="name",
+        limit=20,
+        offset=0,
+    )
+
+    assert page.total == 1
+    assert page.items[0].display_name == "Taylor"
+    assert page.items[0].observed_title == "IT02 Support Analyst"
+    assert page.items[0].observed_classifications == ("IT-02",)
+    assert page.items[0].source_url.startswith("https://geds-sage.gc.ca/")
+    assert not {"email", "phone", "fax", "address"} & set(dataclasses.asdict(page.items[0]))
+
+
+def test_people_does_not_expose_unapproved_source_hosts(repository):
+    org_id = repository.children(parent_id=None, limit=20).items[0].org_id
+
+    page = repository.people(org_id=org_id, query="ada", limit=20, offset=0)
+
+    assert page.items[0].display_name == "Ada"
+    assert page.items[0].source_url == ""
 
 
 def test_team_profile_exposes_non_claiming_leads_and_unverified_vacancy_signals(repository):

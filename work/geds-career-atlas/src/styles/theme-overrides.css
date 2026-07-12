@@ -1,0 +1,16 @@
+.filter-rail--functional select,.role-filters select,.saved-map button,.org-breadcrumb button,.constellation-heading button{border-color:var(--line);background:var(--surface2);color:var(--text)}
+.quality-chip{border-color:var(--warning);background:var(--warning-soft);color:var(--warning)}
+.saved-map button:hover,.saved-map button:focus-visible{border-color:var(--accent);color:var(--accent)}
+.tour-list small,.org-explorer>nav,.org-breadcrumb nav{color:var(--muted)}
+.org-root-list button{border-color:var(--line);background:var(--surface);color:var(--text)}
+.org-root-list button:hover,.org-root-list button:focus-visible,.org-root-list button[aria-expanded=true]{border-color:var(--accent);background:var(--surface2)}
+.constellation-stage{background-image:radial-gradient(color-mix(in srgb,var(--line) 70%,transparent) 1px,transparent 1px)}
+.constellation-evidence,.constellation-stage [role=listbox]:focus-within{background:color-mix(in srgb,var(--surface) 96%,transparent);border-color:var(--line);box-shadow:var(--shadow);color:var(--text)}
+.constellation-evidence button{border-color:var(--accent);background:var(--surface2);color:var(--accent)}
+.interpretation-panel,.match-card,.signal-card,.methodology{border-color:var(--line);background:var(--surface);box-shadow:var(--shadow);color:var(--text)}
+.interpretation-panel .interpretation,.match-card strong{color:var(--text)}
+.match-card p,.signal-card ul,.methodology article p{color:var(--muted)}
+.active-constraints button,.match-card button{border-color:var(--line);background:var(--surface2);color:var(--text)}
+.match-card small,.vacancy-card .signal-label,.vacancy-card strong{color:var(--warning)}
+.vacancy-card{border-color:var(--warning);background:var(--warning-soft)}
+.methodology-facts div{border-color:var(--line);background:var(--surface2)}

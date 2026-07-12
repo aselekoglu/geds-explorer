@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import base64
 from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -85,6 +86,34 @@ def test_dashboard_uses_command_center_information_architecture(running_server):
     assert "Operate" in body
     assert "Plan" in body
     assert "Explore Data" in body
+
+
+def test_dashboard_identifies_private_admin_and_supports_persistent_dual_theme(running_server):
+    body = _get_root_html(running_server)
+
+    assert "Private admin" in body
+    assert 'id="admin-theme"' in body
+    assert "geds-admin-theme" in body
+    assert 'data-theme' in body
+    assert "prefers-color-scheme: dark" in body
+    assert '>Light<' in body
+    assert '>Dark<' in body
+    assert '>System<' in body
+    assert 'class="career-atlas-link"' in body
+    assert "Career Atlas" in body
+
+
+def test_admin_navigation_remains_operator_only(running_server):
+    body = _get_root_html(running_server)
+    nav = body[body.index('aria-label="Primary workspace navigation"'):body.index("</nav>",body.index('aria-label="Primary workspace navigation"'))]
+
+    assert "Crawlers" in nav
+    assert "Run History" in nav
+    assert "Coverage" in nav
+    assert "Schedules" in nav
+    assert "Snapshot Data" in nav
+    assert "Government Explorer" not in nav
+    assert "Constellation" not in nav
 
 
 def test_dashboard_contains_guided_creation_flows(running_server):
@@ -178,6 +207,41 @@ def test_unknown_route_returns_json_404(running_server):
 
     assert exc.value.code == 404
     assert json.loads(exc.value.read()) == {"error": "Not found"}
+
+
+def test_non_loopback_admin_bind_requires_credentials(tmp_path, monkeypatch):
+    db_path = tmp_path / "snapshot.sqlite"
+    _create_snapshot(db_path)
+    monkeypatch.delenv("GEDS_ADMIN_USERNAME", raising=False)
+    monkeypatch.delenv("GEDS_ADMIN_PASSWORD", raising=False)
+
+    with pytest.raises(ValueError, match="GEDS_ADMIN_USERNAME"):
+        create_server(db_path, "0.0.0.0", 0)
+
+
+def test_configured_admin_credentials_protect_html_and_api(tmp_path, monkeypatch):
+    db_path = tmp_path / "snapshot.sqlite"
+    _create_snapshot(db_path)
+    monkeypatch.setenv("GEDS_ADMIN_USERNAME", "owner")
+    monkeypatch.setenv("GEDS_ADMIN_PASSWORD", "secret-value")
+    server = create_server(db_path, "127.0.0.1", 0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with pytest.raises(HTTPError) as exc:
+            urlopen(f"{base}/", timeout=2)
+        assert exc.value.code == 401
+        assert exc.value.headers["WWW-Authenticate"] == 'Basic realm="GEDS Admin"'
+
+        token = base64.b64encode(b"owner:secret-value").decode("ascii")
+        request = Request(f"{base}/api/status", headers={"Authorization": f"Basic {token}"})
+        with urlopen(request, timeout=2) as response:
+            assert response.status == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 def _create_finished_source(db_path, code, department_name, person_name):

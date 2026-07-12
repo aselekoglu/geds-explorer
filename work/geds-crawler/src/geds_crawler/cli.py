@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ui_parser = subparsers.add_parser("ui")
     ui_parser.add_argument("--db", type=Path, required=True)
-    ui_parser.add_argument("--host", default="0.0.0.0")
+    ui_parser.add_argument("--host", default="127.0.0.1")
     ui_parser.add_argument("--port", type=int, default=8765)
 
     args = parser.parse_args(argv)

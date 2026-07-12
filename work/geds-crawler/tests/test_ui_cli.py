@@ -17,7 +17,7 @@ class FakeServer:
         self.closed = True
 
 
-def test_ui_command_uses_lan_default_and_serves(tmp_path, monkeypatch, capsys):
+def test_ui_command_uses_loopback_default_and_serves(tmp_path, monkeypatch, capsys):
     db_path = tmp_path / "snapshot.sqlite"
     _create_snapshot(db_path)
     fake = FakeServer()
@@ -32,7 +32,7 @@ def test_ui_command_uses_lan_default_and_serves(tmp_path, monkeypatch, capsys):
     result = cli.main(["ui", "--db", str(db_path)])
 
     assert result == 0
-    assert called == {"path": db_path, "host": "0.0.0.0", "port": 8765}
+    assert called == {"path": db_path, "host": "127.0.0.1", "port": 8765}
     assert fake.served
     assert fake.closed
     assert "http://127.0.0.1:8765" in capsys.readouterr().out

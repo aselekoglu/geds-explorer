@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import base64
+import binascii
+import os
+import secrets
 import sqlite3
 import time
 import uuid
@@ -20,6 +24,12 @@ def create_server(
     db_path = Path(db_path).resolve()
     if not db_path.is_file():
         raise FileNotFoundError(f"Database not found: {db_path}")
+    admin_username = os.environ.get("GEDS_ADMIN_USERNAME", "")
+    admin_password = os.environ.get("GEDS_ADMIN_PASSWORD", "")
+    if bool(admin_username) != bool(admin_password):
+        raise ValueError("GEDS_ADMIN_USERNAME and GEDS_ADMIN_PASSWORD must be configured together")
+    if host not in {"127.0.0.1", "localhost", "::1"} and not admin_username:
+        raise ValueError("non-loopback admin bind requires GEDS_ADMIN_USERNAME and GEDS_ADMIN_PASSWORD")
     
     # Detect if control plane or legacy snapshot
     is_control_plane = False
@@ -54,7 +64,31 @@ def create_server(
     reader = SnapshotReader(db_path)
 
     class SnapshotHandler(BaseHTTPRequestHandler):
+        def _require_authorization(self) -> bool:
+            if not admin_username:
+                return True
+            header = self.headers.get("Authorization", "")
+            try:
+                scheme, encoded = header.split(" ", 1)
+                if scheme.casefold() != "basic":
+                    raise ValueError
+                decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
+                username, password = decoded.split(":", 1)
+            except (ValueError, UnicodeDecodeError, binascii.Error):
+                username, password = "", ""
+            valid = secrets.compare_digest(username, admin_username) and secrets.compare_digest(password, admin_password)
+            if valid:
+                return True
+            self.send_response(HTTPStatus.UNAUTHORIZED)
+            self.send_header("WWW-Authenticate", 'Basic realm="GEDS Admin"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return False
+
         def do_GET(self) -> None:
+            if not self._require_authorization():
+                return
             parsed = urlparse(self.path)
             if parsed.path == "/":
                 html = DASHBOARD_HTML.replace(
@@ -82,6 +116,8 @@ def create_server(
             self._json(HTTPStatus.OK, payload)
 
         def do_POST(self) -> None:
+            if not self._require_authorization():
+                return
             if not is_control_plane:
                 self._json(HTTPStatus.NOT_IMPLEMENTED, {"error": "Control plane not enabled"})
                 return
@@ -216,6 +252,8 @@ def create_server(
             self._json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
         def do_DELETE(self) -> None:
+            if not self._require_authorization():
+                return
             if not is_control_plane:
                 self._json(HTTPStatus.NOT_IMPLEMENTED, {"error": "Control plane not enabled"})
                 return
@@ -728,6 +766,15 @@ DASHBOARD_HTML = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GEDS Crawl Control Plane</title>
+  <script>
+    (() => {
+      const saved = localStorage.getItem("geds-admin-theme") || "system";
+      const resolved = saved === "system"
+        ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : saved;
+      document.documentElement.dataset.theme = resolved;
+    })();
+  </script>
   <style>
     :root {
       color-scheme: light;
@@ -1274,6 +1321,51 @@ DASHBOARD_HTML = """<!doctype html>
     @media (max-width: 760px) {
       .data-explorer-intro { display: grid; }
     }
+    :root, :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f5f5f2;
+      --bg-deep: #eceae4;
+      --surface: #ffffff;
+      --surface-2: #f0efeb;
+      --surface-3: #e7e5df;
+      --line: rgba(74, 70, 64, 0.24);
+      --text: #202124;
+      --ink: #202124;
+      --muted: #5f6368;
+      --accent: #b10e1e;
+      --accent-strong: #8f0b19;
+      --warning: #9a6700;
+      --danger: #b10e1e;
+      --info: #146c94;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #11151b;
+      --bg-deep: #0b0f14;
+      --surface: #191f27;
+      --surface-2: #222a34;
+      --surface-3: #2b3541;
+      --line: rgba(183, 192, 202, 0.28);
+      --text: #f7f3ed;
+      --ink: #f7f3ed;
+      --muted: #b7c0ca;
+      --accent: #ff6b75;
+      --accent-strong: #ff8b94;
+      --warning: #f6c453;
+      --danger: #ff7d86;
+      --info: #7cc7e8;
+    }
+    body { background: var(--bg-deep); }
+    .topbar { min-height: 0; padding: 0; background: transparent; color: var(--text); }
+    .security-strip { background: var(--warning-soft); border-bottom-color: var(--warning); color: var(--warning); }
+    .sidebar { background: color-mix(in srgb, var(--surface) 94%, transparent); }
+    .brand-mark { border-radius: 4px; background: var(--accent); color: white; }
+    .private-admin-badge { display: inline-flex; margin-top: 5px; padding: 3px 7px; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .panel-card, .main-stage .workspace, .main-stage .drawer, .connection-pill { background: var(--surface); color: var(--text); }
+    .admin-theme-control { display: grid; gap: 3px; color: var(--muted); font-size: 11px; }
+    .admin-theme-control select { min-height: 40px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--text); padding: 7px 10px; }
+    .career-atlas-link { min-height: 40px; display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; color: var(--accent); padding: 7px 10px; text-decoration: none; font-weight: 700; }
+    :focus-visible { outline-color: var(--info); }
   </style>
 </head>
 <body>
@@ -1289,6 +1381,7 @@ DASHBOARD_HTML = """<!doctype html>
         <div>
           <div class="brand-title">GEDS</div>
           <div class="brand-subtitle">Control Plane</div>
+          <span class="private-admin-badge">Private admin</span>
         </div>
       </div>
 
@@ -1319,6 +1412,8 @@ DASHBOARD_HTML = """<!doctype html>
           <p id="page-description" class="page-description">Live crawler status, attention items, and next actions.</p>
         </div>
         <div class="topbar-actions">
+          <a class="career-atlas-link" href="http://127.0.0.1:8780/" target="_blank" rel="noopener noreferrer">Career Atlas</a>
+          <label class="admin-theme-control"><span>Theme</span><select id="admin-theme"><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select></label>
           <span id="run-state" class="connection-pill" role="status" aria-live="polite">Connecting...</span>
           <span id="last-updated" class="muted"></span>
           <button id="refresh" class="btn" type="button">Refresh</button>
@@ -2913,6 +3008,24 @@ DASHBOARD_HTML = """<!doctype html>
         const open = !document.body.classList.contains("nav-open");
         document.body.classList.toggle("nav-open", open);
         el("mobile-nav-toggle").setAttribute("aria-expanded", String(open));
+      });
+    }
+    const adminTheme = el("admin-theme");
+    const adminThemeMedia = matchMedia("(prefers-color-scheme: dark)");
+    function applyAdminTheme(choice) {
+      const resolved = choice === "system" ? (adminThemeMedia.matches ? "dark" : "light") : choice;
+      document.documentElement.dataset.theme = resolved;
+    }
+    if (adminTheme) {
+      const savedTheme = localStorage.getItem("geds-admin-theme") || "system";
+      adminTheme.value = savedTheme;
+      applyAdminTheme(savedTheme);
+      adminTheme.addEventListener("change", () => {
+        localStorage.setItem("geds-admin-theme", adminTheme.value);
+        applyAdminTheme(adminTheme.value);
+      });
+      adminThemeMedia.addEventListener("change", () => {
+        if (adminTheme.value === "system") applyAdminTheme("system");
       });
     }
 

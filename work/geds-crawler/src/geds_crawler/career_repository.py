@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .career_leads import LeadSuggestion, infer_leads, load_lead_rules
+from .career_people import PeoplePage, PublicPerson, extract_observed_classifications, official_geds_url, public_person_id
 from .career_taxonomy import load_taxonomy, normalize_text
 
 
@@ -273,6 +274,73 @@ class CareerRepository:
             for vacancy in vacancy_rows
         )
         return TeamProfile(org_id, str(row["name"]), str(row["department_name"]), tuple(json.loads(row["canonical_path_json"])), int(row["direct_people_count"]), int(row["descendant_people_count"]), int(row["child_count"]), str(meta["snapshot_id"]), str(meta["as_of_at"]), str(meta["quality_status"]), str(row["source_url"]), leads, vacancy_signals)
+
+    def people(
+        self,
+        *,
+        org_id: str,
+        query: str = "",
+        classification: str | None = None,
+        sort: str = "name",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> PeoplePage:
+        limit = _bounded(limit, MAX_PAGE_SIZE)
+        offset = max(0, int(offset))
+        query_folded = normalize_text(query)
+        with self.connect() as con:
+            meta = self._meta(con)
+            organization = con.execute(
+                "SELECT org_dn,org_id,name FROM organizations_current WHERE snapshot_id=? AND org_id=?",
+                (meta["snapshot_id"], org_id),
+            ).fetchone()
+            if organization is None:
+                raise KeyError(org_id)
+            rows = con.execute(
+                """SELECT display_name,title,source_url
+                   FROM people_current
+                   WHERE snapshot_id=? AND org_dn=? AND presence_status='present'
+                   ORDER BY display_name COLLATE NOCASE,source_url""",
+                (meta["snapshot_id"], organization["org_dn"]),
+            ).fetchall()
+
+        all_people = [
+            PublicPerson(
+                person_id=public_person_id(str(row["source_url"])),
+                display_name=str(row["display_name"]),
+                observed_title=str(row["title"] or ""),
+                observed_classifications=extract_observed_classifications(row["title"]),
+                org_id=str(organization["org_id"]),
+                organization_name=str(organization["name"]),
+                snapshot_id=str(meta["snapshot_id"]),
+                snapshot_as_of=str(meta["as_of_at"]),
+                source_url=official_geds_url(str(row["source_url"])),
+            )
+            for row in rows
+        ]
+        available = tuple(sorted({value for person in all_people for value in person.observed_classifications}))
+        filtered = [
+            person
+            for person in all_people
+            if (not query_folded or query_folded in normalize_text(f"{person.display_name} {person.observed_title}"))
+            and (classification is None or classification in person.observed_classifications)
+        ]
+        if sort == "title":
+            filtered.sort(key=lambda person: (person.observed_title.casefold(), person.display_name.casefold(), person.person_id))
+        else:
+            filtered.sort(key=lambda person: (person.display_name.casefold(), person.observed_title.casefold(), person.person_id))
+        total = len(filtered)
+        page = tuple(filtered[offset : offset + limit])
+        return PeoplePage(
+            page,
+            total,
+            limit,
+            offset,
+            available,
+            str(meta["snapshot_id"]),
+            str(meta["quality_status"]),
+            _etag(meta, "people", org_id, query, classification or "all", sort, limit, offset),
+        )
 
     def departments(self) -> DepartmentResult:
         with self.connect() as con:
