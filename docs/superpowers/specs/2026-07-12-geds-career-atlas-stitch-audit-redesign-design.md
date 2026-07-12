@@ -1,8 +1,13 @@
 # GEDS Career Atlas Stitch Audit and Redesign Design
 
 **Date:** 2026-07-12
-**Status:** Approved for Stitch production
+**Status:** Superseded by `2026-07-12-geds-public-admin-experience-design.md`
 **Surface:** `work/geds-career-atlas` public explorer
+
+> This document records the first Stitch audit direction. Its visual and product
+> boundary decisions are no longer current. Use the replacement specification
+> for the approved public Career Atlas, private Admin Console, theme, and
+> team-to-people experience.
 
 ## Goal
 
