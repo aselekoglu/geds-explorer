@@ -116,3 +116,52 @@ Follow this workflow to perform a pagination backfill for capped organizations (
 
 > [!NOTE]
 > GEDS and TBS employee totals represent different populations and are not expected to be identical. Do not attempt to force them to match.
+
+## Career Atlas publication and serving
+
+Career Atlas is a separate public, read-only application. It never mounts the crawler control-plane routes and cannot start, stop, schedule, or configure crawler work.
+
+From `work\geds-crawler`, install the backend and test dependencies:
+
+```powershell
+py -m pip install -e ".[dev]"
+```
+
+Publish a canonical snapshot from a completed control-plane run, then rebuild the deterministic career index:
+
+```powershell
+py -m geds_crawler.career_cli publish `
+  --control-db ..\..\outputs\control.sqlite `
+  --run-id <completed-run-id> `
+  --master-db ..\..\outputs\master\geds-master.sqlite `
+  --as-of <ISO-8601-timestamp>
+
+py -m geds_crawler.career_cli index `
+  --master-db ..\..\outputs\master\geds-master.sqlite `
+  --taxonomy src\geds_crawler\data\career_taxonomy.v1.json
+```
+
+Build the frontend first, then serve both the public API and static application:
+
+```powershell
+cd ..\geds-career-atlas
+npm.cmd install
+npm.cmd run build
+
+cd ..\geds-crawler
+py -m geds_crawler.career_cli serve `
+  --master-db ..\..\outputs\master\geds-master.sqlite `
+  --frontend-dir ..\geds-career-atlas\dist `
+  --host 127.0.0.1 `
+  --port 8780
+```
+
+Use `--host 0.0.0.0` only for trusted-LAN review. The public app is read-only but local HTTP still has no transport encryption or authentication.
+
+Trust boundaries:
+
+- The canonical SQLite database and generated `dist\` assets are build/runtime artifacts and must not be committed.
+- Public payloads contain organization IDs, observed titles, aggregate counts, evidence, and official GEDS source URLs. They contain no email, phone, fax, address, or personal display-name fields.
+- Matching is deterministic and versioned. Confidence and evidence describe relevance, not eligibility, responsibility, hiring intent, or a job opening.
+- A GEDS `vacant` marker is always labelled as an unverified directory signal. It is not a verified GC Jobs competition and never creates an Apply action.
+- GC Jobs ingestion and a verified Opportunity Engine are intentionally deferred to a later, separately approved design.

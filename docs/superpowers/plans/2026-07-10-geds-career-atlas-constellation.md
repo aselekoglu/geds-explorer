@@ -934,7 +934,7 @@ git commit -m "feat: expose read-only Career Atlas API"
 **Interfaces:**
 - Routed public application shell with stable tokens and no control actions.
 
-- [ ] **Step 1: Create exact package metadata**
+- [x] **Step 1: Create exact package metadata**
 
 ~~~json
 {
@@ -1127,7 +1127,7 @@ git commit -m "feat: discover government teams by career interest"
 - Consumes departments(), children(), ancestors(), and selected org URL state.
 - Produces desktop multi-column hierarchy and mobile drill-in.
 
-- [ ] **Step 1: Write failing path and fanout tests**
+- [x] **Step 1: Write failing path and fanout tests**
 
 ~~~tsx
 it("reveals a shared deep path", async () => {
@@ -1148,15 +1148,15 @@ it("virtualizes 348 siblings", async () => {
 })
 ~~~
 
-- [ ] **Step 2: Implement accessible virtual columns**
+- [x] **Step 2: Implement accessible virtual columns**
 
 Use useVirtualizer with useFlushSync false for React 19. Columns use role tree and rows role treeitem plus aria-level. Arrow keys move, Right/Enter opens, Left returns, and typeahead filters. Counts distinguish direct people, descendant people, children, and descendants.
 
-- [ ] **Step 3: Implement one-state responsive drill-in**
+- [x] **Step 3: Implement one-state responsive drill-in**
 
 Below 760 px render one active column and persistent breadcrumb/back action. Reuse the same selected-org URL state; do not create a separate mobile navigation model.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test -- src/features/org-walk/OrgWalk.test.tsx
 
@@ -1183,7 +1183,7 @@ git commit -m "feat: browse government through virtualized Org Walk"
 - Consumes team_profile(), roles(), and active interpretation.
 - Produces evidence-rich team details and role-family/title exploration.
 
-- [ ] **Step 1: Write failing trust-language tests**
+- [x] **Step 1: Write failing trust-language tests**
 
 ~~~tsx
 it("shows observed evidence without inventing a mandate or job", async () => {
@@ -1196,15 +1196,15 @@ it("shows observed evidence without inventing a mandate or job", async () => {
 })
 ~~~
 
-- [ ] **Step 2: Implement profile evidence**
+- [x] **Step 2: Implement profile evidence**
 
 Render canonical chain, direct/descendant counts, role families, representative titles, match evidence, related teams, freshness, fallback warnings, and official GEDS links. Computed prose begins “Inferred from observed organization and role names” and immediately lists evidence. A “Copy data issue report” action copies organization ID, snapshot ID, observed source values, source URL, and a blank correction description; it does not transmit anything.
 
-- [ ] **Step 3: Implement role exploration**
+- [x] **Step 3: Implement role exploration**
 
 Group normalized titles under taxonomy categories while preserving originals. Support institution, subtree, and confidence filters; each group links back to matching teams.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test -- src/features/team-profile/TeamProfile.test.tsx
 
@@ -1229,7 +1229,7 @@ git commit -m "feat: explain teams and observed government roles"
 - GET /api/constellation?root_id&max_depth&limit&category.
 - buildPackLayout(slice, width, height) -> PackedNode[].
 
-- [ ] **Step 1: Write failing bounds and stability tests**
+- [x] **Step 1: Write failing bounds and stability tests**
 
 ~~~python
 def test_root_constellation_returns_departments_not_every_org(repository):
@@ -1246,19 +1246,19 @@ it("returns identical positions for identical input", () => {
 })
 ~~~
 
-- [ ] **Step 2: Implement aggregate slices**
+- [x] **Step 2: Implement aggregate slices**
 
 Root returns 156 institutions. Focused requests return descendants to max_depth with a 2000-node cap. Over-bound branches become aggregate nodes carrying child_count, descendant_org_count, descendant_people_count, match_count, quality_status, and has_more true.
 
-- [ ] **Step 3: Implement stable circle packing**
+- [x] **Step 3: Implement stable circle packing**
 
 Use d3.hierarchy, sum by selected metric, sort by descending value then stable org_id, pack.size, and fixed padding. Use no random or force simulation.
 
-- [ ] **Step 4: Evaluate three hierarchical layouts on real data**
+- [x] **Step 4: Evaluate three hierarchical layouts on real data**
 
 Record circle pack, partition, and treemap results for hierarchy readability, label density, hit targets, and focus-transition continuity. Record root and largest 2000-node layout timings. Targets: root under 50 ms and focused layout under 150 ms. Circle pack remains primary unless measured evidence requires a committed plan amendment.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: cd work/geds-crawler; py -m pytest tests/test_career_repository.py -v
 
@@ -1286,7 +1286,7 @@ git commit -m "feat: lay out bounded government constellations"
 - Consumes constellation API, URL category/focus, and packed layout.
 - Produces spatial focus, semantic zoom, synchronized list, and shareable state.
 
-- [ ] **Step 1: Write failing focus, reduced-motion, and fallback tests**
+- [x] **Step 1: Write failing focus, reduced-motion, and fallback tests**
 
 ~~~tsx
 it("lights systems and synchronizes focus", async () => {
@@ -1314,19 +1314,19 @@ it("keeps the synchronized list when canvas fails", async () => {
 })
 ~~~
 
-- [ ] **Step 2: Implement canvas semantic zoom**
+- [x] **Step 2: Implement canvas semantic zoom**
 
 Render visible nodes only. Wide zoom shows institutions and aggregate match intensity; focused zoom reveals branches; close zoom adds names, counts, role families, quality halo, and vacancy badge. Use a spatial lookup for hit testing. Hover never becomes the only detail path.
 
-- [ ] **Step 3: Synchronize accessible list and URL**
+- [x] **Step 3: Synchronize accessible list and URL**
 
 ConstellationList exposes the same sorted nodes, selected state, evidence, and focus actions in semantic HTML. Focus updates mode, focus, and breadcrumb URL state. Browser Back restores state. Recompute layout from stable IDs instead of serializing coordinates.
 
-- [ ] **Step 4: Apply visual semantics**
+- [x] **Step 4: Apply visual semantics**
 
 Institution colors stay stable. Domain relevance uses intensity plus outline. Quality uses labelled halo/badge. Vacancy uses a dotted marker and “Recorded as vacant in GEDS”, never the healthy-success green.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test -- src/features/constellation/ConstellationPage.test.tsx; npm.cmd run typecheck; npm.cmd run build
 
@@ -1350,7 +1350,7 @@ git commit -m "feat: explore government as a constellation"
 - Curated AI, software, cybersecurity, policy, and data tours.
 - Local-only SavedView with no person/contact fields.
 
-- [ ] **Step 1: Write failing tour and privacy tests**
+- [x] **Step 1: Write failing tour and privacy tests**
 
 ~~~tsx
 it("opens an AI tour as shareable state", async () => {
@@ -1373,15 +1373,15 @@ it("does not persist people or contacts", () => {
 })
 ~~~
 
-- [ ] **Step 2: Implement editorial tours**
+- [x] **Step 2: Implement editorial tours**
 
 Each tour has id, bilingual title/description, categories, initial focus, ordered stops, and evidence notes. Validate stop IDs against current snapshot and mark missing stops rather than retargeting.
 
-- [ ] **Step 3: Implement local SavedView**
+- [x] **Step 3: Implement local SavedView**
 
 Persist query, categories, department, org/focus IDs, confidence, vacancy, mode, language, user label, an optional local note capped at 2000 characters, and created_at. Compare at most four teams and store only aggregate/profile references. Notes never enter URLs or API requests.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: cd work/geds-career-atlas; npm.cmd test -- src/features/saved-map/SavedMap.test.tsx
 
@@ -1578,7 +1578,7 @@ git commit -m "test: gate Career Atlas accessibility and performance"
 **Interfaces:**
 - Exact build/run workflow and requirement-by-requirement completion evidence.
 
-- [ ] **Step 1: Document local workflows**
+- [x] **Step 1: Document local workflows**
 
 Backend run:
 
@@ -1598,7 +1598,7 @@ npm.cmd run dev
 
 Document publication/index rebuild, trust indicators, no-contact policy, vacancy semantics, public/control separation, and generated artifacts.
 
-- [ ] **Step 2: Run complete verification**
+- [x] **Step 2: Run complete verification**
 
 Run: cd work/geds-crawler; py -m pytest -q
 
@@ -1608,15 +1608,15 @@ Run: cd ../..; git diff --check; git status --short
 
 Expected: all tests/builds pass, diff check is silent, and only intended handoff docs remain before final commit.
 
-- [ ] **Step 3: Audit every design criterion**
+- [x] **Step 3: Audit every design criterion**
 
 The acceptance file has one row per criterion with requirement text, implementing task/files, exact automated test, real-data/browser evidence, and status proven or not proven. Intent, a narrower unit test, or absence of observed failure is not proof.
 
-- [ ] **Step 4: Inspect rendered screens**
+- [x] **Step 4: Inspect rendered screens**
 
 Review desktop Discover, Org Walk, Team Profile, Constellation, Roles, Saved Map, About, French Discover; mobile Discover/Org Walk; reduced-motion Constellation; and no-match, partial, stale, source-unavailable, and canvas-failure states. Record findings/fixes and rerun affected gates.
 
-- [ ] **Step 5: Commit handoff**
+- [x] **Step 5: Commit handoff**
 
 ~~~powershell
 git add work/geds-crawler/README.md work/geds-career-atlas/README.md docs/superpowers/evidence/geds-career-atlas-acceptance.md docs/superpowers/progress/geds-career-atlas.md

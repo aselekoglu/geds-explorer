@@ -539,3 +539,48 @@ Manual assistive-technology note:
 Next:
 
 - complete Task 21 operator documentation, requirement-by-requirement acceptance ledger, rendered-state inspection, and final completion audit.
+
+## Tasks 13â€“17 closure audit
+
+Status: implementation gaps found by the final audit were closed and verified
+
+- Org Walk now virtualizes 348-sibling fanout, supports arrow/right/left/typeahead keyboard behavior, uses one responsive state model, and reconstructs a deep shared URL focus through the ancestors API.
+- Team Profile exposes canonical path, direct/descendant counts, source/freshness/quality, related teams, local issue-report copy, observed role families, evidence, and department/team/confidence/vacancy role filters.
+- bounded constellation slices now expose descendant organization count, category match count, quality, vacancy count, and explicit `has_more`; the real-data circle-pack/partition/treemap evaluation is in `docs/superpowers/evidence/constellation-layout-evaluation.md`.
+- Constellation synchronizes visual and semantic-list focus, browser history, shared Discover filters, reduced motion, quality/vacancy semantics, and a semantic-list-preserving visual error boundary.
+- five bilingual tours and privacy-bounded local saved maps remain verified.
+
+## Task 21 â€” Final acceptance and operator handoff
+
+Status: final verification and commit pending
+
+Completed:
+
+- added exact publish/index/build/serve workflows and public/control trust boundaries to both package READMEs;
+- added the requirement-by-requirement acceptance ledger with one row per approved design criterion;
+- inspected desktop Discover, Constellation, Team Profile/Roles, Tours/Saved Map, About, French no-match, 360px mobile, quality and failure states against the real canonical snapshot;
+- found and fixed a desktop overflow/new-card styling regression during rendered review;
+- fixed Windows Playwright teardown: the built-in webServer relied on denied `taskkill`, so E2E now owns a direct Python child via global setup; one-test reproduction exits in 8.6s and the full gate reports `18 passed (38.4s)`;
+- current broad verification before the final documentation/style delta: backend `204 passed`; frontend `23 files / 42 tests`; typecheck/build passed; Playwright `18 passed`.
+
+Remaining:
+
+- rerun the complete verification set and diff audit after the final rendered fixes;
+- check the remaining Task 21 gates, commit the intended handoff changes, and perform the requirement-by-requirement completion audit without pushing.
+
+Final pre-commit verification (2026-07-11):
+
+- backend: `205 passed in 23.59s`;
+- frontend: `23` Vitest files / `42` tests passed;
+- TypeScript typecheck and production Vite build passed;
+- npm audit: `0 vulnerabilities`;
+- Playwright real-canonical-data gate: `18 passed in 41.4s`;
+- current performance samples: root layout `8.1629, 0.8304, 0.5603, 0.6693, 0.6287 ms`; 2,000-node layout `13.6207, 7.8610, 8.2135, 7.8239, 7.5040 ms`; Discover useful `1002.7871, 918.3440, 946.5033, 953.0268, 975.0840 ms`; filter feedback `19.7, 14.4, 7.3, 7.2, 8.9 ms`;
+- `git diff --check` is silent; only intended implementation, test, plan, evidence, and handoff files remain;
+- commit attempt was not executed because the Codex permission gate reported the current usage limit. No staging, commit, push, or deploy occurred.
+
+Continuation result:
+
+- implementation gaps and their tests were committed locally as `e9ee8bf feat: close Career Atlas exploration gaps`;
+- no push or deploy was performed;
+- the next local commit contains only operator documentation, durable acceptance evidence, plan, and progress handoff.
