@@ -584,3 +584,16 @@ Continuation result:
 - implementation gaps and their tests were committed locally as `e9ee8bf feat: close Career Atlas exploration gaps`;
 - no push or deploy was performed;
 - the next local commit contains only operator documentation, durable acceptance evidence, plan, and progress handoff.
+
+## Completion gate â€” 2026-07-11
+
+Status: proven complete
+
+- all 21 implementation-plan tasks and every nested checkbox are complete;
+- every approved design acceptance row is `Proven`; there are no Pending or Not proven rows;
+- post-commit backend suite: `205 passed in 32.79s`;
+- post-commit frontend suite: `23` files / `42` tests passed; typecheck and production build passed; npm audit found `0 vulnerabilities`;
+- post-commit Playwright real-data gate: `18 passed in 43.9s`, including Chrome/axe, keyboard, reduced motion, responsive layout, resilience, privacy, bounds, and performance;
+- `git diff --check` is silent after removing Markdown hard-break whitespace;
+- branch `codex/geds-career-atlas` is intentionally ahead of its remote and has not been pushed or deployed;
+- GC Jobs integration remains explicitly deferred, GEDS vacancy markers remain unverified signals, and the public application exposes no Apply or crawler-control action.

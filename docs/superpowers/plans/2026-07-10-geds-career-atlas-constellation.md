@@ -1623,7 +1623,7 @@ git add work/geds-crawler/README.md work/geds-career-atlas/README.md docs/superp
 git commit -m "docs: verify and hand off GEDS Career Atlas"
 ~~~
 
-- [ ] **Step 6: Completion gate**
+- [x] **Step 6: Completion gate**
 
 Re-run status, full tests, acceptance audit, and the durable goal objective. Mark the goal complete only when all 21 tasks are checked, every acceptance row is proven, no required work remains, and current evidence passes. Do not push or deploy.
 

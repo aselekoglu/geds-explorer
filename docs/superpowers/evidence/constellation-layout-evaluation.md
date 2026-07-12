@@ -1,7 +1,8 @@
 # Constellation hierarchy layout evaluation
 
-Date: 2026-07-11  
-Snapshot: `edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5`  
+Date: 2026-07-11
+
+Snapshot: `edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5`
 Dataset scale: 156 root institutions, 26,421 organization units, 193,163 current people records.
 
 ## Decision

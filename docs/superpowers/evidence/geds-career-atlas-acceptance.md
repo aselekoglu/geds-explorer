@@ -1,8 +1,10 @@
 # GEDS Career Atlas acceptance ledger
 
-Audit date: 2026-07-11  
-Canonical snapshot: `edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5`  
-Scale: 156 root institutions, 26,421 organization units, 193,163 current people records.  
+Audit date: 2026-07-11
+
+Canonical snapshot: `edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5`
+
+Scale: 156 root institutions, 26,421 organization units, 193,163 current people records.
 Status vocabulary: **Proven** means current source plus a scope-matched automated or rendered/runtime check establishes the requirement; **Pending** means stronger evidence is still required.
 
 | Acceptance criterion | Implementing evidence | Automated evidence | Real-data / rendered evidence | Status |
