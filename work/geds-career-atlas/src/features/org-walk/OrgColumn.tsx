@@ -1,0 +1,20 @@
+import { useVirtualizer } from "@tanstack/react-virtual"
+import { useRef } from "react"
+import type { OrgNode } from "../../api/types"
+import { useLanguage } from "../../i18n/i18n"
+
+type Props={label:string;items:OrgNode[];columnIndex:number;expandedId?:string;onOpen:(node:OrgNode,columnIndex:number)=>void;onBack:(columnIndex:number)=>void}
+
+export function OrgColumn({label,items,columnIndex,expandedId,onOpen,onBack}:Props){
+  const scrollRef=useRef<HTMLDivElement>(null)
+  const {t,formatNumber}=useLanguage()
+  const virtualizer=useVirtualizer({count:items.length,getScrollElement:()=>scrollRef.current,estimateSize:()=>62,overscan:6,useFlushSync:false})
+  const virtualItems=virtualizer.getVirtualItems().length?virtualizer.getVirtualItems():items.slice(0,60).map((_,index)=>({index,key:index,start:index*62,size:62,end:(index+1)*62,lane:0}))
+  function focusIndex(index:number){const bounded=Math.max(0,Math.min(items.length-1,index));virtualizer.scrollToIndex(bounded);const focus=()=>scrollRef.current?.querySelector<HTMLElement>(`[data-org-id="${CSS.escape(items[bounded].org_id)}"]`)?.focus();focus();requestAnimationFrame(focus)}
+  function typeahead(key:string){if(key.length!==1)return;const index=items.findIndex(item=>item.name.toLocaleLowerCase().startsWith(key.toLocaleLowerCase()));if(index>=0)focusIndex(index)}
+  return <div ref={scrollRef} className="org-root-list" role="tree" aria-label={label} onKeyDown={event=>typeahead(event.key)}>
+    <div className="org-virtual-space" style={{height:virtualizer.getTotalSize()||Math.min(items.length,60)*62}}>
+      {virtualItems.map(item=>{const node=items[item.index];return <button data-org-id={node.org_id} key={item.key} role="treeitem" aria-level={node.depth+1} aria-expanded={node.child_count>0?expandedId===node.org_id:undefined} style={{position:"absolute",transform:`translateY(${item.start}px)`,height:item.size}} onClick={()=>onOpen(node,columnIndex)} onKeyDown={event=>{if(event.key==="ArrowDown"||event.key==="ArrowUp"){event.preventDefault();focusIndex(item.index+(event.key==="ArrowDown"?1:-1))}if((event.key==="ArrowRight"||event.key==="Enter")&&node.child_count){event.preventDefault();onOpen(node,columnIndex)}if(event.key==="ArrowLeft"&&columnIndex){event.preventDefault();onBack(columnIndex)}}}><span>{node.name}</span><small>{t("orgWalk.summary",{teams:node.child_count,people:formatNumber(node.descendant_people_count)})}</small></button>})}
+    </div>
+  </div>
+}

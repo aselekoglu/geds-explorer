@@ -15,3 +15,16 @@ it("opens a selected organization in the next hierarchy column", async () => {
   fireEvent.click(await screen.findByRole("treeitem", { name: /AI Centre/i }))
   expect(await screen.findByText("Digital Services / AI Centre")).toBeInTheDocument()
 })
+
+it("restores a deep shared path from selected URL state",async()=>{
+  const root={org_id:"root-1",name:"Department",depth:0,child_count:1,descendant_people_count:20}
+  const branch={org_id:"branch-1",name:"Branch",parent_id:"root-1",depth:1,child_count:1,descendant_people_count:10}
+  const team={org_id:"team-1",name:"Team",parent_id:"branch-1",depth:2,child_count:0,descendant_people_count:4}
+  const client={
+    rootChildren:async()=>({items:[root],snapshot_id:"snapshot",etag:"etag"}),
+    ancestors:async()=>({items:[root,branch,team],snapshot_id:"snapshot",etag:"etag"}),
+    children:async(id:string)=>({items:id==="root-1"?[branch]:id==="branch-1"?[team]:[],snapshot_id:"snapshot",etag:"etag"}),
+  }
+  render(<OrganizationExplorer client={client} selectedOrgId="team-1"/>)
+  expect(await screen.findByLabelText("Selected organization path")).toHaveTextContent("Department / Branch / Team")
+})

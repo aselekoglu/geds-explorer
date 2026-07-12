@@ -9,6 +9,9 @@ test("constellation offers synchronized keyboard-selectable semantic map", async
   await option.press("Enter")
   await expect(option).toHaveAttribute("aria-selected", "true")
   await expect(page).toHaveURL(/focus=/)
+  await page.goBack()
+  await expect(page).not.toHaveURL(/focus=/)
+  await expect(page.getByText("Select an organization")).toBeVisible()
 })
 
 test("mobile constellation is list-first without page overflow", async ({ page }) => {

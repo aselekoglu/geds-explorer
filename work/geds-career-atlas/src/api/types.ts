@@ -1,11 +1,12 @@
 export type Evidence={field:string;matched_phrase:string;source_text:string;weight:number;category_id:string}
-export type SearchResult={items:Array<{entity_id:string;entity_kind:string;org_id?:string;title:string;organization_name:string;score:number;confidence:string;evidence:Evidence[]}>;snapshot_id:string;etag:string}
-export type OrgNode={org_id:string;name:string;parent_id?:string;depth:number;child_count:number;descendant_people_count:number}
+export type QueryInterpretation={original_query:string;normalized_query:string;category_ids:string[];expanded_terms:string[];evidence:string[];taxonomy_version:string}
+export type SearchResult={items:Array<{entity_id:string;entity_kind:string;org_id?:string;title:string;organization_name:string;department_name?:string;score:number;confidence:string;evidence:Evidence[];vacancy_signal?:boolean}>;snapshot_id:string;etag:string;quality_status?:string;interpretation?:QueryInterpretation}
+export type OrgNode={org_id:string;name:string;parent_id?:string;depth:number;child_count:number;descendant_people_count:number;descendant_org_count?:number;match_count?:number;quality_status?:string;vacancy_count?:number;has_more?:boolean}
 export type OrgPage={items:OrgNode[];snapshot_id:string;etag:string}
 export type ConstellationSlice={nodes:OrgNode[];limit:number;truncated:boolean;snapshot_id:string;etag:string}
 export type DepartmentPage={items:Array<{department_id:string;name:string}>;snapshot_id:string;etag:string}
 export type LeadSuggestion={kind:"possible_team_lead"|"career_conversation_lead";confidence:string;title:string;org_id:string;source_url:string;reasons:string[]}
 export type VacancySignal={marker:string;title:string;org_id:string;observed_at:string;source_url:string;confidence:string;reasons:string[];live_competition_verified:false}
-export type TeamProfile={org_id:string;name:string;department_name:string;canonical_path:string[];direct_people_count:number;descendant_people_count:number;child_count:number;snapshot_id:string;snapshot_as_of?:string;conversation_leads?:LeadSuggestion[];vacancy_signals?:VacancySignal[]}
+export type TeamProfile={org_id:string;name:string;department_name:string;canonical_path:string[];direct_people_count:number;descendant_people_count:number;child_count:number;snapshot_id:string;snapshot_as_of?:string;quality_status?:string;source_url?:string;conversation_leads?:LeadSuggestion[];vacancy_signals?:VacancySignal[]}
 export type Tour={id:string;title:{en:string;fr:string};description:{en:string;fr:string};categories:string[];initial_focus?:string;stops:Array<{org_id:string;available:boolean;note:{en:string;fr:string}}>} 
 export type TourResult={items:Tour[];snapshot_id:string;etag:string}

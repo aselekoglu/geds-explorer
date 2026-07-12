@@ -30,7 +30,13 @@ def repository(tmp_path):
     dept = "OU=Dept,O=GC,C=CA"; org = f"OU=AI Centre,{dept}"
     con.execute("INSERT INTO crawl_runs VALUES (0,'finished','full','2026-07-09')")
     con.execute("INSERT INTO departments VALUES (?,?)", (dept, "Digital Services"))
-    con.execute("INSERT INTO org_units VALUES (?,?,?,?,?,?)", (org, "AI Centre", dept, 1, "Digital Services / AI Centre", "org"))
+    child_a = f"OU=Platform A,{org}"; child_b = f"OU=Platform B,{org}"; grandchild = f"OU=Delivery,{child_a}"
+    con.executemany("INSERT INTO org_units VALUES (?,?,?,?,?,?)", [
+        (org, "AI Centre", dept, 1, "Digital Services / AI Centre", "org"),
+        (child_a, "Platform A", dept, 2, "Digital Services / AI Centre / Platform A", "org-a"),
+        (child_b, "Platform B", dept, 2, "Digital Services / AI Centre / Platform B", "org-b"),
+        (grandchild, "Delivery", dept, 3, "Digital Services / AI Centre / Platform A / Delivery", "org-delivery"),
+    ])
     con.executemany(
         "INSERT INTO people_index VALUES (?,?,?,?,?,?,?,?,?)",
         [
@@ -53,6 +59,25 @@ def test_search_returns_explainable_ranked_results(repository):
     assert result.limit == 20
     assert result.snapshot_id
     assert result.etag
+
+
+def test_search_marks_only_source_derived_vacancy_records(repository):
+    result = repository.search(query="data", limit=200)
+    by_title = {item.title: item for item in result.items}
+
+    assert by_title["Data Scientist"].vacancy_signal is True
+    assert by_title["Data Scientist"].department_name == "Digital Services"
+    assert by_title["Manager, Data Platforms"].vacancy_signal is False
+    assert by_title["Machine Learning Engineer"].vacancy_signal is False
+
+
+def test_search_returns_explainable_query_interpretation(repository):
+    result = repository.search(query="AI", limit=20)
+
+    assert result.interpretation["original_query"] == "AI"
+    assert result.interpretation["category_ids"] == ["data-ai-research"]
+    assert "artificial intelligence" in result.interpretation["expanded_terms"]
+    assert result.interpretation["evidence"]
 
 
 def test_children_caps_unbounded_limit(repository):
@@ -109,6 +134,16 @@ def test_navigation_queries_are_snapshot_bound_and_capped(repository):
     assert constellation.items
 
 
+def test_role_explorer_rows_preserve_original_titles_and_category_evidence(repository):
+    org_id = repository.children(parent_id=None, limit=20).items[0].org_id
+    roles = repository.roles(org_id=org_id, limit=200)
+    by_title = {item.title: item for item in roles.items}
+
+    assert by_title["Data Scientist"].evidence
+    assert {evidence["category_id"] for evidence in by_title["Data Scientist"].evidence} >= {"data-ai-research"}
+    assert by_title["Data Scientist"].confidence in {"high", "medium", "exploratory"}
+
+
 def test_root_constellation_returns_only_root_organizations(repository):
     result = repository.constellation_slice(root_id=None, max_depth=1, limit=2000)
 
@@ -116,6 +151,28 @@ def test_root_constellation_returns_only_root_organizations(repository):
     assert all(node.parent_id is None for node in result.nodes)
     assert result.truncated is False
     assert result.limit == 2000
+    assert result.nodes[0].descendant_org_count == 3
+    assert result.nodes[0].quality_status in {"complete", "partial_overlay"}
+    assert result.nodes[0].match_count == 0
+    assert result.nodes[0].vacancy_count == 1
+    assert result.nodes[0].has_more is True
+
+
+def test_truncated_constellation_marks_visible_parent_as_aggregate(repository):
+    root = repository.constellation_slice(root_id=None, max_depth=1, limit=20).nodes[0]
+    result = repository.constellation_slice(root_id=root.org_id, max_depth=3, limit=2)
+
+    assert result.truncated is True
+    assert len(result.nodes) == 2
+    assert result.nodes[0].org_id == root.org_id
+    assert result.nodes[0].has_more is True
+    assert result.nodes[0].descendant_org_count == 3
+
+
+def test_constellation_category_exposes_direct_match_counts(repository):
+    root = repository.constellation_slice(root_id=None, max_depth=1, limit=20, category="data-ai-research").nodes[0]
+
+    assert root.match_count > 0
 
 
 def test_tours_are_deterministic_and_have_no_personal_data(repository):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .career_leads import LeadSuggestion, infer_leads, load_lead_rules
@@ -24,6 +24,8 @@ class SearchItem:
     score: int
     confidence: str
     evidence: tuple[dict, ...]
+    vacancy_signal: bool = False
+    department_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,7 @@ class SearchResult:
     snapshot_id: str
     quality_status: str
     etag: str
+    interpretation: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,11 @@ class OrgNode:
     depth: int
     child_count: int
     descendant_people_count: int
+    descendant_org_count: int = 0
+    match_count: int = 0
+    quality_status: str = "unknown"
+    vacancy_count: int = 0
+    has_more: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,6 +84,7 @@ class TeamProfile:
     snapshot_id: str
     snapshot_as_of: str
     quality_status: str
+    source_url: str
     conversation_leads: tuple[LeadSuggestion, ...]
     vacancy_signals: tuple["VacancySignal", ...]
 
@@ -161,14 +170,18 @@ class CareerRepository:
         with self.connect() as con:
             meta = self._meta(con)
             if not interpretation.category_ids:
-                return SearchResult((), limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit))
+                return SearchResult((), limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit), _interpretation_payload(interpretation))
             placeholders = ",".join("?" for _ in interpretation.category_ids)
             rows = con.execute(
                 f"""
-                SELECT e.entity_id, e.entity_kind, e.org_id, e.title, e.organization_name,
-                       m.category_id, m.score, m.confidence, m.evidence_json
+                SELECT e.entity_id, e.entity_kind, e.org_id, e.title, e.organization_name,e.ancestor_text,COALESCE(d.name,'') department_name,
+                       m.category_id, m.score, m.confidence, m.evidence_json,
+                       CASE WHEN v.entity_id IS NULL THEN 0 ELSE 1 END vacancy_signal
                 FROM career_matches AS m
                 JOIN career_entities AS e ON e.entity_id = m.entity_id
+                LEFT JOIN organizations_current o ON o.org_id=e.org_id AND o.snapshot_id=e.snapshot_id
+                LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=e.snapshot_id
+                LEFT JOIN vacancy_signals AS v ON v.entity_id=e.entity_id AND v.snapshot_id=e.snapshot_id
                 WHERE m.category_id IN ({placeholders})
                 ORDER BY m.score DESC, e.entity_id ASC
                 """,
@@ -189,10 +202,12 @@ class CareerRepository:
                 score=value["score"],
                 confidence=_confidence(value["score"]),
                 evidence=tuple(value["evidence"]),
+                vacancy_signal=bool(value["row"]["vacancy_signal"]),
+                department_name=str(value["row"]["department_name"]),
             )
             for key, value in sorted(grouped.items(), key=lambda item: (-item[1]["score"], item[0]))[:limit]
         )
-        return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit))
+        return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit), _interpretation_payload(interpretation))
 
     def children(self, *, parent_id: str | None, limit: int = 50) -> OrgPage:
         limit = _bounded(limit, MAX_PAGE_SIZE)
@@ -257,7 +272,7 @@ class CareerRepository:
             )
             for vacancy in vacancy_rows
         )
-        return TeamProfile(org_id, str(row["name"]), str(row["department_name"]), tuple(json.loads(row["canonical_path_json"])), int(row["direct_people_count"]), int(row["descendant_people_count"]), int(row["child_count"]), str(meta["snapshot_id"]), str(meta["as_of_at"]), str(meta["quality_status"]), leads, vacancy_signals)
+        return TeamProfile(org_id, str(row["name"]), str(row["department_name"]), tuple(json.loads(row["canonical_path_json"])), int(row["direct_people_count"]), int(row["descendant_people_count"]), int(row["child_count"]), str(meta["snapshot_id"]), str(meta["as_of_at"]), str(meta["quality_status"]), str(row["source_url"]), leads, vacancy_signals)
 
     def departments(self) -> DepartmentResult:
         with self.connect() as con:
@@ -281,13 +296,32 @@ class CareerRepository:
         limit = _bounded(limit, MAX_PAGE_SIZE)
         with self.connect() as con:
             meta = self._meta(con)
-            sql = "SELECT entity_id,entity_kind,org_id,title,organization_name FROM career_entities WHERE snapshot_id=? AND entity_kind='person'"
+            sql = "SELECT e.entity_id,e.entity_kind,e.org_id,e.title,e.organization_name,e.ancestor_text,COALESCE(d.name,'') department_name,CASE WHEN v.entity_id IS NULL THEN 0 ELSE 1 END vacancy_signal FROM career_entities e LEFT JOIN vacancy_signals v ON v.entity_id=e.entity_id AND v.snapshot_id=e.snapshot_id LEFT JOIN organizations_current o ON o.org_id=e.org_id AND o.snapshot_id=e.snapshot_id LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=e.snapshot_id WHERE e.snapshot_id=? AND e.entity_kind='person'"
             params: list[object] = [meta["snapshot_id"]]
             if org_id is not None:
-                sql += " AND org_id=?"; params.append(org_id)
-            sql += " ORDER BY title,entity_id LIMIT ?"; params.append(limit)
+                sql += " AND e.org_id=?"; params.append(org_id)
+            sql += " ORDER BY e.title,e.entity_id LIMIT ?"; params.append(limit)
             rows = con.execute(sql, params).fetchall()
-        items = tuple(SearchItem(str(r["entity_id"]), str(r["entity_kind"]), r["org_id"], str(r["title"]), str(r["organization_name"]), 0, "none", ()) for r in rows)
+            match_map: dict[str, dict[str, object]] = {}
+            if rows:
+                entity_ids = [str(row["entity_id"]) for row in rows]
+                placeholders = ",".join("?" for _ in entity_ids)
+                for match in con.execute(
+                    f"SELECT entity_id,score,evidence_json FROM career_matches WHERE entity_id IN ({placeholders}) ORDER BY entity_id,category_id",
+                    entity_ids,
+                ).fetchall():
+                    grouped = match_map.setdefault(str(match["entity_id"]), {"score": 0, "evidence": []})
+                    grouped["score"] = int(grouped["score"]) + int(match["score"])
+                    grouped["evidence"].extend(json.loads(match["evidence_json"]))
+        items = tuple(
+            SearchItem(
+                str(r["entity_id"]), str(r["entity_kind"]), r["org_id"], str(r["title"]), str(r["organization_name"]),
+                int(match_map.get(str(r["entity_id"]), {}).get("score", 0)),
+                _confidence(int(match_map.get(str(r["entity_id"]), {}).get("score", 0))),
+                tuple(match_map.get(str(r["entity_id"]), {}).get("evidence", [])), bool(r["vacancy_signal"]), str(r["department_name"]),
+            )
+            for r in rows
+        )
         return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "roles", org_id or "all", limit))
 
     def vacancy_signals(self, *, limit: int = 50) -> VacancyDiscoveryResult:
@@ -326,13 +360,13 @@ class CareerRepository:
         with self.connect() as con:
             meta = self._meta(con)
             if not interpretation.category_ids:
-                return SearchResult((), limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "constellation", query, limit))
+                return SearchResult((), limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "constellation", query, limit), _interpretation_payload(interpretation))
             placeholders = ",".join("?" for _ in interpretation.category_ids)
-            rows = con.execute(f"SELECT e.entity_id,e.entity_kind,e.org_id,e.title,e.organization_name,m.score,m.confidence,m.evidence_json FROM career_matches m JOIN career_entities e ON e.entity_id=m.entity_id WHERE m.category_id IN ({placeholders}) ORDER BY m.score DESC,e.entity_id LIMIT ?", (*interpretation.category_ids, limit)).fetchall()
-        items = tuple(SearchItem(str(r["entity_id"]), str(r["entity_kind"]), r["org_id"], str(r["title"]), str(r["organization_name"]), int(r["score"]), str(r["confidence"]), tuple(json.loads(r["evidence_json"]))) for r in rows)
-        return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "constellation", query, limit))
+            rows = con.execute(f"SELECT e.entity_id,e.entity_kind,e.org_id,e.title,e.organization_name,e.ancestor_text,COALESCE(d.name,'') department_name,m.score,m.confidence,m.evidence_json,CASE WHEN v.entity_id IS NULL THEN 0 ELSE 1 END vacancy_signal FROM career_matches m JOIN career_entities e ON e.entity_id=m.entity_id LEFT JOIN vacancy_signals v ON v.entity_id=e.entity_id AND v.snapshot_id=e.snapshot_id LEFT JOIN organizations_current o ON o.org_id=e.org_id AND o.snapshot_id=e.snapshot_id LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=e.snapshot_id WHERE m.category_id IN ({placeholders}) ORDER BY m.score DESC,e.entity_id LIMIT ?", (*interpretation.category_ids, limit)).fetchall()
+        items = tuple(SearchItem(str(r["entity_id"]), str(r["entity_kind"]), r["org_id"], str(r["title"]), str(r["organization_name"]), int(r["score"]), str(r["confidence"]), tuple(json.loads(r["evidence_json"])), bool(r["vacancy_signal"]), str(r["department_name"])) for r in rows)
+        return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "constellation", query, limit), _interpretation_payload(interpretation))
 
-    def constellation_slice(self, *, root_id: str | None, max_depth: int = 1, limit: int = 200) -> ConstellationSlice:
+    def constellation_slice(self, *, root_id: str | None, max_depth: int = 1, limit: int = 200, category: str | None = None) -> ConstellationSlice:
         """Return a bounded organization slice for spatial exploration, never the full graph."""
         limit = _bounded(limit, MAX_CONSTELLATION_SIZE)
         max_depth = _bounded(max_depth, 12)
@@ -341,7 +375,7 @@ class CareerRepository:
             snapshot_id = str(meta["snapshot_id"])
             if root_id is None:
                 rows = con.execute(
-                    """SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.descendant_people_count
+                    """SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.descendant_people_count,o.descendant_org_count
                        FROM organizations_current o
                        WHERE o.snapshot_id=? AND o.parent_dn IS NULL
                        ORDER BY o.name,o.org_id LIMIT ?""",
@@ -356,16 +390,52 @@ class CareerRepository:
                            FROM organizations_current child JOIN slice ON child.parent_dn=slice.org_dn
                            WHERE child.snapshot_id=? AND slice.level < ?
                        )
-                       SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.descendant_people_count
+                       SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.descendant_people_count,o.descendant_org_count
                        FROM slice JOIN organizations_current o ON o.org_dn=slice.org_dn
                        LEFT JOIN organizations_current p ON p.org_dn=o.parent_dn
                        ORDER BY o.depth,o.name,o.org_id LIMIT ?""",
                     (snapshot_id, root_id, snapshot_id, max_depth, limit + 1),
                 ).fetchall()
+            visible_org_ids = [str(row["org_id"]) for row in rows[:limit]]
+            match_counts: dict[str, int] = {}
+            vacancy_counts: dict[str, int] = {}
+            if visible_org_ids:
+                placeholders = ",".join("?" for _ in visible_org_ids)
+                if category:
+                    match_counts = {
+                        str(row["org_id"]): int(row["match_count"])
+                        for row in con.execute(
+                            f"""SELECT e.org_id,COUNT(*) match_count FROM career_matches m
+                                JOIN career_entities e ON e.entity_id=m.entity_id
+                                WHERE m.category_id=? AND e.snapshot_id=? AND e.org_id IN ({placeholders})
+                                GROUP BY e.org_id""",
+                            (category, snapshot_id, *visible_org_ids),
+                        ).fetchall()
+                    }
+                vacancy_counts = {
+                    str(row["org_id"]): int(row["vacancy_count"])
+                    for row in con.execute(
+                        f"SELECT org_id,COUNT(*) vacancy_count FROM vacancy_signals WHERE snapshot_id=? AND org_id IN ({placeholders}) GROUP BY org_id",
+                        (snapshot_id, *visible_org_ids),
+                    ).fetchall()
+                }
         truncated = len(rows) > limit
         rows = rows[:limit]
-        nodes = tuple(OrgNode(str(row["org_id"]), str(row["name"]), row["parent_id"], int(row["depth"]), int(row["child_count"]), int(row["descendant_people_count"])) for row in rows)
-        return ConstellationSlice(nodes, limit, truncated, snapshot_id, str(meta["quality_status"]), _etag(meta, "constellation-slice", root_id or "root", max_depth, limit))
+        visible_children: dict[str, int] = {}
+        for row in rows:
+            if row["parent_id"] is not None:
+                visible_children[str(row["parent_id"])] = visible_children.get(str(row["parent_id"]), 0) + 1
+        nodes = tuple(
+            OrgNode(
+                str(row["org_id"]), str(row["name"]), row["parent_id"], int(row["depth"]),
+                int(row["child_count"]), int(row["descendant_people_count"]), int(row["descendant_org_count"]),
+                match_counts.get(str(row["org_id"]), 0), str(meta["quality_status"]),
+                vacancy_counts.get(str(row["org_id"]), 0),
+                int(row["child_count"]) > visible_children.get(str(row["org_id"]), 0),
+            )
+            for row in rows
+        )
+        return ConstellationSlice(nodes, limit, truncated, snapshot_id, str(meta["quality_status"]), _etag(meta, "constellation-slice", root_id or "root", max_depth, limit, category or "all"))
 
     def tours(self) -> TourResult:
         document = json.loads(self.tours_path.read_text(encoding="utf-8"))
@@ -392,6 +462,17 @@ def _bounded(value: int, maximum: int) -> int:
 
 def _confidence(score: int) -> str:
     return "high" if score >= 100 else "medium" if score >= 60 else "exploratory" if score >= 25 else "none"
+
+
+def _interpretation_payload(interpretation) -> dict[str, object]:
+    return {
+        "original_query": interpretation.original_query,
+        "normalized_query": interpretation.normalized_query,
+        "category_ids": list(interpretation.category_ids),
+        "expanded_terms": list(interpretation.expanded_terms),
+        "evidence": list(interpretation.evidence),
+        "taxonomy_version": interpretation.taxonomy_version,
+    }
 
 
 def _etag(meta: dict[str, object], *parts: object) -> str:

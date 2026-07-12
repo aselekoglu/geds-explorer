@@ -53,7 +53,10 @@ def create_career_app(master_db: Path | str, frontend_dir: Path | str | None = N
 
     @app.get("/api/orgs/{org_id}/ancestors")
     def ancestors(request: Request, org_id: str):
-        return payload(repository(request).ancestors(org_id))
+        try:
+            return payload(repository(request).ancestors(org_id))
+        except KeyError as exc:
+            raise HTTPException(404, "organization not found") from exc
 
     @app.get("/api/orgs/{org_id}/profile")
     def profile(request: Request, org_id: str):
@@ -71,8 +74,8 @@ def create_career_app(master_db: Path | str, frontend_dir: Path | str | None = N
         return payload(repository(request).vacancy_signals(limit=limit))
 
     @app.get("/api/constellation/slice")
-    def constellation_slice(request: Request, root_id: str | None = None, max_depth: int = Query(1, ge=1, le=12), limit: int = Query(200, ge=1, le=2000)):
-        return payload(repository(request).constellation_slice(root_id=root_id, max_depth=max_depth, limit=limit))
+    def constellation_slice(request: Request, root_id: str | None = None, max_depth: int = Query(1, ge=1, le=12), limit: int = Query(200, ge=1, le=2000), category: str | None = Query(None, max_length=80)):
+        return payload(repository(request).constellation_slice(root_id=root_id, max_depth=max_depth, limit=limit, category=category))
 
     @app.get("/api/constellation")
     def constellation(request: Request, q: str = Query(min_length=1, max_length=240), limit: int = Query(200, ge=1)):

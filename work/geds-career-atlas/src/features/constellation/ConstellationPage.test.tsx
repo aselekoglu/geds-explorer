@@ -17,3 +17,16 @@ it("keeps the accessible list when the visual layer is unavailable",async()=>{
   render(<ConstellationPage client={client}/>)
   expect(await screen.findByRole("listbox",{name:/Government map/i})).toBeVisible()
 })
+
+it("applies shared interest filters to illuminated teams",async()=>{
+  const client={
+    constellationSlice:async()=>({nodes:[],limit:2000,truncated:false,snapshot_id:"snapshot",etag:"etag"}),
+    constellation:async()=>({items:[
+      {entity_id:"a",org_id:"statcan",entity_kind:"organization",title:"",organization_name:"Statistics Canada",department_name:"Statistics Canada",score:90,confidence:"medium",vacancy_signal:false,evidence:[{field:"organization",matched_phrase:"AI",source_text:"AI",weight:90,category_id:"data-ai-research"}]},
+      {entity_id:"b",org_id:"ssc",entity_kind:"organization",title:"",organization_name:"Shared Services Canada",department_name:"Shared Services Canada",score:120,confidence:"high",vacancy_signal:true,evidence:[{field:"organization",matched_phrase:"AI",source_text:"AI",weight:120,category_id:"data-ai-research"}]},
+    ],snapshot_id:"snapshot",etag:"etag"})
+  }
+  render(<ConstellationPage client={client} query="AI" filters={{domain:"data-ai-research",department:"Shared Services Canada",confidence:"high",vacancy:true}}/>)
+  expect(await screen.findByRole("option",{name:/Shared Services Canada/i})).toBeVisible()
+  expect(screen.queryByRole("option",{name:/Statistics Canada/i})).not.toBeInTheDocument()
+})

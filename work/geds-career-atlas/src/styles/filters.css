@@ -1,0 +1,7 @@
+.filter-rail--functional { display:grid;grid-template-columns:minmax(170px,.8fr) minmax(230px,1.5fr) minmax(150px,.65fr) auto auto;align-items: end; }
+.filter-rail--functional label { display: grid; gap: 4px;min-width:0; color: var(--muted); font-size: 11px; }
+.filter-rail--functional select { min-height: 44px; border: 1px solid #35516e; border-radius: 7px; background: #0a1e35; color: var(--text); padding: 8px; }
+.filter-rail--functional .filter-check { display: flex; align-items: center; gap: 7px; min-height: 44px; }
+.quality-chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border: 1px solid #8a6c31; border-radius: 999px; color: #ffd269; font-size: 11px; white-space: nowrap; }
+@media(max-width:1250px){.filter-rail--functional{grid-template-columns:minmax(160px,1fr) minmax(220px,1.5fr) minmax(150px,.7fr);}.filter-check,.quality-chip{justify-self:start}}
+@media(max-width:680px){.filter-rail--functional{grid-template-columns:minmax(0,1fr);overflow:visible}.filter-rail--functional label,.filter-rail--functional select{width:100%}.quality-chip{white-space:normal}}

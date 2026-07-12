@@ -49,6 +49,11 @@ def test_org_root_and_child_contract(career_client):
     assert children.status_code == 200
 
 
+def test_unknown_organization_ancestors_returns_404(career_client):
+    response=career_client.get("/api/orgs/unavailable-source/ancestors")
+    assert response.status_code==404
+
+
 @pytest.mark.parametrize("path", ["/api/crawlers", "/api/jobs", "/api/schedules"])
 def test_public_app_has_no_control_routes(career_client, path):
     assert career_client.get(path).status_code == 404

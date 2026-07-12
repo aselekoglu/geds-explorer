@@ -1,0 +1,15 @@
+.constellation-stage svg circle.has-quality-warning {
+  stroke: #ffd269;
+  stroke-width: 2;
+}
+
+.constellation-stage svg circle.has-vacancy {
+  stroke-dasharray: 4 3;
+}
+
+.constellation-stage [role="option"] small {
+  display: block;
+  margin-top: 3px;
+  color: #ffd269;
+  font-size: 10px;
+}
