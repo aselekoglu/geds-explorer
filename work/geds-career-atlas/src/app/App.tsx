@@ -27,6 +27,8 @@ export function App(){
   const [meta,setMeta]=useState<AtlasMeta|null>(null)
   const client=useMemo(()=>new CareerApiClient(),[])
   const {language,setLanguage,t}=useLanguage()
+  const selectedDepartment=useMemo(()=>departments.find(item=>item.name===scope.department),[departments,scope.department])
+  const institutionRoot=useMemo(()=>selectedDepartment?{org_id:selectedDepartment.department_id,name:selectedDepartment.name,depth:0,child_count:1,descendant_people_count:0}:undefined,[selectedDepartment])
 
   useEffect(()=>{
     const restore=()=>{const next=readUrlState();setQuery(next.query);setSelectedOrgId(next.focus);setScopeState(next.scope);setView(next.view)}
@@ -43,7 +45,8 @@ export function App(){
   function selectOrg(orgId:string){const params=new URLSearchParams(location.search);params.set("focus",orgId);history.pushState(null,"",`${location.pathname}?${params}${location.hash||"#discover"}`);setSelectedOrgId(orgId)}
   function clearOrg(){writeUrl(params=>params.delete("focus"));setSelectedOrgId(null)}
   function updateScope(next:DiscoverScope){
-    writeUrl(params=>{next.department?params.set("department",next.department):params.delete("department");params.delete("domain");params.delete("confidence");params.delete("vacancy")})
+    writeUrl(params=>{next.department?params.set("department",next.department):params.delete("department");params.delete("focus");params.delete("domain");params.delete("confidence");params.delete("vacancy")})
+    setSelectedOrgId(null)
     setScopeState(next)
   }
 
@@ -60,8 +63,8 @@ export function App(){
     </aside>
     <main id="main">
       {view!=="about"&&<><header className="command-bar"><label><span className="sr-only">{t("app.interest")}</span><input value={query} onChange={event=>updateQuery(event.target.value)} placeholder={t("app.placeholder")}/></label><ThemeControl/><button type="button" className="language" onClick={()=>setLanguage(language==="en"?"fr":"en")}>{language==="en"?"Français":"English"}</button></header><FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status??"loading"} onChange={updateScope}/></>}
-      {view==="discover"&&<>{query&&<DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope}/>}<ConstellationPage client={client} query={query} focus={selectedOrgId??undefined} onFocus={selectOrg} scope={scope}/></>}
-      {view==="explorer"&&<OrganizationExplorer client={client} onSelect={selectOrg} selectedOrgId={selectedOrgId}/>} 
+      {view==="discover"&&<>{query&&<DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope}/>}<ConstellationPage client={client} query={query} focus={selectedOrgId??undefined} onFocus={selectOrg} scope={scope} rootOrgId={selectedDepartment?.department_id}/></>}
+      {view==="explorer"&&<OrganizationExplorer client={client} onSelect={selectOrg} selectedOrgId={selectedOrgId} rootOrg={institutionRoot}/>} 
       {view==="about"&&<AboutPage client={client}/>} 
     </main>
     {selectedOrgId&&<aside className="detail-panel detail-panel--open" aria-label={t("profile.eyebrow")}><button className="close" aria-label={t("app.close")} onClick={clearOrg}>×</button><TeamProfileLoader orgId={selectedOrgId} client={client}/></aside>}

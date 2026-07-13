@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { expect, it, vi } from "vitest"
 import { ConstellationPage } from "./ConstellationPage"
 
@@ -18,6 +18,14 @@ it("keeps the accessible list when the visual layer is unavailable",async()=>{
   expect(await screen.findByRole("listbox",{name:/Government map/i})).toBeVisible()
 })
 
+it("reloads the hierarchy slice when institution root changes",async()=>{
+  const constellationSlice=vi.fn().mockResolvedValue({nodes:[{org_id:"team",name:"Team",depth:1,child_count:0,descendant_people_count:2}],limit:2000,truncated:false,snapshot_id:"snapshot",etag:"etag"})
+  const {rerender}=render(<ConstellationPage client={{constellationSlice}} rootOrgId="department-a"/>)
+  await waitFor(()=>expect(constellationSlice).toHaveBeenLastCalledWith("department-a",expect.any(AbortSignal)))
+  rerender(<ConstellationPage client={{constellationSlice}} rootOrgId="department-b"/>)
+  await waitFor(()=>expect(constellationSlice).toHaveBeenLastCalledWith("department-b",expect.any(AbortSignal)))
+})
+
 it("applies shared interest filters to illuminated teams",async()=>{
   const client={
     constellationSlice:async()=>({nodes:[],limit:2000,truncated:false,snapshot_id:"snapshot",etag:"etag"}),
@@ -26,7 +34,7 @@ it("applies shared interest filters to illuminated teams",async()=>{
       {entity_id:"b",org_id:"ssc",entity_kind:"organization",title:"",organization_name:"Shared Services Canada",department_name:"Shared Services Canada",score:120,confidence:"high",vacancy_signal:true,evidence:[{field:"organization",matched_phrase:"AI",source_text:"AI",weight:120,category_id:"data-ai-research"}]},
     ],snapshot_id:"snapshot",etag:"etag"})
   }
-  render(<ConstellationPage client={client} query="AI" filters={{domain:"data-ai-research",department:"Shared Services Canada",confidence:"high",vacancy:true}}/>)
+  render(<ConstellationPage client={client} query="AI" scope={{department:"Shared Services Canada"}}/>)
   expect(await screen.findByRole("option",{name:/Shared Services Canada/i})).toBeVisible()
   expect(screen.queryByRole("option",{name:/Statistics Canada/i})).not.toBeInTheDocument()
 })

@@ -1,11 +1,19 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { expect, it } from "vitest"
+import { expect, it, vi } from "vitest"
 import { OrganizationExplorer } from "./OrganizationExplorer"
 
 it("loads the canonical root organizations from the public API", async () => {
   const client = { rootChildren: async () => ({ items: [{ org_id: "root-1", name: "Digital Services", depth: 0, child_count: 2, descendant_people_count: 12 }], snapshot_id: "snapshot", etag: "etag" }), children: async () => ({ items: [], snapshot_id: "snapshot", etag: "etag" }) }
   render(<OrganizationExplorer client={client} />)
   expect(await screen.findByRole("treeitem", { name: /Digital Services/i })).toBeInTheDocument()
+})
+
+it("starts inside the selected institution root",async()=>{
+  const rootOrg={org_id:"department-a",name:"Department A",depth:0,child_count:1,descendant_people_count:10}
+  const children=vi.fn().mockResolvedValue({items:[{org_id:"team",name:"Team",parent_id:"department-a",depth:1,child_count:0,descendant_people_count:2}],snapshot_id:"snapshot",etag:"etag"})
+  render(<OrganizationExplorer client={{rootChildren:vi.fn(),children}} rootOrg={rootOrg}/>)
+  expect(await screen.findByRole("treeitem",{name:/Team/i})).toBeVisible()
+  expect(children).toHaveBeenCalledWith("department-a",expect.any(AbortSignal))
 })
 
 it("opens a selected organization in the next hierarchy column", async () => {

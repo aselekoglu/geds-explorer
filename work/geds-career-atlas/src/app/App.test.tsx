@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { vi } from "vitest"
 import { App } from "./App"
 it("renders public navigation and theme control without private operator actions", () => {
@@ -16,6 +16,20 @@ it("does not reserve an empty profile column",()=>{
   history.replaceState(null,"","/#discover")
   const {container}=render(<App/>)
   expect(container.querySelector(".detail-panel")).not.toBeInTheDocument()
+})
+
+it("clears a stale team profile when institution changes",async()=>{
+  history.replaceState(null,"","/?focus=old-team&department=Department%20A#discover")
+  vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL)=>{
+    const url=String(input)
+    const body=url.includes("/departments")?{items:[{department_id:"a",name:"Department A"},{department_id:"b",name:"Department B"}]}:url.includes("/meta")?{quality_status:"complete"}:url.includes("/constellation/slice")?{nodes:[{org_id:"team",name:"Team",depth:1,child_count:0,descendant_people_count:2}],limit:2000,truncated:false,snapshot_id:"s",etag:"e"}:url.includes("/profile")?{org_id:"old-team",name:"Old Team",department_name:"Department A",canonical_path:["Department A","Old Team"],direct_people_count:1,descendant_people_count:1,child_count:0,snapshot_id:"s"}:url.includes("/roles")?{items:[],snapshot_id:"s",etag:"e"}:url.includes("/people")?{items:[],total:0,limit:50,offset:0,available_classifications:[],snapshot_id:"s",quality_status:"complete",etag:"e"}:{items:[],snapshot_id:"s",etag:"e"}
+    return {ok:true,json:async()=>body} as Response
+  }))
+  render(<App/>)
+  fireEvent.change(await screen.findByLabelText("Institution"),{target:{value:"Department B"}})
+  await waitFor(()=>expect(new URLSearchParams(location.search).has("focus")).toBe(false))
+  expect(screen.queryByLabelText("TEAM PROFILE")).not.toBeInTheDocument()
+  vi.unstubAllGlobals()
 })
 
 it("marks a selected team profile as an open responsive sheet",()=>{

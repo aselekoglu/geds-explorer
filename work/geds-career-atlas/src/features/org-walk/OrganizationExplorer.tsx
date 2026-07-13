@@ -7,7 +7,7 @@ import { OrgColumn } from "./OrgColumn"
 type RootClient = { rootChildren: (signal?: AbortSignal) => Promise<OrgPage>; children: (orgId: string, signal?: AbortSignal) => Promise<OrgPage>;ancestors?:(orgId:string,signal?:AbortSignal)=>Promise<OrgPage> }
 type Column = { parent?: OrgNode; items: OrgNode[] }
 
-export function OrganizationExplorer({ client, onSelect, selectedOrgId }: { client: RootClient; onSelect?: (orgId: string) => void;selectedOrgId?:string|null }) {
+export function OrganizationExplorer({ client, onSelect, selectedOrgId,rootOrg }: { client: RootClient; onSelect?: (orgId: string) => void;selectedOrgId?:string|null;rootOrg?:OrgNode }) {
   const [columns, setColumns] = useState<Column[]>([])
   const [error, setError] = useState(false)
   const { t } = useLanguage()
@@ -15,6 +15,7 @@ export function OrganizationExplorer({ client, onSelect, selectedOrgId }: { clie
     const controller = new AbortController()
     async function load(){
       setError(false)
+      if(rootOrg){const page=await client.children(rootOrg.org_id,controller.signal);setColumns([{parent:rootOrg,items:page.items}]);return}
       const root=await client.rootChildren(controller.signal)
       if(!selectedOrgId||!client.ancestors){setColumns([{items:root.items}]);return}
       const lineage=await client.ancestors(selectedOrgId,controller.signal)
@@ -23,7 +24,7 @@ export function OrganizationExplorer({ client, onSelect, selectedOrgId }: { clie
     }
     void load().catch(value=>{if(value.name!=="AbortError")setError(true)})
     return()=>controller.abort()
-  },[client,selectedOrgId])
+  },[client,selectedOrgId,rootOrg])
   async function open(node: OrgNode, columnIndex: number) { const page = await client.children(node.org_id); setColumns(current => [...current.slice(0, columnIndex + 1), { parent: node, items: page.items }]) }
   if (error) return <p role="status">{t("orgWalk.unavailable")}</p>
   if (!columns.length) return <p role="status">{t("orgWalk.loading")}</p>
