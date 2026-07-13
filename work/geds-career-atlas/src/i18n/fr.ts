@@ -65,6 +65,11 @@ export const fr = {
     removeVacancy: "Retirer le filtre de vacance",
     showAllEvidence: "Afficher toutes les preuves",
     showLessEvidence: "Réduire les preuves",
+    resultType: "Type de résultat",
+    kindAll: "Tous",
+    kindTopics: "Sujets",
+    kindTeams: "Équipes",
+    kindPeople: "Personnes",
   },
   orgWalk: {
     unavailable: "Les données organisationnelles sont indisponibles pour le moment.",

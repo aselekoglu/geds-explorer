@@ -62,6 +62,24 @@ def test_search_returns_explainable_ranked_results(repository):
     assert result.etag
 
 
+def test_search_finds_people_by_observed_name_without_exposing_contact_fields(repository):
+    result = repository.search(query="Ada", limit=20)
+
+    person = next(item for item in result.items if item.entity_kind == "person")
+    assert person.display_name == "Ada"
+    assert person.title == "Machine Learning Engineer"
+    assert person.source_url == ""
+    assert not {"email", "phone", "fax", "address"} & set(dataclasses.asdict(person))
+
+
+def test_search_finds_teams_by_observed_name_without_taxonomy_match(repository):
+    result = repository.search(query="Platform A", limit=20)
+
+    team = next(item for item in result.items if item.entity_kind == "organization")
+    assert team.organization_name == "Platform A"
+    assert team.org_id
+
+
 def test_search_marks_only_source_derived_vacancy_records(repository):
     result = repository.search(query="data", limit=200)
     by_title = {item.title: item for item in result.items}

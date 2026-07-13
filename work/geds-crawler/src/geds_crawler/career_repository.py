@@ -27,6 +27,8 @@ class SearchItem:
     evidence: tuple[dict, ...]
     vacancy_signal: bool = False
     department_name: str = ""
+    display_name: str = ""
+    source_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -170,23 +172,41 @@ class CareerRepository:
         interpretation = taxonomy.interpret(query)
         with self.connect() as con:
             meta = self._meta(con)
-            if not interpretation.category_ids:
-                return SearchResult((), limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit), _interpretation_payload(interpretation))
-            placeholders = ",".join("?" for _ in interpretation.category_ids)
-            rows = con.execute(
-                f"""
-                SELECT e.entity_id, e.entity_kind, e.org_id, e.title, e.organization_name,e.ancestor_text,COALESCE(d.name,'') department_name,
-                       m.category_id, m.score, m.confidence, m.evidence_json,
-                       CASE WHEN v.entity_id IS NULL THEN 0 ELSE 1 END vacancy_signal
-                FROM career_matches AS m
-                JOIN career_entities AS e ON e.entity_id = m.entity_id
-                LEFT JOIN organizations_current o ON o.org_id=e.org_id AND o.snapshot_id=e.snapshot_id
-                LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=e.snapshot_id
-                LEFT JOIN vacancy_signals AS v ON v.entity_id=e.entity_id AND v.snapshot_id=e.snapshot_id
-                WHERE m.category_id IN ({placeholders})
-                ORDER BY m.score DESC, e.entity_id ASC
-                """,
-                interpretation.category_ids,
+            rows = []
+            if interpretation.category_ids:
+                placeholders = ",".join("?" for _ in interpretation.category_ids)
+                rows = con.execute(
+                    f"""
+                    SELECT e.entity_id, e.entity_kind, e.org_id, e.title, e.organization_name,e.ancestor_text,COALESCE(d.name,'') department_name,
+                           COALESCE(p.display_name,'') display_name,COALESCE(p.source_url,'') source_url,
+                           m.category_id, m.score, m.confidence, m.evidence_json,
+                           CASE WHEN v.entity_id IS NULL THEN 0 ELSE 1 END vacancy_signal
+                    FROM career_matches AS m
+                    JOIN career_entities AS e ON e.entity_id = m.entity_id
+                    LEFT JOIN organizations_current o ON o.org_id=e.org_id AND o.snapshot_id=e.snapshot_id
+                    LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=e.snapshot_id
+                    LEFT JOIN people_current p ON e.entity_kind='person' AND e.entity_id=('person:' || p.source_url) AND p.snapshot_id=e.snapshot_id
+                    LEFT JOIN vacancy_signals AS v ON v.entity_id=e.entity_id AND v.snapshot_id=e.snapshot_id
+                    WHERE m.category_id IN ({placeholders})
+                    ORDER BY m.score DESC, e.entity_id ASC
+                    """,
+                    interpretation.category_ids,
+                ).fetchall()
+            direct_orgs = con.execute(
+                """SELECT o.org_id,o.name,COALESCE(d.name,'') department_name,o.canonical_path_json
+                   FROM organizations_current o LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=o.snapshot_id
+                   WHERE o.snapshot_id=? AND (instr(lower(o.name),lower(?))>0 OR instr(lower(o.canonical_path_json),lower(?))>0)
+                   ORDER BY CASE WHEN lower(o.name)=lower(?) THEN 0 ELSE 1 END,o.name COLLATE NOCASE LIMIT ?""",
+                (meta["snapshot_id"], query, query, query, limit),
+            ).fetchall()
+            direct_people = con.execute(
+                """SELECT p.source_url,p.display_name,COALESCE(p.title,'') title,o.org_id,COALESCE(o.name,p.org_unit) organization_name,COALESCE(d.name,p.department_name) department_name
+                   FROM people_current p LEFT JOIN organizations_current o ON o.org_dn=p.org_dn AND o.snapshot_id=p.snapshot_id
+                   LEFT JOIN departments_current d ON d.department_dn=p.department_dn AND d.snapshot_id=p.snapshot_id
+                   WHERE p.snapshot_id=? AND p.presence_status='present' AND
+                     (instr(lower(p.display_name),lower(?))>0 OR instr(lower(COALESCE(p.title,'')),lower(?))>0 OR instr(lower(p.org_unit),lower(?))>0)
+                   ORDER BY CASE WHEN lower(p.display_name)=lower(?) THEN 0 ELSE 1 END,p.display_name COLLATE NOCASE LIMIT ?""",
+                (meta["snapshot_id"], query, query, query, query, limit),
             ).fetchall()
         grouped: dict[str, dict] = {}
         for row in rows:
@@ -205,10 +225,40 @@ class CareerRepository:
                 evidence=tuple(value["evidence"]),
                 vacancy_signal=bool(value["row"]["vacancy_signal"]),
                 department_name=str(value["row"]["department_name"]),
+                display_name=str(value["row"]["display_name"]),
+                source_url=official_geds_url(str(value["row"]["source_url"])),
             )
-            for key, value in sorted(grouped.items(), key=lambda item: (-item[1]["score"], item[0]))[:limit]
+            for key, value in grouped.items()
         )
-        return SearchResult(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit), _interpretation_payload(interpretation))
+        merged = {item.entity_id: item for item in items}
+        for row in direct_orgs:
+            entity_id = f"org:{row['org_id']}"
+            direct = SearchItem(
+                entity_id, "organization", str(row["org_id"]), "", str(row["name"]),
+                1000 if str(row["name"]).casefold() == query.casefold() else 500,
+                "high", ({"field": "organization", "matched_phrase": query, "source_text": str(row["name"]), "weight": 500, "category_id": "direct-search"},),
+                False, str(row["department_name"]),
+            )
+            existing = merged.get(entity_id)
+            if existing:
+                direct = SearchItem(direct.entity_id,direct.entity_kind,direct.org_id,direct.title,direct.organization_name,max(direct.score,existing.score),direct.confidence,existing.evidence+direct.evidence,existing.vacancy_signal,direct.department_name)
+            merged[entity_id] = direct
+        for row in direct_people:
+            entity_id = f"person:{row['source_url']}"
+            source_text = str(row["display_name"])
+            field = "display_name" if query.casefold() in source_text.casefold() else "title"
+            direct = SearchItem(
+                entity_id, "person", row["org_id"], str(row["title"]), str(row["organization_name"]),
+                1000 if source_text.casefold() == query.casefold() else 450,
+                "high", ({"field": field, "matched_phrase": query, "source_text": source_text if field == "display_name" else str(row["title"]), "weight": 450, "category_id": "direct-search"},),
+                False, str(row["department_name"]), str(row["display_name"]), official_geds_url(str(row["source_url"])),
+            )
+            existing = merged.get(entity_id)
+            if existing:
+                direct = SearchItem(direct.entity_id,direct.entity_kind,direct.org_id,direct.title,direct.organization_name,max(direct.score,existing.score),direct.confidence,existing.evidence+direct.evidence,existing.vacancy_signal,direct.department_name,direct.display_name,direct.source_url)
+            merged[entity_id] = direct
+        ranked = tuple(sorted(merged.values(), key=lambda item: (-item.score, item.entity_id))[:limit])
+        return SearchResult(ranked, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit), _interpretation_payload(interpretation))
 
     def children(self, *, parent_id: str | None, limit: int = 50) -> OrgPage:
         limit = _bounded(limit, MAX_PAGE_SIZE)

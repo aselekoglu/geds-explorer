@@ -13,3 +13,4 @@
 .match-card button{margin-top:8px;border:1px solid #355b7d;border-radius:7px;background:#0c2742;color:#d8eaff;padding:8px 12px}
 .match-card small{display:block;margin-top:12px;padding:8px 10px;border:1px dotted #d3a84c;border-radius:7px;color:#ffd36d}
 @media(max-width:680px){.discover-results{padding:18px 16px 26px}.match-grid{grid-template-columns:1fr}.interpretation-panel{padding:14px}}
+.search-kind{display:flex;gap:8px;border:0;padding:0;margin:0 0 12px}.search-kind legend{position:absolute;left:-9999px}.search-kind label{cursor:pointer}.search-kind input{position:absolute;opacity:0}.search-kind span{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}.search-kind input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast)}.match-title{font-weight:650;color:var(--text)}

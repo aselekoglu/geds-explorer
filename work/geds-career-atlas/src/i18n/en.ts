@@ -65,6 +65,11 @@ export const en = {
     removeVacancy: "Remove vacancy constraint",
     showAllEvidence: "Show all evidence",
     showLessEvidence: "Show less evidence",
+    resultType: "Search result type",
+    kindAll: "All",
+    kindTopics: "Topics",
+    kindTeams: "Teams",
+    kindPeople: "People",
   },
   orgWalk: {
     unavailable: "Organization data is unavailable right now.",
