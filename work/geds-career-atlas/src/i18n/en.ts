@@ -140,6 +140,8 @@ export const en = {
     childTeams: "Child teams",
     rolesTitle: "Observed roles",
     rolesIntro: "These are title records observed in the current GEDS snapshot, not open jobs.",
+    noTitle: "No title recorded",
+    noTitleHelp: "The source record did not include a usable title.",
     matchedTitle: "Matched because",
     matchedIntro: "Inferred from observed organization and role names. Validate details through the official source before acting.",
     loading: "Loading team profile…",

@@ -57,3 +57,26 @@ it("does not render a guessed link when the official source is unavailable",asyn
   expect(await screen.findByText("Official GEDS record unavailable")).toBeVisible()
   expect(screen.queryByRole("link",{name:/View in official GEDS/i})).not.toBeInTheDocument()
 })
+
+it("groups direct people under normalized titles and collapses missing titles",async()=>{
+  const grouped=page()
+  grouped.items=[
+    grouped.items[0],
+    {...grouped.items[0],person_id:"person-2",display_name:"Grace Hopper",observed_title:" it02   support analyst ",source_url:"https://geds-sage.gc.ca/grace"},
+    {...grouped.items[0],person_id:"person-3",display_name:"Unknown Person",observed_title:"",observed_classifications:[],source_url:""},
+  ]
+  grouped.total=3
+  render(<PeopleInTeam orgId="ai" client={{people:vi.fn().mockResolvedValue(grouped)}}/>)
+
+  expect(await screen.findByRole("heading",{name:/IT02 Support Analyst · 2/i})).toBeVisible()
+  expect(screen.getByText("Ada Lovelace")).toBeVisible()
+  expect(screen.getByText("Grace Hopper")).toBeVisible()
+  const empty=screen.getByText(/No title recorded · 1/i)
+  expect(empty.closest("details")).not.toHaveAttribute("open")
+})
+
+it("uses title grouping instead of a separate sort control",async()=>{
+  render(<PeopleInTeam orgId="ai" client={{people:vi.fn().mockResolvedValue(page())}}/>)
+  expect(await screen.findByText("Ada Lovelace")).toBeVisible()
+  expect(screen.queryByLabelText(/Sort people/i)).not.toBeInTheDocument()
+})
