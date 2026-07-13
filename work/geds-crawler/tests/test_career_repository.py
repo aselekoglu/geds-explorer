@@ -72,6 +72,25 @@ def test_search_finds_people_by_observed_name_without_exposing_contact_fields(re
     assert not {"email", "phone", "fax", "address"} & set(dataclasses.asdict(person))
 
 
+def test_search_uses_bounded_fts_candidates_instead_of_scanning_every_person(repository, monkeypatch):
+    statements = []
+    original_connect = repository.connect
+
+    def traced_connect():
+        con = original_connect()
+        con.set_trace_callback(statements.append)
+        return con
+
+    monkeypatch.setattr(repository, "connect", traced_connect)
+    repository.search(query="Ada", limit=20)
+
+    sql = "\n".join(statements).casefold()
+    assert "career_entities_fts" in sql
+    assert "p.source_url=substr(e.entity_id,8)" in sql
+    assert "('person:' || p.source_url)" not in sql
+    assert "instr(lower(p.display_name)" not in sql
+
+
 def test_search_finds_teams_by_observed_name_without_taxonomy_match(repository):
     result = repository.search(query="Platform A", limit=20)
 

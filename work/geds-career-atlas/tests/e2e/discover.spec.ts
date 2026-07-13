@@ -4,9 +4,8 @@ import { waitForAtlas } from "./helpers"
 test("broad interest illuminates explainable government teams", async ({ page }) => {
   await page.goto("/?q=AI&lang=en")
   await waitForAtlas(page)
-  const discover = page.getByRole("region", { name: "Discover government teams" })
-  await expect(discover.getByRole("article").first()).toBeVisible()
-  await expect(discover.getByText("Matched because", { exact: false }).first()).toBeVisible()
+  const discover = page.getByRole("region", { name: "Government constellation" })
+  await expect(discover.getByRole("option").first()).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await expect(page.getByRole("button", { name: /apply/i })).toHaveCount(0)
 

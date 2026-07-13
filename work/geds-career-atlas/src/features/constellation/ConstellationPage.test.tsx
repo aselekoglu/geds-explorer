@@ -56,3 +56,10 @@ it("applies shared interest filters to illuminated teams",async()=>{
   expect(await screen.findByRole("option",{name:/Shared Services Canada/i})).toBeVisible()
   expect(screen.queryByRole("option",{name:/Statistics Canada/i})).not.toBeInTheDocument()
 })
+
+it("shows a useful empty state instead of unrelated organizations for an unknown query",async()=>{
+  const client={constellationSlice:async()=>page([rootNode]),constellation:async()=>({items:[],snapshot_id:"snapshot",etag:"etag"})}
+  render(<ConstellationPage client={client} query="zzzz-no-category"/>)
+  expect(await screen.findByText(/No strong match yet/)).toBeVisible()
+  expect(screen.queryByRole("option",{name:/Statistics Canada/i})).not.toBeInTheDocument()
+})

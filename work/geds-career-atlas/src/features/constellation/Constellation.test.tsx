@@ -18,3 +18,8 @@ it("uses abbreviations at government level and wraps lower-level names without e
   expect(container.querySelector("svg text")?.textContent).not.toContain("...")
   expect(container.querySelectorAll("svg tspan").length).toBeGreaterThan(1)
 })
+
+it("labels the explicit detail controls as an accessible group",()=>{
+  render(<Constellation nodes={[{id:"a",name:"AI Centre"}]}/>)
+  expect(screen.getByRole("group",{name:"Organization details"})).toBeInTheDocument()
+})

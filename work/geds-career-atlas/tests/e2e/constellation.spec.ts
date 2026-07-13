@@ -1,17 +1,15 @@
 import { expect, test } from "@playwright/test"
 
-test("constellation offers synchronized keyboard-selectable semantic map", async ({ page }) => {
+test("constellation offers synchronized keyboard-drillable semantic map", async ({ page }) => {
   await page.goto("/#constellation")
   const map = page.getByRole("listbox", { name: "Government map" })
   await expect(map).toBeAttached()
-  const option = map.getByRole("option").first()
+  const option = map.getByRole("option").filter({ hasText: "More teams available" }).first()
   await option.focus()
   await option.press("Enter")
-  await expect(option).toHaveAttribute("aria-selected", "true")
-  await expect(page).toHaveURL(/focus=/)
-  await page.goBack()
-  await expect(page).not.toHaveURL(/focus=/)
-  await expect(page.getByText("Select an organization")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible()
+  await page.getByRole("button", { name: "Back" }).click()
+  await expect(page.getByRole("button", { name: "Back" })).toHaveCount(0)
 })
 
 test("mobile constellation is list-first without page overflow", async ({ page }) => {

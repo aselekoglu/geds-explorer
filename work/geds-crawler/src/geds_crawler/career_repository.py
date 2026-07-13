@@ -176,22 +176,32 @@ class CareerRepository:
             rows = []
             if interpretation.category_ids:
                 placeholders = ",".join("?" for _ in interpretation.category_ids)
+                candidate_limit = max(50, limit * 4)
                 rows = con.execute(
                     f"""
+                    WITH ranked AS (
+                      SELECT entity_id,SUM(score) total_score
+                      FROM career_matches
+                      WHERE category_id IN ({placeholders})
+                      GROUP BY entity_id
+                      ORDER BY total_score DESC,entity_id ASC
+                      LIMIT ?
+                    )
                     SELECT e.entity_id, e.entity_kind, e.org_id, e.title, e.organization_name,e.ancestor_text,COALESCE(d.name,'') department_name,
                            COALESCE(p.display_name,'') display_name,COALESCE(p.source_url,'') source_url,
                            m.category_id, m.score, m.confidence, m.evidence_json,
                            CASE WHEN v.entity_id IS NULL THEN 0 ELSE 1 END vacancy_signal
-                    FROM career_matches AS m
+                    FROM ranked AS ranked
+                    JOIN career_matches AS m ON m.entity_id=ranked.entity_id
                     JOIN career_entities AS e ON e.entity_id = m.entity_id
                     LEFT JOIN organizations_current o ON o.org_id=e.org_id AND o.snapshot_id=e.snapshot_id
                     LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=e.snapshot_id
-                    LEFT JOIN people_current p ON e.entity_kind='person' AND e.entity_id=('person:' || p.source_url) AND p.snapshot_id=e.snapshot_id
+                    LEFT JOIN people_current p ON e.entity_kind='person' AND p.source_url=substr(e.entity_id,8) AND p.snapshot_id=e.snapshot_id
                     LEFT JOIN vacancy_signals AS v ON v.entity_id=e.entity_id AND v.snapshot_id=e.snapshot_id
                     WHERE m.category_id IN ({placeholders})
-                    ORDER BY m.score DESC, e.entity_id ASC
+                    ORDER BY ranked.total_score DESC,e.entity_id ASC,m.category_id ASC
                     """,
-                    interpretation.category_ids,
+                    (*interpretation.category_ids, candidate_limit, *interpretation.category_ids),
                 ).fetchall()
             direct_orgs = con.execute(
                 """SELECT o.org_id,o.name,COALESCE(d.name,'') department_name,o.canonical_path_json
@@ -200,14 +210,26 @@ class CareerRepository:
                    ORDER BY CASE WHEN lower(o.name)=lower(?) THEN 0 ELSE 1 END,o.name COLLATE NOCASE LIMIT ?""",
                 (meta["snapshot_id"], query, query, query, limit),
             ).fetchall()
+            fts_query = f'"{query.replace(chr(34), chr(34) * 2)}"'
             direct_people = con.execute(
                 """SELECT p.source_url,p.display_name,COALESCE(p.title,'') title,o.org_id,COALESCE(o.name,p.org_unit) organization_name,COALESCE(d.name,p.department_name) department_name
-                   FROM people_current p LEFT JOIN organizations_current o ON o.org_dn=p.org_dn AND o.snapshot_id=p.snapshot_id
+                   FROM career_entities_fts
+                   JOIN career_entities e ON e.entity_id=career_entities_fts.entity_id
+                   JOIN people_current p ON e.entity_kind='person' AND p.source_url=substr(e.entity_id,8) AND p.snapshot_id=e.snapshot_id
+                   LEFT JOIN organizations_current o ON o.org_dn=p.org_dn AND o.snapshot_id=p.snapshot_id
                    LEFT JOIN departments_current d ON d.department_dn=p.department_dn AND d.snapshot_id=p.snapshot_id
-                   WHERE p.snapshot_id=? AND p.presence_status='present' AND
-                     (instr(lower(p.display_name),lower(?))>0 OR instr(lower(COALESCE(p.title,'')),lower(?))>0 OR instr(lower(p.org_unit),lower(?))>0)
-                   ORDER BY CASE WHEN lower(p.display_name)=lower(?) THEN 0 ELSE 1 END,p.display_name COLLATE NOCASE LIMIT ?""",
-                (meta["snapshot_id"], query, query, query, query, limit),
+                   WHERE career_entities_fts MATCH ? AND e.snapshot_id=? AND p.presence_status='present'
+                   ORDER BY bm25(career_entities_fts),CASE WHEN lower(p.display_name)=lower(?) THEN 0 ELSE 1 END,p.display_name COLLATE NOCASE LIMIT ?""",
+                (fts_query, meta["snapshot_id"], query, limit),
+            ).fetchall()
+            direct_people += con.execute(
+                """SELECT p.source_url,p.display_name,COALESCE(p.title,'') title,o.org_id,COALESCE(o.name,p.org_unit) organization_name,COALESCE(d.name,p.department_name) department_name
+                   FROM people_current p
+                   LEFT JOIN organizations_current o ON o.org_dn=p.org_dn AND o.snapshot_id=p.snapshot_id
+                   LEFT JOIN departments_current d ON d.department_dn=p.department_dn AND d.snapshot_id=p.snapshot_id
+                   WHERE p.snapshot_id=? AND p.presence_status='present' AND p.display_name LIKE ('%' || ? || '%') COLLATE NOCASE
+                   LIMIT ?""",
+                (meta["snapshot_id"], query, limit),
             ).fetchall()
         grouped: dict[str, dict] = {}
         for row in rows:

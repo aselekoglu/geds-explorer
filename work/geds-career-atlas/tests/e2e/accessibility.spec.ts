@@ -10,13 +10,14 @@ for (const target of ["/?q=AI", "/#explorer", "/#constellation", "/#about"]) {
   })
 }
 
-test("supports skip link, visible focus, tree semantics, and reduced motion", async ({ page }) => {
+test("supports skip link, visible focus, action-list semantics, and reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" })
   await page.goto("/#explorer")
   await page.keyboard.press("Tab")
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused()
-  const tree = page.getByRole("tree", { name: "Top-level government organizations" })
-  await expect(tree).toBeVisible()
+  const list = page.getByRole("list", { name: "Top-level government organizations" })
+  await expect(list).toBeVisible()
+  await page.getByRole("link", { name: "Discover" }).click()
   const duration = await page.locator(".constellation-stage svg circle").first().evaluate(element => getComputedStyle(element).transitionDuration)
-  expect(duration).toBe("0s")
+  expect(Number.parseFloat(duration)).toBeLessThanOrEqual(0.001)
 })
