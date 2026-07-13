@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { LeadSuggestion, SearchResult, VacancySignal } from "../../api/types"
+import type { LeadSuggestion, VacancySignal } from "../../api/types"
 import { useLanguage } from "../../i18n/i18n"
 import { CareerConversationLeads } from "./CareerConversationLeads"
 import { PeopleInTeam, type PeopleClient } from "../people/PeopleInTeam"
@@ -8,7 +8,7 @@ import { GroupedRoles } from "./GroupedRoles"
 type ProfileFacts = { org_id: string; department_name: string; canonical_path: string[]; direct_people_count: number; descendant_people_count: number; child_count: number; snapshot_id: string; snapshot_as_of?: string; quality_status?: string; source_url?: string; conversation_leads?: LeadSuggestion[]; vacancy_signals?: VacancySignal[] }
 type RelatedTeam = { org_id: string; name: string }
 
-export function TeamProfile({ name, roles, roleItems = [], profile, relatedTeams = [], peopleClient }: { name: string; roles: string[]; roleItems?: SearchResult["items"]; profile?: ProfileFacts; relatedTeams?: RelatedTeam[]; peopleClient?:PeopleClient }) {
+export function TeamProfile({ name, roles, profile, relatedTeams = [], peopleClient }: { name: string; roles: string[]; profile?: ProfileFacts; relatedTeams?: RelatedTeam[]; peopleClient?:PeopleClient }) {
   const { t, formatDate, formatNumber } = useLanguage()
   const [copied, setCopied] = useState(false)
   async function copyIssueReport() {

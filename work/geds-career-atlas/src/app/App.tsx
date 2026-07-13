@@ -7,6 +7,7 @@ import { DiscoverPage } from "../features/discover/DiscoverPage"
 import { FilterRail, type DiscoverScope } from "../features/discover/FilterRail"
 import { OrganizationExplorer } from "../features/org-walk/OrganizationExplorer"
 import { TeamProfileLoader } from "../features/profile/TeamProfileLoader"
+import { ProfileDrawer } from "../features/profile/ProfileDrawer"
 import { useLanguage } from "../i18n/i18n"
 import { AboutPage } from "../routes/about"
 import { readPublicView, type PublicView } from "../state/publicView"
@@ -41,7 +42,7 @@ export function App(){
     const params=new URLSearchParams(location.search);update(params)
     history.replaceState(null,"",`${location.pathname}${params.size?`?${params}`:""}${hash}`)
   }
-  function updateQuery(value:string){setQuery(value);writeUrl(params=>value?params.set("q",value):params.delete("q"))}
+  function updateQuery(value:string){setQuery(value);if(value&&view!=="discover")setView("discover");writeUrl(params=>value?params.set("q",value):params.delete("q"),value?"#discover":location.hash||"#discover")}
   function selectOrg(orgId:string){const params=new URLSearchParams(location.search);params.set("focus",orgId);history.pushState(null,"",`${location.pathname}?${params}${location.hash||"#discover"}`);setSelectedOrgId(orgId)}
   function clearOrg(){writeUrl(params=>params.delete("focus"));setSelectedOrgId(null)}
   function updateScope(next:DiscoverScope){
@@ -63,10 +64,10 @@ export function App(){
     </aside>
     <main id="main">
       {view!=="about"&&<><header className="command-bar"><label><span className="sr-only">{t("app.interest")}</span><input value={query} onChange={event=>updateQuery(event.target.value)} placeholder={t("app.placeholder")}/></label><ThemeControl/><button type="button" className="language" onClick={()=>setLanguage(language==="en"?"fr":"en")}>{language==="en"?"Français":"English"}</button></header><FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status??"loading"} onChange={updateScope}/></>}
-      {view==="discover"&&<>{query&&<DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope}/>}<ConstellationPage client={client} query={query} focus={selectedOrgId??undefined} onFocus={selectOrg} scope={scope} rootOrgId={selectedDepartment?.department_id}/></>}
+      {view==="discover"&&<div className={`discover-workspace${query?" discover-workspace--searching":""}`}>{query&&<DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope}/>}<ConstellationPage client={client} query={query} focus={selectedOrgId??undefined} onFocus={selectOrg} scope={scope} rootOrgId={selectedDepartment?.department_id}/></div>}
       {view==="explorer"&&<OrganizationExplorer client={client} onSelect={selectOrg} selectedOrgId={selectedOrgId} rootOrg={institutionRoot}/>} 
       {view==="about"&&<AboutPage client={client}/>} 
     </main>
-    {selectedOrgId&&<aside className="detail-panel detail-panel--open" aria-label={t("profile.eyebrow")}><button className="close" aria-label={t("app.close")} onClick={clearOrg}>×</button><TeamProfileLoader orgId={selectedOrgId} client={client}/></aside>}
+    <ProfileDrawer open={Boolean(selectedOrgId)} onClose={clearOrg} label={t("profile.eyebrow")}>{selectedOrgId&&<TeamProfileLoader orgId={selectedOrgId} client={client}/>}</ProfileDrawer>
   </div>
 }

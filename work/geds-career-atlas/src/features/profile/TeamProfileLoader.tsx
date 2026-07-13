@@ -16,5 +16,5 @@ export function TeamProfileLoader({ orgId, client }: { orgId: string; client: Pr
   }, [client, orgId])
   if (error) return <p role="status">{t("profile.unavailable")}</p>
   if (!data) return <p role="status">{t("profile.loading")}</p>
-  return <TeamProfile name={data.profile.name} roles={data.roles.items.map(item => item.title)} roleItems={data.roles.items} profile={data.profile} relatedTeams={data.children.map(item=>({org_id:item.org_id,name:item.name}))} peopleClient={client.people?{people:client.people.bind(client)}:undefined} />
+  return <TeamProfile name={data.profile.name} roles={data.roles.items.map(item => item.title)} profile={data.profile} relatedTeams={data.children.map(item=>({org_id:item.org_id,name:item.name}))} peopleClient={client.people?{people:client.people.bind(client)}:undefined} />
 }
