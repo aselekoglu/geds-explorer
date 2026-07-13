@@ -29,7 +29,7 @@ export function App(){
   const client=useMemo(()=>new CareerApiClient(),[])
   const {language,setLanguage,t}=useLanguage()
   const selectedDepartment=useMemo(()=>departments.find(item=>item.name===scope.department),[departments,scope.department])
-  const institutionRoot=useMemo(()=>selectedDepartment?{org_id:selectedDepartment.department_id,name:selectedDepartment.name,depth:0,child_count:1,descendant_people_count:0}:undefined,[selectedDepartment])
+  const institutionRoot=useMemo(()=>selectedDepartment?{org_id:selectedDepartment.department_id,name:selectedDepartment.name,depth:0,child_count:1,direct_people_count:0,descendant_people_count:0}:undefined,[selectedDepartment])
 
   useEffect(()=>{
     const restore=()=>{const next=readUrlState();setQuery(next.query);setSelectedOrgId(next.focus);setScopeState(next.scope);setView(next.view)}

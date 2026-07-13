@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react"
 import { vi } from "vitest"
 import { OrgColumn } from "./OrgColumn"
 
-const items=Array.from({length:348},(_,index)=>({org_id:`org-${index}`,name:`Organization ${index}`,depth:2,child_count:index===42?3:0,descendant_people_count:index}))
+const items=Array.from({length:348},(_,index)=>({org_id:`org-${index}`,name:`Organization ${index}`,depth:2,child_count:index===42?3:0,direct_people_count:index,descendant_people_count:index}))
 
 it("virtualizes large sibling fanout with accessible tree state",()=>{
   render(<OrgColumn label="Teams" items={items} columnIndex={0} expandedId="org-42" onOpen={vi.fn()} onBack={vi.fn()}/>)

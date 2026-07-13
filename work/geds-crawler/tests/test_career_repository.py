@@ -200,10 +200,21 @@ def test_root_constellation_returns_only_root_organizations(repository):
     assert result.truncated is False
     assert result.limit == 2000
     assert result.nodes[0].descendant_org_count == 3
+    assert isinstance(result.nodes[0].direct_people_count, int)
     assert result.nodes[0].quality_status in {"complete", "partial_overlay"}
     assert result.nodes[0].match_count == 0
     assert result.nodes[0].vacancy_count == 1
     assert result.nodes[0].has_more is True
+
+
+def test_org_navigation_nodes_include_direct_people_counts(repository):
+    root = repository.children(parent_id=None, limit=20).items[0]
+    child = repository.children(parent_id=root.org_id, limit=20).items[0]
+    ancestors = repository.ancestors(child.org_id).items
+
+    assert isinstance(root.direct_people_count, int)
+    assert isinstance(child.direct_people_count, int)
+    assert all(isinstance(node.direct_people_count, int) for node in ancestors)
 
 
 def test_truncated_constellation_marks_visible_parent_as_aggregate(repository):

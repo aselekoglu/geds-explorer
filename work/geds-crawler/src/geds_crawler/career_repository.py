@@ -48,6 +48,7 @@ class OrgNode:
     parent_id: str | None
     depth: int
     child_count: int
+    direct_people_count: int
     descendant_people_count: int
     descendant_org_count: int = 0
     match_count: int = 0
@@ -265,10 +266,10 @@ class CareerRepository:
         with self.connect() as con:
             meta = self._meta(con)
             if parent_id is None:
-                rows = con.execute("""SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.descendant_people_count FROM organizations_current o WHERE o.snapshot_id=? AND o.parent_dn IS NULL ORDER BY o.name,o.org_id LIMIT ?""", (meta["snapshot_id"], limit)).fetchall()
+                rows = con.execute("""SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.direct_people_count,o.descendant_people_count FROM organizations_current o WHERE o.snapshot_id=? AND o.parent_dn IS NULL ORDER BY o.name,o.org_id LIMIT ?""", (meta["snapshot_id"], limit)).fetchall()
             else:
-                rows = con.execute("""SELECT child.org_id,child.name,parent.org_id parent_id,child.depth,child.child_count,child.descendant_people_count FROM organizations_current child JOIN organizations_current parent ON parent.org_dn=child.parent_dn WHERE child.snapshot_id=? AND parent.org_id=? ORDER BY child.name,child.org_id LIMIT ?""", (meta["snapshot_id"], parent_id, limit)).fetchall()
-        items = tuple(OrgNode(str(r["org_id"]), str(r["name"]), r["parent_id"], int(r["depth"]), int(r["child_count"]), int(r["descendant_people_count"])) for r in rows)
+                rows = con.execute("""SELECT child.org_id,child.name,parent.org_id parent_id,child.depth,child.child_count,child.direct_people_count,child.descendant_people_count FROM organizations_current child JOIN organizations_current parent ON parent.org_dn=child.parent_dn WHERE child.snapshot_id=? AND parent.org_id=? ORDER BY child.name,child.org_id LIMIT ?""", (meta["snapshot_id"], parent_id, limit)).fetchall()
+        items = tuple(OrgNode(org_id=str(r["org_id"]), name=str(r["name"]), parent_id=r["parent_id"], depth=int(r["depth"]), child_count=int(r["child_count"]), direct_people_count=int(r["direct_people_count"]), descendant_people_count=int(r["descendant_people_count"])) for r in rows)
         return OrgPage(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, parent_id or "root", limit))
 
     def team_profile(self, org_id: str) -> TeamProfile:
@@ -406,8 +407,8 @@ class CareerRepository:
             row = con.execute("SELECT org_dn FROM organizations_current WHERE snapshot_id=? AND org_id=?", (meta["snapshot_id"], org_id)).fetchone()
             if row is None:
                 raise KeyError(org_id)
-            chain = con.execute("""WITH RECURSIVE lineage AS (SELECT org_dn,parent_dn,0 ordinal FROM organizations_current WHERE org_dn=? UNION ALL SELECT parent.org_dn,parent.parent_dn,lineage.ordinal+1 FROM organizations_current parent JOIN lineage ON parent.org_dn=lineage.parent_dn) SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.descendant_people_count,lineage.ordinal FROM lineage JOIN organizations_current o ON o.org_dn=lineage.org_dn LEFT JOIN organizations_current p ON p.org_dn=o.parent_dn ORDER BY lineage.ordinal DESC""", (row["org_dn"],)).fetchall()
-        items = tuple(OrgNode(str(r["org_id"]), str(r["name"]), r["parent_id"], int(r["depth"]), int(r["child_count"]), int(r["descendant_people_count"])) for r in chain)
+            chain = con.execute("""WITH RECURSIVE lineage AS (SELECT org_dn,parent_dn,0 ordinal FROM organizations_current WHERE org_dn=? UNION ALL SELECT parent.org_dn,parent.parent_dn,lineage.ordinal+1 FROM organizations_current parent JOIN lineage ON parent.org_dn=lineage.parent_dn) SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.direct_people_count,o.descendant_people_count,lineage.ordinal FROM lineage JOIN organizations_current o ON o.org_dn=lineage.org_dn LEFT JOIN organizations_current p ON p.org_dn=o.parent_dn ORDER BY lineage.ordinal DESC""", (row["org_dn"],)).fetchall()
+        items = tuple(OrgNode(org_id=str(r["org_id"]), name=str(r["name"]), parent_id=r["parent_id"], depth=int(r["depth"]), child_count=int(r["child_count"]), direct_people_count=int(r["direct_people_count"]), descendant_people_count=int(r["descendant_people_count"])) for r in chain)
         return OrgPage(items, len(items), profile.snapshot_id, profile.quality_status, _etag(meta, "ancestors", org_id))
 
     def roles(self, *, org_id: str | None = None, limit: int = 50) -> SearchResult:
@@ -493,7 +494,7 @@ class CareerRepository:
             snapshot_id = str(meta["snapshot_id"])
             if root_id is None:
                 rows = con.execute(
-                    """SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.descendant_people_count,o.descendant_org_count
+                    """SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.direct_people_count,o.descendant_people_count,o.descendant_org_count
                        FROM organizations_current o
                        WHERE o.snapshot_id=? AND o.parent_dn IS NULL
                        ORDER BY o.name,o.org_id LIMIT ?""",
@@ -508,7 +509,7 @@ class CareerRepository:
                            FROM organizations_current child JOIN slice ON child.parent_dn=slice.org_dn
                            WHERE child.snapshot_id=? AND slice.level < ?
                        )
-                       SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.descendant_people_count,o.descendant_org_count
+                       SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.direct_people_count,o.descendant_people_count,o.descendant_org_count
                        FROM slice JOIN organizations_current o ON o.org_dn=slice.org_dn
                        LEFT JOIN organizations_current p ON p.org_dn=o.parent_dn
                        ORDER BY o.depth,o.name,o.org_id LIMIT ?""",
@@ -545,11 +546,12 @@ class CareerRepository:
                 visible_children[str(row["parent_id"])] = visible_children.get(str(row["parent_id"]), 0) + 1
         nodes = tuple(
             OrgNode(
-                str(row["org_id"]), str(row["name"]), row["parent_id"], int(row["depth"]),
-                int(row["child_count"]), int(row["descendant_people_count"]), int(row["descendant_org_count"]),
-                match_counts.get(str(row["org_id"]), 0), str(meta["quality_status"]),
-                vacancy_counts.get(str(row["org_id"]), 0),
-                int(row["child_count"]) > visible_children.get(str(row["org_id"]), 0),
+                org_id=str(row["org_id"]), name=str(row["name"]), parent_id=row["parent_id"], depth=int(row["depth"]),
+                child_count=int(row["child_count"]), direct_people_count=int(row["direct_people_count"]),
+                descendant_people_count=int(row["descendant_people_count"]), descendant_org_count=int(row["descendant_org_count"]),
+                match_count=match_counts.get(str(row["org_id"]), 0), quality_status=str(meta["quality_status"]),
+                vacancy_count=vacancy_counts.get(str(row["org_id"]), 0),
+                has_more=int(row["child_count"]) > visible_children.get(str(row["org_id"]), 0),
             )
             for row in rows
         )
