@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react"
-import type { OrgNode, OrgPage } from "../../api/types"
+import type { OrgNode, OrgPage, SearchResult } from "../../api/types"
 import { useLanguage } from "../../i18n/i18n"
 import { OrgBreadcrumb } from "./OrgBreadcrumb"
 import { OrgColumn } from "./OrgColumn"
 
-type RootClient = { rootChildren: (signal?: AbortSignal) => Promise<OrgPage>; children: (orgId: string, signal?: AbortSignal) => Promise<OrgPage>;ancestors?:(orgId:string,signal?:AbortSignal)=>Promise<OrgPage> }
+type RootClient = { rootChildren: (signal?: AbortSignal) => Promise<OrgPage>; children: (orgId: string, signal?: AbortSignal) => Promise<OrgPage>;ancestors?:(orgId:string,signal?:AbortSignal)=>Promise<OrgPage>;search?:(query:string,signal?:AbortSignal)=>Promise<SearchResult> }
 type Column = { parent?: OrgNode; items: OrgNode[]; leaf?: boolean }
+type Match={org_id:string;name:string}
 
-export function OrganizationExplorer({ client, onProfile, selectedOrgId,rootOrg }: { client: RootClient; onProfile?: (orgId: string) => void;selectedOrgId?:string|null;rootOrg?:OrgNode }) {
+export function OrganizationExplorer({ client, onProfile, selectedOrgId,rootOrg,query="",institutionName="" }: { client: RootClient; onProfile?: (orgId: string) => void;selectedOrgId?:string|null;rootOrg?:OrgNode;query?:string;institutionName?:string }) {
   const [columns, setColumns] = useState<Column[]>([])
   const [error, setError] = useState(false)
+  const [matches,setMatches]=useState<Match[]>([])
+  const [searchState,setSearchState]=useState<"idle"|"loading"|"empty"|"error">("idle")
   const { t } = useLanguage()
   useEffect(() => {
     const controller = new AbortController()
@@ -25,16 +28,46 @@ export function OrganizationExplorer({ client, onProfile, selectedOrgId,rootOrg 
     void load().catch(value=>{if(value.name!=="AbortError")setError(true)})
     return()=>controller.abort()
   },[client,selectedOrgId,rootOrg])
+  useEffect(()=>{
+    const controller=new AbortController()
+    const value=query.trim()
+    if(!value||!client.search){setMatches([]);setSearchState("idle");return()=>controller.abort()}
+    setSearchState("loading")
+    client.search(value,controller.signal).then(result=>{
+      const unique=new Map<string,Match>()
+      for(const item of result.items){if(!item.org_id)continue;if(institutionName&&item.department_name!==institutionName)continue;if(!unique.has(item.org_id))unique.set(item.org_id,{org_id:item.org_id,name:item.organization_name})}
+      const next=[...unique.values()]
+      setMatches(next);setSearchState(next.length?"idle":"empty")
+    }).catch(value=>{if(value.name!=="AbortError"){setMatches([]);setSearchState("error")}})
+    return()=>controller.abort()
+  },[client,query,institutionName])
   async function drill(node: OrgNode, columnIndex: number) {
     if(node.child_count===0){setColumns(current=>[...current.slice(0,columnIndex+1),{parent:node,items:[],leaf:true}]);return}
     const page = await client.children(node.org_id)
     setColumns(current => [...current.slice(0, columnIndex + 1), { parent: node, items: page.items }])
   }
+  async function restoreMatch(orgId:string){
+    if(!client.ancestors)return
+    const lineage=(await client.ancestors(orgId)).items
+    if(rootOrg){
+      const rootIndex=lineage.findIndex(node=>node.org_id===rootOrg.org_id)
+      const scoped=rootIndex>=0?lineage.slice(rootIndex):lineage
+      const first=await client.children(rootOrg.org_id)
+      const next:Column[]=[{parent:rootOrg,items:first.items}]
+      for(const node of scoped.slice(1)){if(node.child_count===0)next.push({parent:node,items:[],leaf:true});else next.push({parent:node,items:(await client.children(node.org_id)).items})}
+      setColumns(next);return
+    }
+    const root=await client.rootChildren()
+    const next:Column[]=[{items:root.items}]
+    for(const node of lineage){if(node.child_count===0)next.push({parent:node,items:[],leaf:true});else next.push({parent:node,items:(await client.children(node.org_id)).items})}
+    setColumns(next)
+  }
   if (error) return <p role="status">{t("orgWalk.unavailable")}</p>
   if (!columns.length) return <p role="status">{t("orgWalk.loading")}</p>
   return <section className="org-explorer" aria-labelledby="org-explorer-title">
     <div><p className="eyebrow">{t("orgWalk.eyebrow")}</p><h2 id="org-explorer-title">{t("orgWalk.title")}</h2><p>{t("orgWalk.intro")}</p></div>
-    <OrgBreadcrumb path={columns.slice(1).map(column=>column.parent?.name).filter((name):name is string=>Boolean(name))} label={t("orgWalk.path")} onBack={()=>setColumns(current=>current.slice(0,-1))}/>
+    {query.trim()&&<section className="org-matches" aria-labelledby="org-matches-title"><h3 id="org-matches-title">{t("orgWalk.matches")}</h3>{searchState==="loading"&&<p role="status">{t("orgWalk.searching")}</p>}{searchState==="empty"&&<p role="status">{t("orgWalk.noMatches")}</p>}{searchState==="error"&&<p role="status">{t("orgWalk.searchError")}</p>}<div className="org-match-list">{matches.map(match=><article className="org-match" key={match.org_id}><button type="button" className="org-match__primary" aria-label={t("orgWalk.openInHierarchy",{name:match.name})} onClick={()=>void restoreMatch(match.org_id)}>{match.name}</button><button type="button" className="org-match__profile" aria-label={t("orgWalk.openProfile",{name:match.name})} onClick={()=>onProfile?.(match.org_id)}>i</button></article>)}</div></section>}
+    <OrgBreadcrumb path={columns.map(column=>column.parent?.name).filter((name):name is string=>Boolean(name))} label={t("orgWalk.path")} onBack={()=>setColumns(current=>current.slice(0,-1))}/>
     <div className="org-columns">{columns.map((column,columnIndex)=>column.leaf?<div key={`${column.parent?.org_id}-leaf`} className="org-empty-column" role="status"><strong>{column.parent?.name}</strong><span>{t("orgWalk.noChildren")}</span></div>:<OrgColumn key={column.parent?.org_id??"root"} label={column.parent?t("orgWalk.teamLabel",{name:column.parent.name}):t("orgWalk.top")} items={column.items} columnIndex={columnIndex} expandedId={columns[columnIndex+1]?.parent?.org_id} onDrill={(node,index)=>void drill(node,index)} onProfile={orgId=>onProfile?.(orgId)} onBack={index=>setColumns(current=>current.slice(0,index))}/>)}</div>
   </section>
 }

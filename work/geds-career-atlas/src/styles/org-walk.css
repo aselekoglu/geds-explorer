@@ -14,3 +14,50 @@
     padding: 22px 16px;
   }
 }
+
+.org-matches {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+
+.org-matches h3 {
+  margin: 0 0 10px;
+}
+
+.org-match-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.org-match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 6px;
+}
+
+.org-match button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.org-match__primary {
+  padding: 9px 11px;
+  text-align: left;
+}
+
+.org-match__profile {
+  font-weight: 750;
+}
+
+.org-match button:hover,
+.org-match button:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
