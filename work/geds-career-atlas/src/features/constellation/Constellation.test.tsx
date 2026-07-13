@@ -10,3 +10,11 @@ it("labels quality and recorded-vacancy semantics without success color claims",
   expect(option).toHaveTextContent("Recorded as vacant in GEDS — unverified")
   expect(option).toHaveTextContent("More teams available")
 })
+
+it("uses abbreviations at government level and wraps lower-level names without ellipses",()=>{
+  const {container,rerender}=render(<Constellation topLevel nodes={[{id:"crtc",name:"Canadian Radio-television and Telecommunications Commission",value:100}]} focus="crtc"/>)
+  expect(container.querySelector("svg text")?.textContent).toBe("CRTC")
+  rerender(<Constellation nodes={[{id:"team",name:"Dispute Resolution and Regulatory Implementation",value:100}]} focus="team"/>)
+  expect(container.querySelector("svg text")?.textContent).not.toContain("...")
+  expect(container.querySelectorAll("svg tspan").length).toBeGreaterThan(1)
+})
