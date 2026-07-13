@@ -64,7 +64,7 @@ export function App(){
     </aside>
     <main id="main">
       {view!=="about"&&<><header className="command-bar"><label><span className="sr-only">{t("app.interest")}</span><input value={query} onChange={event=>updateQuery(event.target.value)} placeholder={t("app.placeholder")}/></label><ThemeControl/><button type="button" className="language" onClick={()=>setLanguage(language==="en"?"fr":"en")}>{language==="en"?"Français":"English"}</button></header><FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status??"loading"} onChange={updateScope}/></>}
-      {view==="discover"&&<div className={`discover-workspace${query?" discover-workspace--searching":""}`}>{query&&<DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope}/>}<ConstellationPage client={client} query={query} focus={selectedOrgId??undefined} onFocus={selectOrg} scope={scope} rootOrgId={selectedDepartment?.department_id}/></div>}
+      {view==="discover"&&<div className={`discover-workspace${query?" discover-workspace--searching":""}`}>{query&&<DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope}/>}<ConstellationPage client={client} query={query} focus={selectedOrgId??undefined} onProfile={selectOrg} scope={scope} rootOrgId={selectedDepartment?.department_id}/></div>}
       {view==="explorer"&&<OrganizationExplorer client={client} onProfile={selectOrg} selectedOrgId={selectedOrgId} rootOrg={institutionRoot}/>} 
       {view==="about"&&<AboutPage client={client}/>} 
     </main>
