@@ -21,8 +21,8 @@ test("cached initial Discover is useful under 2.5 seconds and feedback appears u
   for (let run = 0; run < 5; run += 1) {
     const started = performance.now()
     await page.goto("/?q=AI")
-    const discover = page.getByRole("region", { name: "Discover government teams" })
-    await expect(discover.getByRole("article").first()).toBeVisible()
+    const discover = page.getByRole("region", { name: "Government constellation" })
+    await expect(discover.getByRole("option").first()).toBeVisible()
     useful.push(performance.now() - started)
   }
   console.info(`PERF discover-useful-ms=${useful.join(",")}`)
@@ -36,14 +36,14 @@ test("cached initial Discover is useful under 2.5 seconds and feedback appears u
       document.querySelector("input")!.addEventListener("input", () => {
         const started = performance.now()
         const check = () => {
-          if (document.body.textContent?.includes("Finding related government teams")) state.__feedbackMs = performance.now() - started
+          if (document.body.textContent?.includes("Finding matching teams")) state.__feedbackMs = performance.now() - started
           else requestAnimationFrame(check)
         }
         requestAnimationFrame(check)
       }, { once: true })
     })
     await page.getByRole("textbox", { name: "Career interest" }).fill("AI")
-    await expect(page.getByText(/Finding related government teams/)).toBeVisible()
+    await expect(page.getByText(/Finding matching teams/)).toBeVisible()
     feedback.push(await page.evaluate(() => (window as Window & { __feedbackMs: number }).__feedbackMs))
   }
   console.info(`PERF filter-feedback-ms=${feedback.join(",")}`)

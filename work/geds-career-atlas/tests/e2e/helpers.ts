@@ -29,18 +29,16 @@ export async function findProfileFromInterestResults(
   request: APIRequestContext,
   predicate: (profile: Record<string, unknown>) => boolean,
 ) {
-  const orgIds = new Set<string>()
   for (const query of ["AI", "software", "cybersecurity", "policy", "data"]) {
-    const result = await (await request.get(`/api/search?q=${encodeURIComponent(query)}&limit=200`)).json()
-    for (const item of result.items as Array<{ org_id?: string }>) if (item.org_id) orgIds.add(item.org_id)
+    const result = await (await request.get(`/api/search?q=${encodeURIComponent(query)}&limit=50`)).json()
+    const ids = [...new Set((result.items as Array<{ org_id?: string }>).flatMap(item => item.org_id ? [item.org_id] : []))]
+    for (let offset = 0; offset < ids.length; offset += 10) {
+      const profiles = await Promise.all(ids.slice(offset, offset + 10).map(async orgId =>
+        (await (await request.get(`/api/orgs/${orgId}/profile`)).json()) as Record<string, unknown> & { org_id: string; name: string },
+      ))
+      const found = profiles.find(predicate)
+      if (found) return found
+    }
   }
-  const ids = [...orgIds]
-  for (let offset = 0; offset < ids.length; offset += 25) {
-    const profiles = await Promise.all(ids.slice(offset, offset + 25).map(async orgId =>
-      (await (await request.get(`/api/orgs/${orgId}/profile`)).json()) as Record<string, unknown> & { org_id: string; name: string },
-    ))
-    const found = profiles.find(predicate)
-    if (found) return found
-  }
-  throw new Error(`No matching profile found in ${ids.length} bounded interest-result organizations`)
+  throw new Error("No matching profile found in bounded interest-result organizations")
 }

@@ -43,3 +43,12 @@ Current Chrome inspection used the live canonical server on `0.0.0.0:8780` plus 
 | Mobile Discover / Org Walk | 360x800 inspection rendered persistent horizontal nav, stacked command/filter controls, single-column cards, and no page-level overflow (`scrollWidth 345 <= viewport 360`). Mobile Constellation remains list-first. |
 | Reduced motion | Playwright emulation proves navigation remains usable and animation duration becomes zero. |
 | No-match / partial / source unavailable / visual failure | French no-match, real `partial_overlay`, unknown-profile 404, constellation API failure, and visual-boundary semantic-list fallback are covered by unit plus resilience E2E. No state removes the alternate Organization Walk journey. |
+
+## 2026-07-13 hierarchy interaction verification
+
+- Discover bubbles and Organization Walk rows now use a consistent two-action contract: the primary action drills into child organizations, while the adjacent information action opens Team Profile.
+- Discover provides a Back action after drill-down. Government-wide bubbles use compact institution labels with full accessible names; lower hierarchy levels use wrapped full labels. Hover and keyboard focus expose direct people, total branch people, and child-team counts without a persistent overlay card.
+- Observed Role headings are grouped by title and count. Selecting a role applies the shared query to the current view: matching Discover results or the Organization Walk matching-team lane.
+- Unknown queries now render an explicit no-match state instead of falling back to unrelated organizations. Organization lists expose valid list semantics and distinct accessible names for drill and profile actions; current axe runs report no serious or critical violations.
+- Real canonical-data timings after replacing the non-indexable person join: `/api/search?q=AI&limit=200` 0.211 seconds and `/api/constellation?q=AI&limit=200` 0.258 seconds on the local release server. Direct repository checks completed `AI` in 0.153 seconds, `Senior Advisor` in 0.928 seconds, and an unknown query in 0.138 seconds.
+- Fresh release gates: 218 Python tests, 31 Vitest files / 75 tests, TypeScript typecheck, production build, and 18 Playwright tests all passed. Playwright measured cached Discover useful rendering at 0.36–0.44 seconds in four of five runs (0.42 seconds first run) and filter feedback at 2.9–13 ms.

@@ -62,6 +62,43 @@ def test_search_returns_explainable_ranked_results(repository):
     assert result.etag
 
 
+def test_search_finds_people_by_observed_name_without_exposing_contact_fields(repository):
+    result = repository.search(query="Ada", limit=20)
+
+    person = next(item for item in result.items if item.entity_kind == "person")
+    assert person.display_name == "Ada"
+    assert person.title == "Machine Learning Engineer"
+    assert person.source_url == ""
+    assert not {"email", "phone", "fax", "address"} & set(dataclasses.asdict(person))
+
+
+def test_search_uses_bounded_fts_candidates_instead_of_scanning_every_person(repository, monkeypatch):
+    statements = []
+    original_connect = repository.connect
+
+    def traced_connect():
+        con = original_connect()
+        con.set_trace_callback(statements.append)
+        return con
+
+    monkeypatch.setattr(repository, "connect", traced_connect)
+    repository.search(query="Ada", limit=20)
+
+    sql = "\n".join(statements).casefold()
+    assert "career_entities_fts" in sql
+    assert "p.source_url=substr(e.entity_id,8)" in sql
+    assert "('person:' || p.source_url)" not in sql
+    assert "instr(lower(p.display_name)" not in sql
+
+
+def test_search_finds_teams_by_observed_name_without_taxonomy_match(repository):
+    result = repository.search(query="Platform A", limit=20)
+
+    team = next(item for item in result.items if item.entity_kind == "organization")
+    assert team.organization_name == "Platform A"
+    assert team.org_id
+
+
 def test_search_marks_only_source_derived_vacancy_records(repository):
     result = repository.search(query="data", limit=200)
     by_title = {item.title: item for item in result.items}
@@ -182,10 +219,21 @@ def test_root_constellation_returns_only_root_organizations(repository):
     assert result.truncated is False
     assert result.limit == 2000
     assert result.nodes[0].descendant_org_count == 3
+    assert isinstance(result.nodes[0].direct_people_count, int)
     assert result.nodes[0].quality_status in {"complete", "partial_overlay"}
     assert result.nodes[0].match_count == 0
     assert result.nodes[0].vacancy_count == 1
     assert result.nodes[0].has_more is True
+
+
+def test_org_navigation_nodes_include_direct_people_counts(repository):
+    root = repository.children(parent_id=None, limit=20).items[0]
+    child = repository.children(parent_id=root.org_id, limit=20).items[0]
+    ancestors = repository.ancestors(child.org_id).items
+
+    assert isinstance(root.direct_people_count, int)
+    assert isinstance(child.direct_people_count, int)
+    assert all(isinstance(node.direct_people_count, int) for node in ancestors)
 
 
 def test_truncated_constellation_marks_visible_parent_as_aggregate(repository):

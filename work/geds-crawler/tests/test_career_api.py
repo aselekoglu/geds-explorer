@@ -134,6 +134,7 @@ def test_constellation_slice_contract(career_client):
     response = career_client.get("/api/constellation/slice", params={"max_depth": 1, "limit": 2000})
     assert response.status_code == 200
     assert response.json()["nodes"]
+    assert "direct_people_count" in response.json()["nodes"][0]
     assert response.json()["truncated"] is False
 
 

@@ -1,4 +1,9 @@
 .filter-rail--functional select,.role-filters select,.saved-map button,.org-breadcrumb button,.constellation-heading button{border-color:var(--line);background:var(--surface2);color:var(--text)}
+:root,
+[data-theme="light"] {
+  --warning: #805400;
+}
+
 .quality-chip{border-color:var(--warning);background:var(--warning-soft);color:var(--warning)}
 .saved-map button:hover,.saved-map button:focus-visible{border-color:var(--accent);color:var(--accent)}
 .tour-list small,.org-explorer>nav,.org-breadcrumb nav{color:var(--muted)}
