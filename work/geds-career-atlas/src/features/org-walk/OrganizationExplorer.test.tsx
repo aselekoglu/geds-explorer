@@ -22,6 +22,19 @@ it("opens a selected organization in the next hierarchy column", async () => {
   fireEvent.click(await screen.findByRole("treeitem", { name: /Digital Services/i }))
   fireEvent.click(await screen.findByRole("treeitem", { name: /AI Centre/i }))
   expect(await screen.findByText("Digital Services / AI Centre")).toBeInTheDocument()
+  expect(screen.getByText("No child teams")).toBeInTheDocument()
+})
+
+it("opens Team Profile only from the compact detail action",async()=>{
+  const onProfile=vi.fn()
+  const children=vi.fn().mockResolvedValue({items:[],snapshot_id:"snapshot",etag:"etag"})
+  const client={rootChildren:async()=>({items:[{org_id:"root-1",name:"Digital Services",depth:0,child_count:1,direct_people_count:2,descendant_people_count:12}],snapshot_id:"snapshot",etag:"etag"}),children}
+  render(<OrganizationExplorer client={client} onProfile={onProfile}/>)
+  fireEvent.click(await screen.findByRole("treeitem",{name:/Digital Services/i}))
+  expect(onProfile).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole("button",{name:"Open Digital Services profile"}))
+  expect(onProfile).toHaveBeenCalledWith("root-1")
+  expect(children).toHaveBeenCalledTimes(1)
 })
 
 it("restores a deep shared path from selected URL state",async()=>{

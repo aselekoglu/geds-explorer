@@ -81,6 +81,8 @@ export const fr = {
     top: "Organisations gouvernementales de premier niveau",
     teamLabel: "Équipes de {name}",
     summary: "{teams} équipes · {people} personnes indexées",
+    openProfile: "Ouvrir le profil de {name}",
+    noChildren: "Aucune équipe enfant",
     legacyPath: "Chemin organisationnel",
     legacyCount: "{count} organisations",
     legacyHierarchy: "Hiérarchie organisationnelle",
