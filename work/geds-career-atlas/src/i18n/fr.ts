@@ -150,6 +150,7 @@ export const fr = {
     rolesIntro: "Ces titres sont observés dans l’instantané GEDS actuel; ce ne sont pas des postes ouverts.",
     noTitle: "Aucun titre enregistré",
     noTitleHelp: "Le dossier source ne contenait pas de titre utilisable.",
+    filterByRole: "Filtrer par {title}",
     matchedTitle: "Raison de la correspondance",
     matchedIntro: "Inféré à partir des noms d’organisation et de rôle observés. Validez les détails auprès de la source officielle avant d’agir.",
     loading: "Chargement du profil d’équipe…",

@@ -43,6 +43,7 @@ export function App(){
     history.replaceState(null,"",`${location.pathname}${params.size?`?${params}`:""}${hash}`)
   }
   function updateQuery(value:string){setQuery(value);if(value&&view!=="discover")setView("discover");writeUrl(params=>value?params.set("q",value):params.delete("q"),value?"#discover":location.hash||"#discover")}
+  function applyRoleQuery(title:string){const value=title.trim();setQuery(value);setSelectedOrgId(null);writeUrl(params=>{value?params.set("q",value):params.delete("q");params.delete("focus")},location.hash||"#discover")}
   function selectOrg(orgId:string){const params=new URLSearchParams(location.search);params.set("focus",orgId);history.pushState(null,"",`${location.pathname}?${params}${location.hash||"#discover"}`);setSelectedOrgId(orgId)}
   function clearOrg(){writeUrl(params=>params.delete("focus"));setSelectedOrgId(null)}
   function updateScope(next:DiscoverScope){
@@ -68,6 +69,6 @@ export function App(){
       {view==="explorer"&&<OrganizationExplorer client={client} onProfile={selectOrg} selectedOrgId={selectedOrgId} rootOrg={institutionRoot}/>} 
       {view==="about"&&<AboutPage client={client}/>} 
     </main>
-    <ProfileDrawer open={Boolean(selectedOrgId)} onClose={clearOrg} label={t("profile.eyebrow")}>{selectedOrgId&&<TeamProfileLoader orgId={selectedOrgId} client={client}/>}</ProfileDrawer>
+    <ProfileDrawer open={Boolean(selectedOrgId)} onClose={clearOrg} label={t("profile.eyebrow")}>{selectedOrgId&&<TeamProfileLoader orgId={selectedOrgId} client={client} onRoleQuery={applyRoleQuery}/>}</ProfileDrawer>
   </div>
 }

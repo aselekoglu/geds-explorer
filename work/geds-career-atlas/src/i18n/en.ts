@@ -150,6 +150,7 @@ export const en = {
     rolesIntro: "These are title records observed in the current GEDS snapshot, not open jobs.",
     noTitle: "No title recorded",
     noTitleHelp: "The source record did not include a usable title.",
+    filterByRole: "Filter by {title}",
     matchedTitle: "Matched because",
     matchedIntro: "Inferred from observed organization and role names. Validate details through the official source before acting.",
     loading: "Loading team profile…",

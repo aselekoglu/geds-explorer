@@ -39,3 +39,19 @@ it("marks a selected team profile as an open responsive sheet",()=>{
 
   expect(container.querySelector(".detail-panel")).toHaveClass("detail-panel--open")
 })
+
+it.each(["discover","explorer"])("applies an observed role query without leaving the %s view",async(view)=>{
+  history.replaceState(null,"",`/?focus=team#${view}`)
+  vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL)=>{
+    const url=String(input)
+    const body=url.includes("/departments")?{items:[]}:url.includes("/meta")?{quality_status:"complete"}:url.includes("/constellation/slice")?{nodes:[],limit:2000,truncated:false,snapshot_id:"s",etag:"e"}:url.includes("/profile")?{org_id:"team",name:"Policy Team",department_name:"Department",canonical_path:["Department","Policy Team"],direct_people_count:1,descendant_people_count:1,child_count:0,snapshot_id:"s"}:url.includes("/roles")?{items:[{entity_id:"p",entity_kind:"person",org_id:"team",title:"Senior Advisor",organization_name:"Policy Team",score:1,confidence:"high",evidence:[]}],snapshot_id:"s",etag:"e"}:url.includes("/people")?{items:[],total:0,limit:50,offset:0,available_classifications:[],snapshot_id:"s",quality_status:"complete",etag:"e"}:{items:[],snapshot_id:"s",etag:"e"}
+    return {ok:true,json:async()=>body} as Response
+  }))
+  render(<App/>)
+  fireEvent.click(await screen.findByRole("button",{name:/Filter by Senior Advisor/i}))
+  await waitFor(()=>expect(location.hash).toBe(`#${view}`))
+  expect(new URLSearchParams(location.search).get("q")).toBe("Senior Advisor")
+  expect(new URLSearchParams(location.search).has("focus")).toBe(false)
+  expect(screen.queryByLabelText("TEAM PROFILE")).not.toBeInTheDocument()
+  vi.unstubAllGlobals()
+})
