@@ -3,13 +3,11 @@ import type { ConstellationSlice, SearchResult } from "../../api/types"
 import { useLanguage } from "../../i18n/i18n"
 import { Constellation } from "./Constellation"
 import { ConstellationBoundary } from "./ConstellationBoundary"
-import type { DiscoverFilters } from "../discover/FilterRail"
+import type { DiscoverScope } from "../discover/FilterRail"
 
 type SliceClient = { constellationSlice: (rootId?: string, signal?: AbortSignal) => Promise<ConstellationSlice>; constellation?: (query: string, signal?: AbortSignal) => Promise<SearchResult> }
 
-const confidenceRank:Record<string,number>={none:0,exploratory:1,medium:2,high:3}
-
-export function ConstellationPage({ client, query = "", focus, onFocus, filters={domain:"",department:"",confidence:"exploratory",vacancy:false} }: { client: SliceClient; query?: string; focus?: string; onFocus?: (orgId: string) => void;filters?:DiscoverFilters }) {
+export function ConstellationPage({ client, query = "", focus, onFocus, scope={department:""} }: { client: SliceClient; query?: string; focus?: string; onFocus?: (orgId: string) => void;scope?:DiscoverScope }) {
   const [slice, setSlice] = useState<ConstellationSlice | null>(null)
   const [matches, setMatches] = useState<SearchResult | null>(null)
   const [rootId, setRootId] = useState<string | undefined>(focus)
@@ -21,9 +19,9 @@ export function ConstellationPage({ client, query = "", focus, onFocus, filters=
   useEffect(() => { const controller = new AbortController(); if (query.trim() && client.constellation) client.constellation(query, controller.signal).then(setMatches).catch(value => { if (value.name !== "AbortError") setMatches(null) }); else setMatches(null); return () => controller.abort() }, [client, query])
   const interestNodes = useMemo(() => {
     const grouped = new Map<string, { id: string; name: string; value: number; vacancy_count: number }>()
-    for (const item of matches?.items ?? []) { if (!item.org_id) continue;if((confidenceRank[item.confidence]??0)<confidenceRank[filters.confidence])continue;if(filters.domain&&!item.evidence.some(record=>record.category_id===filters.domain))continue;if(filters.department&&item.department_name!==filters.department)continue;if(filters.vacancy&&!item.vacancy_signal)continue; const current = grouped.get(item.org_id); if (current) { current.value += Math.max(1, item.score); if (item.vacancy_signal) current.vacancy_count += 1 } else grouped.set(item.org_id, { id: item.org_id, name: item.organization_name, value: Math.max(1, item.score), vacancy_count: item.vacancy_signal ? 1 : 0 }) }
+    for (const item of matches?.items ?? []) { if (!item.org_id) continue;if(scope.department&&item.department_name!==scope.department)continue; const current = grouped.get(item.org_id); if (current) { current.value += Math.max(1, item.score); if (item.vacancy_signal) current.vacancy_count += 1 } else grouped.set(item.org_id, { id: item.org_id, name: item.organization_name, value: Math.max(1, item.score), vacancy_count: item.vacancy_signal ? 1 : 0 }) }
     return [...grouped.values()]
-  }, [filters,matches])
+  }, [scope,matches])
   const visualNodes = query.trim() && interestNodes.length ? interestNodes : (slice?.nodes.map(node => ({ id: node.org_id, name: node.name, value: Math.max(1, node.descendant_people_count), quality_status: node.quality_status, vacancy_count: node.vacancy_count, has_more: node.has_more })) ?? [])
   useEffect(() => { if (visualNodes.length && !visualNodes.some(node => node.id === activeFocus)) { const first = [...visualNodes].sort((a, b) => b.value - a.value || a.id.localeCompare(b.id))[0]; setLocalFocus(first.id) } }, [activeFocus, visualNodes])
   function select(orgId: string) { setLocalFocus(orgId); onFocus?.(orgId) }

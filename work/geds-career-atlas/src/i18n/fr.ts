@@ -1,7 +1,7 @@
 export const fr = {
   nav: {
     discover: "Découvrir",
-    explorer: "Explorer le gouvernement",
+    explorer: "Parcours organisationnel",
     constellation: "Constellation",
     tours: "Parcours",
     about: "À propos des données",
