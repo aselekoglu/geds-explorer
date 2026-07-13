@@ -1,7 +1,7 @@
 # Career Atlas Search-First Layout and Grouped Team Profiles
 
 **Date:** 2026-07-13  
-**Status:** Approved for implementation planning  
+**Status:** Implemented and verified
 **Surface:** Public, read-only GEDS Career Atlas only
 
 ## Goal
@@ -45,7 +45,7 @@ The command header contains:
 
 Search is the primary action. The current domain dropdown is removed from the persistent filter rail. Topic discovery is performed through the same query and result-type control instead of a separate taxonomy-first filter.
 
-The backend search remains deterministic and source-derived. `Teams` displays organization entities and `People` displays person entities from the existing search response. `Topics` displays only taxonomy categories and interpretation evidence already returned for the query; it is not a synthetic third entity type. `All` combines the available topic summary, team results, and person results. The frontend does not invent semantic matches.
+The backend search remains deterministic and source-derived. The existing search response now merges taxonomy matches with direct organization-name and person name/title/organization matches from the canonical snapshot. `Teams` displays organization entities and `People` displays person entities; person results expose display name, observed title, organization context, and an official GEDS source URL only. `Topics` displays only taxonomy categories and interpretation evidence already returned for the query; it is not a synthetic third entity type. `All` combines the available topic summary, team results, and person results. The frontend does not invent semantic matches or expose contact fields.
 
 ### Institution scope
 
@@ -200,3 +200,12 @@ Existing backend fields and endpoints may remain for compatibility unless remova
 8. Non-leaf profiles do not expose descendant names as if they were direct members.
 9. About the Data remains available and unchanged in meaning.
 10. Public Career Atlas remains read-only and contains no Admin Console controls or crawl state.
+
+## Verification Evidence
+
+- Frontend: 29 Vitest files and 62 tests passed; TypeScript typecheck and Vite production build passed.
+- Backend: 216 pytest tests passed from `work/geds-crawler/tests`.
+- Live service: `/`, `/api/meta`, `/api/departments`, and search returned successfully on localhost; the built app returned HTTP 200 on `100.96.69.138:8780`.
+- Browser: changing Canadian Transportation Agency to CRTC changed the rendered bubble labels and URL; Organization Walk rendered as a distinct view with no guided-tour section.
+- Leaf profile: Dispute Resolution and Regulatory Implementation rendered 14 direct people under 7 title groups with 18 official GEDS links and no flat duplicate role list.
+- Layout: desktop rendered without horizontal overflow and fit a 1280×720 viewport exactly; 390×844 mobile retained all three navigation links with no horizontal overflow.

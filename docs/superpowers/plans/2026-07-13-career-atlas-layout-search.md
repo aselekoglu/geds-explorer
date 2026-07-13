@@ -1,12 +1,14 @@
 # Career Atlas Search-First Layout and Grouped Team Profiles Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Deliver a full-width, search-first public Career Atlas with institution-synchronized bubbles, a dedicated Organization Walk view, an on-demand Team Profile drawer, and title-grouped leaf-team people.
 
 **Architecture:** Keep the existing React/FastAPI contracts and move public view/filter coordination into small frontend state helpers. Institution names resolve to existing department IDs, which become explicit roots for both constellation and hierarchy browsing. Reuse the privacy-safe people endpoint and group its direct-team records with a pure title-normalization utility.
 
 **Tech Stack:** React 19, TypeScript 6, Vite 8, Vitest, Testing Library, CSS custom properties, existing FastAPI read-only Career API.
+
+**Implementation status:** Complete. Tasks 1–6 were delivered in incremental commits; Task 7 was verified against the live canonical snapshot on 2026-07-13. The unified query required a privacy-safe backend extension so person names and direct organization names could be returned alongside taxonomy matches without exposing contact fields.
 
 ## Global Constraints
 
@@ -37,7 +39,7 @@
 - Produces: `readPublicView(hash: string): PublicView` and `publicViewHash(view: PublicView): string`.
 - Produces: `DiscoverScope = { department: string }` and an institution-only `<FilterRail>`.
 
-- [ ] **Step 1: Write failing state and UI tests**
+- [x] **Step 1: Write failing state and UI tests**
 
 ```ts
 it("maps only public hashes to views", () => {
@@ -67,13 +69,13 @@ it("mounts one primary view and does not reserve an empty profile column", async
 })
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `npm.cmd test -- src/state/publicView.test.ts src/features/discover/FilterRail.test.tsx src/app/App.test.tsx`
 
 Expected: FAIL because `publicView.ts` does not exist and the old domain/confidence/vacancy controls and stacked views are still rendered.
 
-- [ ] **Step 3: Implement the minimal view and scope contracts**
+- [x] **Step 3: Implement the minimal view and scope contracts**
 
 ```ts
 export type PublicView="discover"|"explorer"|"about"
@@ -95,13 +97,13 @@ export function FilterRail({departments,value,qualityStatus,onChange}:Props){
 
 Refactor `App` so the nav contains only Discover, Organization Walk, and About; render exactly one primary view; remove `SavedMap`; and render the detail aside only when `selectedOrgId` is non-null.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run: `npm.cmd test -- src/state/publicView.test.ts src/features/discover/FilterRail.test.tsx src/app/App.test.tsx`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the view-state slice**
+- [x] **Step 5: Commit the view-state slice**
 
 ```powershell
 git add work/geds-career-atlas/src/state/publicView.ts work/geds-career-atlas/src/state/publicView.test.ts work/geds-career-atlas/src/features/discover/FilterRail.tsx work/geds-career-atlas/src/features/discover/FilterRail.test.tsx work/geds-career-atlas/src/app/App.tsx work/geds-career-atlas/src/app/App.test.tsx work/geds-career-atlas/src/i18n/en.ts work/geds-career-atlas/src/i18n/fr.ts
@@ -123,7 +125,7 @@ git commit -m "feat: focus Career Atlas public navigation"
 - Produces: `<ConstellationPage rootOrgId?: string ...>`.
 - Produces: `<OrganizationExplorer rootOrg?: OrgNode ...>`.
 
-- [ ] **Step 1: Write failing root synchronization tests**
+- [x] **Step 1: Write failing root synchronization tests**
 
 ```tsx
 it("reloads from the selected institution root", async () => {
@@ -155,13 +157,13 @@ it("clears stale profile focus when institution changes", async () => {
 })
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run: `npm.cmd test -- src/features/constellation/ConstellationPage.test.tsx src/features/org-walk/OrganizationExplorer.test.tsx src/app/App.test.tsx`
 
 Expected: FAIL because neither explorer accepts an institution root and App retains focus.
 
-- [ ] **Step 3: Implement root props and stale-state clearing**
+- [x] **Step 3: Implement root props and stale-state clearing**
 
 In `App`, resolve the selected department once:
 
@@ -184,13 +186,13 @@ useEffect(()=>{setRootId(rootOrgId);setLocalFocus(undefined)},[rootOrgId])
 
 In `OrganizationExplorer`, call `client.children(rootOrg.org_id, signal)` for the initial institution column; otherwise retain `rootChildren` behavior.
 
-- [ ] **Step 4: Run tests and verify GREEN**
+- [x] **Step 4: Run tests and verify GREEN**
 
 Run: `npm.cmd test -- src/features/constellation/ConstellationPage.test.tsx src/features/org-walk/OrganizationExplorer.test.tsx src/app/App.test.tsx`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit institution synchronization**
+- [x] **Step 5: Commit institution synchronization**
 
 ```powershell
 git add work/geds-career-atlas/src/features/constellation work/geds-career-atlas/src/features/org-walk work/geds-career-atlas/src/app/App.tsx work/geds-career-atlas/src/app/App.test.tsx
@@ -211,7 +213,7 @@ git commit -m "fix: synchronize institution exploration roots"
 - Produces: `SearchKind = "all" | "topics" | "teams" | "people"`.
 - Produces: `<DiscoverPage kind department onSelectOrg ...>`.
 
-- [ ] **Step 1: Write failing result-type tests**
+- [x] **Step 1: Write failing result-type tests**
 
 ```tsx
 it("switches one deterministic query between topics, teams, and people", async () => {
@@ -233,13 +235,13 @@ it("applies institution scope without confidence or vacancy filtering", async ()
 })
 ```
 
-- [ ] **Step 2: Run focused search tests and verify RED**
+- [x] **Step 2: Run focused search tests and verify RED**
 
 Run: `npm.cmd test -- src/features/discover/DiscoverPage.test.tsx`
 
 Expected: FAIL because `kind` and entity-kind presentation do not exist.
 
-- [ ] **Step 3: Implement type controls and deterministic filtering**
+- [x] **Step 3: Implement type controls and deterministic filtering**
 
 ```ts
 export type SearchKind="all"|"topics"|"teams"|"people"
@@ -252,13 +254,13 @@ const showTopics=kind==="all"||kind==="topics"
 
 Render a labelled radio group in the command/search region. `Topics` renders `InterpretationChips` only; Teams and People render source records with distinct labels. Organization results call `onSelectOrg(item.org_id)` when available.
 
-- [ ] **Step 4: Run search tests and verify GREEN**
+- [x] **Step 4: Run search tests and verify GREEN**
 
 Run: `npm.cmd test -- src/features/discover/DiscoverPage.test.tsx src/app/App.test.tsx`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit unified search**
+- [x] **Step 5: Commit unified search**
 
 ```powershell
 git add work/geds-career-atlas/src/features/discover work/geds-career-atlas/src/app/App.tsx work/geds-career-atlas/src/styles/discover.css work/geds-career-atlas/src/i18n/en.ts work/geds-career-atlas/src/i18n/fr.ts
@@ -280,7 +282,7 @@ git commit -m "feat: add unified Career Atlas search"
 - Produces: `groupObservedTitles(titles: string[]): TitleGroup[]` where `TitleGroup={key:string;label:string;count:number;empty:boolean}`.
 - Produces: `<GroupedRoles titles: string[]>`.
 
-- [ ] **Step 1: Write failing grouping tests**
+- [x] **Step 1: Write failing grouping tests**
 
 ```ts
 it("groups case and whitespace variants and sorts empty last",()=>{
@@ -300,13 +302,13 @@ it("renders repeated roles once with a count",()=>{
 })
 ```
 
-- [ ] **Step 2: Run grouping tests and verify RED**
+- [x] **Step 2: Run grouping tests and verify RED**
 
 Run: `npm.cmd test -- src/features/profile/titleGroups.test.ts src/features/profile/GroupedRoles.test.tsx src/features/profile/TeamProfile.test.tsx`
 
 Expected: FAIL because grouping modules do not exist and TeamProfile renders a flat list.
 
-- [ ] **Step 3: Implement normalization and grouped disclosure UI**
+- [x] **Step 3: Implement normalization and grouped disclosure UI**
 
 ```ts
 export const normalizeObservedTitle=(title?:string|null)=>(title??"").trim().replace(/\s+/g," ")
@@ -325,13 +327,13 @@ export function groupObservedTitles(titles:string[]):TitleGroup[]{
 
 Replace TeamProfile's raw `<ul>{roles.map(...)}</ul>` and remove nested `RoleExplorer` rendering. The empty group uses a closed `<details>` disclosure; non-empty role headings are rendered once with their counts.
 
-- [ ] **Step 4: Run grouping tests and verify GREEN**
+- [x] **Step 4: Run grouping tests and verify GREEN**
 
 Run: `npm.cmd test -- src/features/profile/titleGroups.test.ts src/features/profile/GroupedRoles.test.tsx src/features/profile/TeamProfile.test.tsx`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit role grouping**
+- [x] **Step 5: Commit role grouping**
 
 ```powershell
 git add work/geds-career-atlas/src/features/profile
@@ -351,7 +353,7 @@ git commit -m "feat: group repeated observed roles"
 - Consumes: `normalizeObservedTitle` and privacy-safe `PeoplePage.items`.
 - Produces: title-grouped direct-team people with person search and classification filter.
 
-- [ ] **Step 1: Write failing leaf-team grouping tests**
+- [x] **Step 1: Write failing leaf-team grouping tests**
 
 ```tsx
 it("places direct people under one normalized title group",async()=>{
@@ -376,23 +378,23 @@ it("does not render a sort control",async()=>{
 })
 ```
 
-- [ ] **Step 2: Run people tests and verify RED**
+- [x] **Step 2: Run people tests and verify RED**
 
 Run: `npm.cmd test -- src/features/people/PeopleInTeam.test.tsx`
 
 Expected: FAIL because the component uses a flat table and exposes sort controls.
 
-- [ ] **Step 3: Implement grouped people presentation**
+- [x] **Step 3: Implement grouped people presentation**
 
 Group returned people by `normalizeObservedTitle(person.observed_title).toLocaleLowerCase()`. Render each non-empty title as a heading with count and a list of names; render the empty title group as a closed disclosure. Keep person search and classification selects, request `sort:"title"`, and render classification badges plus official links inside each person row.
 
-- [ ] **Step 4: Run people and profile tests and verify GREEN**
+- [x] **Step 4: Run people and profile tests and verify GREEN**
 
 Run: `npm.cmd test -- src/features/people/PeopleInTeam.test.tsx src/features/profile/TeamProfileLoader.test.tsx src/features/profile/TeamProfile.test.tsx`
 
 Expected: PASS and non-leaf TeamProfile tests prove that PeopleInTeam is not mounted when `child_count > 0`.
 
-- [ ] **Step 5: Commit grouped people**
+- [x] **Step 5: Commit grouped people**
 
 ```powershell
 git add work/geds-career-atlas/src/features/people work/geds-career-atlas/src/styles/people.css work/geds-career-atlas/src/i18n/en.ts work/geds-career-atlas/src/i18n/fr.ts
@@ -415,7 +417,7 @@ git commit -m "feat: group leaf team people by title"
 **Interfaces:**
 - Produces: `<ProfileDrawer open onClose returnFocusRef children>`.
 
-- [ ] **Step 1: Write failing drawer behavior tests**
+- [x] **Step 1: Write failing drawer behavior tests**
 
 ```tsx
 it("renders nothing while closed and closes on Escape",()=>{
@@ -435,23 +437,23 @@ it("labels the open profile as a modal drawer",()=>{
 })
 ```
 
-- [ ] **Step 2: Run drawer tests and verify RED**
+- [x] **Step 2: Run drawer tests and verify RED**
 
 Run: `npm.cmd test -- src/features/profile/ProfileDrawer.test.tsx src/app/App.test.tsx`
 
 Expected: FAIL because ProfileDrawer does not exist.
 
-- [ ] **Step 3: Implement drawer and responsive workspace CSS**
+- [x] **Step 3: Implement drawer and responsive workspace CSS**
 
 Render a fixed backdrop and drawer only when open, move focus to the close button, close on Escape, and restore the supplied trigger focus on cleanup. Update `.app-shell` to two columns (`side nav + minmax(0,1fr)`), make `.detail-panel` fixed/overlayed, give Discover a viewport-bounded canvas, and keep Organization Walk/About as standalone scroll regions. At narrow widths, use compact navigation and a full-screen drawer.
 
-- [ ] **Step 4: Run drawer tests, typecheck, and build**
+- [x] **Step 4: Run drawer tests, typecheck, and build**
 
 Run: `npm.cmd test -- src/features/profile/ProfileDrawer.test.tsx src/app/App.test.tsx && npm.cmd run typecheck && npm.cmd run build`
 
 Expected: PASS and build exits 0.
 
-- [ ] **Step 5: Commit layout and drawer**
+- [x] **Step 5: Commit layout and drawer**
 
 ```powershell
 git add work/geds-career-atlas/src/features/profile/ProfileDrawer.tsx work/geds-career-atlas/src/features/profile/ProfileDrawer.test.tsx work/geds-career-atlas/src/app/App.tsx work/geds-career-atlas/src/styles
@@ -468,7 +470,7 @@ git commit -m "feat: add full-width Career Atlas workspace"
 **Interfaces:**
 - Verifies every acceptance criterion without changing public API privacy boundaries.
 
-- [ ] **Step 1: Run complete frontend verification**
+- [x] **Step 1: Run complete frontend verification**
 
 Run: `npm.cmd test`
 
@@ -482,15 +484,15 @@ Run: `npm.cmd run build`
 
 Expected: Vite production build exits 0.
 
-- [ ] **Step 2: Run backend regression verification**
+- [x] **Step 2: Run backend regression verification**
 
-Run: `py -m pytest -q`
+Run: `py -m pytest -q tests`
 
 Working directory: `work/geds-crawler`
 
-Expected: all backend tests pass; no API mutation or privacy contract changed.
+Expected: all backend tests pass; no API mutation or privacy contract changed. Targeting `tests` avoids unrelated inaccessible `pytest_temp` directories in the repository root.
 
-- [ ] **Step 3: Serve the merged frontend build locally**
+- [x] **Step 3: Serve the merged frontend build locally**
 
 Run: `py -m geds_crawler.career_cli serve --master-db ..\..\outputs\master\geds-master.sqlite --frontend-dir ..\geds-career-atlas\dist --host 0.0.0.0 --port 8780`
 
@@ -498,7 +500,7 @@ Working directory: `work/geds-crawler`
 
 Expected: `/`, `/api/meta`, and `/api/departments` return HTTP 200 on localhost and the workstation LAN address.
 
-- [ ] **Step 4: Browser-verify critical flows**
+- [x] **Step 4: Browser-verify critical flows**
 
 Verify at desktop and narrow widths:
 
@@ -511,7 +513,7 @@ Verify at desktop and narrow widths:
 7. confirm light and dark themes and mobile full-screen profile behavior;
 8. inspect console for errors.
 
-- [ ] **Step 5: Complete docs and diff audit**
+- [x] **Step 5: Complete docs and diff audit**
 
 Mark implemented acceptance criteria and completed plan checkboxes only after evidence exists.
 
@@ -519,7 +521,7 @@ Run: `git diff --check`
 
 Expected: no whitespace errors and `git status --short` contains only intended tracked changes plus the preserved user-owned UX audit file.
 
-- [ ] **Step 6: Commit verified implementation documentation**
+- [x] **Step 6: Commit verified implementation documentation**
 
 ```powershell
 git add docs/superpowers/specs/2026-07-13-career-atlas-layout-search-design.md docs/superpowers/plans/2026-07-13-career-atlas-layout-search.md
