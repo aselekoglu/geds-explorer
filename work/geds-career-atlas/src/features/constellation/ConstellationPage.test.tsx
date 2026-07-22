@@ -6,31 +6,38 @@ const rootNode={org_id:"statcan",name:"Statistics Canada",depth:0,child_count:1,
 const leafNode={org_id:"ai-team",name:"AI Team",parent_id:"statcan",depth:1,child_count:0,direct_people_count:12,descendant_people_count:12}
 const page=(nodes:typeof rootNode[])=>({nodes,limit:2000,truncated:false,snapshot_id:"snapshot",etag:"etag"})
 
-it("drills bubbles, returns one level with Back, and never opens profile from the bubble",async()=>{
+it("opens facts on one click and drills into a bubble on double click",async()=>{
   const onProfile=vi.fn()
   const constellationSlice=vi.fn(async(rootId?:string)=>rootId==="statcan"?page([leafNode as typeof rootNode]):page([rootNode]))
   render(<ConstellationPage client={{constellationSlice}} onProfile={onProfile}/>)
-  fireEvent.click(await screen.findByRole("option",{name:/Statistics Canada/i}))
+  const node=await screen.findByRole("option",{name:/Statistics Canada/i})
+  fireEvent.click(node)
+  expect(await screen.findByText("People in this team")).toBeVisible()
+  expect(constellationSlice).toHaveBeenCalledTimes(1)
+  fireEvent.doubleClick(node)
   await waitFor(()=>expect(constellationSlice).toHaveBeenLastCalledWith("statcan",expect.any(AbortSignal)))
   expect(onProfile).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole("button",{name:"Back"}))
-  await waitFor(()=>expect(constellationSlice).toHaveBeenLastCalledWith(undefined,expect.any(AbortSignal)))
+  await waitFor(()=>expect(screen.getByRole("option",{name:/Statistics Canada/i})).toBeVisible())
   expect(screen.queryByRole("button",{name:"Back"})).not.toBeInTheDocument()
 })
 
-it("selects a leaf without requesting an empty slice",async()=>{
+it("opens a leaf's details without requesting an empty slice",async()=>{
   const constellationSlice=vi.fn(async()=>page([leafNode as typeof rootNode]))
   render(<ConstellationPage client={{constellationSlice}}/>)
   fireEvent.click(await screen.findByRole("option",{name:/AI Team/i}))
-  expect(await screen.findByRole("status",{name:""})).toHaveTextContent("No child teams")
+  expect(await screen.findByText("People in this team")).toBeVisible()
   expect(constellationSlice).toHaveBeenCalledTimes(1)
 })
 
-it("shows hover facts and opens profile only from the explicit action",async()=>{
+it("opens fixed facts only after click and opens profile from the explicit action",async()=>{
   const onProfile=vi.fn()
   const client={constellationSlice:async()=>page([rootNode])}
   render(<ConstellationPage client={client} onProfile={onProfile}/>)
-  fireEvent.mouseEnter(await screen.findByRole("button",{name:"Statistics Canada"}))
+  const option=await screen.findByRole("button",{name:"Statistics Canada"})
+  fireEvent.mouseEnter(option)
+  expect(screen.queryByText("People in this team")).not.toBeInTheDocument()
+  fireEvent.click(option)
   expect(await screen.findByText("People in this team")).toBeVisible()
   expect(screen.getByText("200")).toBeVisible()
   expect(screen.getByText("2,400")).toBeVisible()
@@ -45,6 +52,60 @@ it("reloads and resets hierarchy when institution root changes",async()=>{
   rerender(<ConstellationPage client={{constellationSlice}} rootOrgId="department-b"/>)
   await waitFor(()=>expect(constellationSlice).toHaveBeenLastCalledWith("department-b",expect.any(AbortSignal)))
   expect(screen.queryByRole("button",{name:"Back"})).not.toBeInTheDocument()
+})
+
+it("dismisses selected facts when the map background is clicked",async()=>{
+  render(<ConstellationPage client={{constellationSlice:async()=>page([rootNode])}}/>)
+  const option=await screen.findByRole("button",{name:"Statistics Canada"})
+  fireEvent.mouseEnter(option)
+  expect(screen.queryByText("People in this team")).not.toBeInTheDocument()
+  fireEvent.click(option)
+  expect(await screen.findByText("People in this team")).toBeVisible()
+  fireEvent.click(screen.getByTestId("constellation-stage"))
+  expect(screen.queryByText("People in this team")).not.toBeInTheDocument()
+})
+
+it("uses the requested Dot Field interaction tuning",async()=>{
+  render(<ConstellationPage client={{constellationSlice:async()=>page([rootNode])}}/>)
+  const stage=await screen.findByTestId("constellation-stage")
+  const field=stage.querySelector(".dot-field")
+  expect(field).toHaveAttribute("data-bulge-strength","58")
+  expect(field).toHaveAttribute("data-dot-spacing","18")
+  expect(field).toHaveAttribute("data-cursor-radius","600")
+  expect(field).toHaveAttribute("data-wave-amplitude","1")
+  expect(field).toHaveAttribute("data-glow-radius","110")
+  expect(field).toHaveAttribute("data-active-frame-rate","60")
+})
+
+it("does not repeat the selected root organization inside its child bubble map",async()=>{
+  const constellationSlice=vi.fn(async(rootId?:string)=>rootId==="statcan"?page([rootNode,leafNode as typeof rootNode]):page([rootNode]))
+  render(<ConstellationPage client={{constellationSlice}}/>)
+  const node=await screen.findByRole("option",{name:/Statistics Canada/i})
+  fireEvent.click(node)
+  expect(await screen.findByText("People in this team")).toBeVisible()
+  expect(constellationSlice).toHaveBeenCalledTimes(1)
+  fireEvent.doubleClick(node)
+  expect(await screen.findByRole("option",{name:/AI Team/i})).toBeVisible()
+  expect(screen.queryByRole("option",{name:/Statistics Canada/i})).not.toBeInTheDocument()
+})
+
+it("ignores an out-of-order drill response and commits only the newest level",async()=>{
+  let resolveA:(value:ReturnType<typeof page>)=>void=()=>{}
+  let resolveB:(value:ReturnType<typeof page>)=>void=()=>{}
+  const a={...rootNode,org_id:"a",name:"A Team"}
+  const b={...rootNode,org_id:"b",name:"B Team"}
+  const client={constellationSlice:vi.fn((rootId?:string)=>{
+    if(rootId==="a")return new Promise<ReturnType<typeof page>>(resolve=>{resolveA=resolve})
+    if(rootId==="b")return new Promise<ReturnType<typeof page>>(resolve=>{resolveB=resolve})
+    return Promise.resolve(page([a,b]))
+  })}
+  render(<ConstellationPage client={client}/>)
+  fireEvent.doubleClick(await screen.findByRole("option",{name:"A Team"}))
+  fireEvent.doubleClick(screen.getByRole("option",{name:"B Team"}))
+  resolveB(page([{...leafNode,org_id:"b-child",name:"B child"} as typeof rootNode]))
+  await screen.findByRole("option",{name:"B child"})
+  resolveA(page([{...leafNode,org_id:"a-child",name:"A child"} as typeof rootNode]))
+  await waitFor(()=>expect(screen.queryByRole("option",{name:"A child"})).not.toBeInTheDocument())
 })
 
 it("applies shared interest filters to illuminated teams",async()=>{

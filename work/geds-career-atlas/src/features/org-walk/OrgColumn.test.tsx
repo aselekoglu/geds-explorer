@@ -35,3 +35,8 @@ it("keeps drill and profile actions as independent sibling controls",()=>{
   expect(onProfile).toHaveBeenCalledWith("org-42")
   expect(onDrill).toHaveBeenCalledTimes(1)
 })
+
+it("marks the selected row even when it is a leaf",()=>{
+  render(<OrgColumn label="Teams" items={[items[43]]} columnIndex={0} expandedId="org-43" onDrill={vi.fn()} onProfile={vi.fn()} onBack={vi.fn()}/> )
+  expect(screen.getByRole("button",{name:/^Organization 43\./})).toHaveAttribute("aria-current","true")
+})

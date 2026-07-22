@@ -7,7 +7,7 @@ it("renders public navigation and theme control without private operator actions
   expect(screen.getByRole("link", { name: /organization walk/i })).toBeVisible()
   expect(screen.queryByRole("link", { name: /constellation/i })).not.toBeInTheDocument()
   expect(screen.queryByRole("link", { name: /tours/i })).not.toBeInTheDocument()
-  expect(screen.getByLabelText("Theme")).toBeVisible()
+  expect(screen.getByRole("button",{name:/Theme: (Dark|Light)/})).toBeVisible()
   expect(screen.queryByText(/private admin/i)).not.toBeInTheDocument()
   expect(screen.queryByText(/start crawler|run history|schedules|snapshot data/i)).not.toBeInTheDocument()
 })

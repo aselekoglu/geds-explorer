@@ -8,22 +8,23 @@ beforeEach(()=>{
   vi.stubGlobal("matchMedia",vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
 })
 
-it("defaults Career Atlas to light and persists an explicit dark choice",()=>{
+it("toggles from light to dark with one persistent button",()=>{
   render(<ThemeControl/>)
   expect(document.documentElement.dataset.theme).toBe("light")
 
-  fireEvent.change(screen.getByLabelText("Theme"),{target:{value:"dark"}})
+  fireEvent.click(screen.getByRole("button",{name:"Theme: Dark"}))
 
   expect(document.documentElement.dataset.theme).toBe("dark")
   expect(localStorage.getItem("geds-career-theme")).toBe("dark")
 })
 
-it("resolves the system choice and stores it independently",()=>{
-  vi.stubGlobal("matchMedia",vi.fn().mockReturnValue({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
+it("restores a saved dark choice and toggles back to light",()=>{
+  localStorage.setItem("geds-career-theme","dark")
   render(<ThemeControl/>)
 
-  fireEvent.change(screen.getByLabelText("Theme"),{target:{value:"system"}})
-
   expect(document.documentElement.dataset.theme).toBe("dark")
-  expect(localStorage.getItem("geds-career-theme")).toBe("system")
+  fireEvent.click(screen.getByRole("button",{name:"Theme: Light"}))
+
+  expect(document.documentElement.dataset.theme).toBe("light")
+  expect(localStorage.getItem("geds-career-theme")).toBe("light")
 })

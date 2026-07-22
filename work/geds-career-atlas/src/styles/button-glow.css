@@ -1,0 +1,45 @@
+button {
+  --button-glow-x: 50%;
+  --button-glow-y: 50%;
+  position: relative;
+  isolation: isolate;
+}
+
+button::before {
+  position: absolute;
+  z-index: 3;
+  border-radius: inherit;
+  background: radial-gradient(
+    88px circle at var(--button-glow-x) var(--button-glow-y),
+    color-mix(in srgb, var(--accent-strong) 95%, white) 0,
+    color-mix(in srgb, var(--accent) 52%, transparent) 34%,
+    transparent 68%
+  );
+  content: "";
+  inset: -1px;
+  opacity: 0;
+  padding: 1px;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+button:hover::before,
+button:focus-visible::before {
+  opacity: 1;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+
+button:hover:not(:disabled),
+button:focus-visible:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent), 0 8px 24px color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+button:disabled::before { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  button::before { transition: none; }
+}

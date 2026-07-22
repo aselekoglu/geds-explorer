@@ -1,0 +1,49 @@
+.constellation-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 280ms cubic-bezier(.2, .8, .2, 1), filter 220ms ease;
+}
+
+.constellation-stage svg circle.constellation-bubble-surface {
+  fill: url(#constellation-bubble-surface);
+  stroke: color-mix(in srgb, var(--accent-strong) 76%, white);
+  stroke-width: 1.35;
+  filter: drop-shadow(0 10px 18px rgb(1 15 20 / 24%));
+  transition: filter 220ms ease, stroke-width 220ms ease;
+}
+
+.constellation-stage svg circle.constellation-bubble-sheen {
+  fill: url(#constellation-bubble-sheen);
+  opacity: .28;
+  pointer-events: none;
+  transition: opacity 140ms linear;
+}
+
+.constellation-stage svg circle.constellation-bubble-border {
+  fill: none;
+  stroke: url(#constellation-bubble-border);
+  stroke-width: 1.2px;
+  opacity: .52;
+  pointer-events: none;
+  transition: opacity 140ms linear, stroke-width 140ms linear;
+}
+
+.constellation-node:hover,
+.constellation-node:focus {
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 46%, transparent));
+}
+
+.constellation-node:hover > circle.constellation-bubble-surface,
+.constellation-node:focus > circle.constellation-bubble-surface,
+.constellation-stage svg circle.constellation-bubble-surface.is-selected {
+  fill: url(#constellation-bubble-surface-selected);
+  stroke: var(--accent-strong);
+  stroke-width: 2.6;
+}
+
+.constellation-node:focus circle.constellation-bubble-sheen,
+.constellation-node:focus circle.constellation-bubble-border { stroke-width: inherit; }
+
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+  .constellation-node { transition: none; }
+}

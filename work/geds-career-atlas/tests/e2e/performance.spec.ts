@@ -36,10 +36,13 @@ test("cached initial Discover is useful under 2.5 seconds and feedback appears u
       document.querySelector("input")!.addEventListener("input", () => {
         const started = performance.now()
         const check = () => {
-          if (document.body.textContent?.includes("Finding matching teams")) state.__feedbackMs = performance.now() - started
-          else requestAnimationFrame(check)
+          if (!document.body.textContent?.includes("Finding matching teams")) return
+          state.__feedbackMs = performance.now() - started
+          observer.disconnect()
         }
-        requestAnimationFrame(check)
+        const observer = new MutationObserver(check)
+        observer.observe(document.body, { childList: true, characterData: true, subtree: true })
+        check()
       }, { once: true })
     })
     await page.getByRole("textbox", { name: "Career interest" }).fill("AI")

@@ -18,5 +18,9 @@ import "./styles/filters.css"
 import "./styles/discover.css"
 import "./styles/people.css"
 import "./styles/theme-overrides.css"
+import "./styles/border-glow.css"
+import "./styles/premium.css"
+import "./styles/button-glow.css"
+import "./styles/magic-bubbles.css"
 initializeTheme()
 createRoot(document.getElementById("root")!).render(<StrictMode><LanguageProvider><App /></LanguageProvider></StrictMode>)

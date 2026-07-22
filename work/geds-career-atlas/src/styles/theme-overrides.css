@@ -8,7 +8,7 @@
 .saved-map button:hover,.saved-map button:focus-visible{border-color:var(--accent);color:var(--accent)}
 .tour-list small,.org-explorer>nav,.org-breadcrumb nav{color:var(--muted)}
 .org-root-list button{border-color:var(--line);background:var(--surface);color:var(--text)}
-.org-root-list button:hover,.org-root-list button:focus-visible,.org-root-list button[aria-expanded=true]{border-color:var(--accent);background:var(--surface2)}
+.org-root-list button:hover,.org-root-list button:focus-visible,.org-root-list button[aria-current=true]{border-color:var(--accent);background:var(--surface2)}
 .constellation-stage{background-image:radial-gradient(color-mix(in srgb,var(--line) 70%,transparent) 1px,transparent 1px)}
 .constellation-evidence,.constellation-stage [role=listbox]:focus-within{background:color-mix(in srgb,var(--surface) 96%,transparent);border-color:var(--line);box-shadow:var(--shadow);color:var(--text)}
 .constellation-evidence button{border-color:var(--accent);background:var(--surface2);color:var(--accent)}

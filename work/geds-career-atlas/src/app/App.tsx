@@ -12,6 +12,7 @@ import { useLanguage } from "../i18n/i18n"
 import { AboutPage } from "../routes/about"
 import { readPublicView, type PublicView } from "../state/publicView"
 import { ThemeControl } from "../theme/ThemeControl"
+import { ButtonGlowController } from "../components/ButtonGlowController"
 
 function readUrlState(){
   const params=new URLSearchParams(location.search)
@@ -53,9 +54,10 @@ export function App(){
   }
 
   return <div className="app-shell">
+    <ButtonGlowController/>
     <a className="skip-link" href="#main">{t("app.skip")}</a>
     <aside className="side-nav" aria-label="Primary navigation">
-      <div className="brand"><span className="brand-mark" aria-hidden="true">✦</span><span>GEDS <b>{t("app.brand")}</b></span></div>
+      <div className="brand"><span className="brand-mark" aria-hidden="true">CA</span><span className="brand-copy">GEDS <b>{t("app.brand")}</b></span></div>
       <nav>
         <a href="#discover" aria-current={view==="discover"?"page":undefined} className={view==="discover"?"active":undefined} onClick={()=>setView("discover")}>{t("nav.discover")}</a>
         <a href="#explorer" aria-current={view==="explorer"?"page":undefined} className={view==="explorer"?"active":undefined} onClick={()=>setView("explorer")}>{t("nav.explorer")}</a>
@@ -64,7 +66,7 @@ export function App(){
       <div className="nav-footer">{t("app.source")}<br/>{t("app.publicReadOnly")}</div>
     </aside>
     <main id="main">
-      {view!=="about"&&<><header className="command-bar"><label><span className="sr-only">{t("app.interest")}</span><input value={query} onChange={event=>updateQuery(event.target.value)} placeholder={t("app.placeholder")}/></label><ThemeControl/><button type="button" className="language" onClick={()=>setLanguage(language==="en"?"fr":"en")}>{language==="en"?"Français":"English"}</button></header><FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status??"loading"} onChange={updateScope}/></>}
+      {view!=="about"&&<><header className="command-bar"><label><span className="command-bar__label">{t("app.interest")}</span><input value={query} onChange={event=>updateQuery(event.target.value)} placeholder={t("app.placeholder")}/></label><ThemeControl/><button type="button" className="language" onClick={()=>setLanguage(language==="en"?"fr":"en")}>{language==="en"?"Français":"English"}</button></header><FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status??"loading"} onChange={updateScope}/></>}
       {view==="discover"&&<div className={`discover-workspace${query?" discover-workspace--searching":""}`}>{query&&<DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope}/>}<ConstellationPage client={client} query={query} focus={selectedOrgId??undefined} onProfile={selectOrg} scope={scope} rootOrgId={selectedDepartment?.department_id}/></div>}
       {view==="explorer"&&<OrganizationExplorer client={client} onProfile={selectOrg} selectedOrgId={selectedOrgId} rootOrg={institutionRoot} query={query} institutionName={scope.department}/>}
       {view==="about"&&<AboutPage client={client}/>} 

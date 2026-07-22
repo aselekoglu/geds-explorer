@@ -1,0 +1,24 @@
+# Discover Canvas Simplification Checklist
+
+- [ ] Capture pointer and stale-frame baselines.
+- [ ] Introduce loaded/pending constellation view state.
+- [ ] Fetch before atomically committing a drill-down level.
+- [ ] Cache prior slices for instant Back navigation.
+- [ ] Convert hover facts to click-selected fixed panel.
+- [ ] Add blank-canvas and Escape dismissal.
+- [ ] Remove the global Magic Bento 480px spotlight scan.
+- [ ] Remove pointer-driven tilt/magnetism from all bubbles.
+- [ ] Keep static gradient, sheen, selected ring, and active-bubble CSS feedback.
+- [ ] Replace Ripple Grid with optimized Dot Field.
+- [ ] Configure `bulgeStrength=58`.
+- [ ] Configure `dotSpacing=18`.
+- [ ] Configure `cursorRadius=600`.
+- [ ] Configure `waveAmplitude=1`.
+- [ ] Configure `glowRadius=110`.
+- [ ] Cap Dot Field at 30 FPS and pause it when hidden/offscreen.
+- [ ] Support static reduced-motion rendering.
+- [ ] Remove Ripple Grid and unused `ogl` dependency.
+- [ ] Pass unit tests and production build.
+- [ ] Pass all E2E and axe checks.
+- [ ] Meet pointer, draw-time, long-task, and stale-frame performance gates.
+- [ ] Review light/dark desktop and 390px mobile screenshots.

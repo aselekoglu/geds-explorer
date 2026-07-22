@@ -17,12 +17,15 @@ it("starts inside the selected institution root",async()=>{
 })
 
 it("opens a selected organization in the next hierarchy column", async () => {
-  const client = { rootChildren: async () => ({ items: [{ org_id: "root-1", name: "Digital Services", depth: 0, child_count: 1, direct_people_count: 2, descendant_people_count: 12 }], snapshot_id: "snapshot", etag: "etag" }), children: async () => ({ items: [{ org_id: "team-1", name: "AI Centre", parent_id: "root-1", depth: 1, child_count: 0, direct_people_count: 4, descendant_people_count: 4 }], snapshot_id: "snapshot", etag: "etag" }) }
+  const client = { rootChildren: async () => ({ items: [{ org_id: "root-1", name: "Digital Services", depth: 0, child_count: 1, direct_people_count: 2, descendant_people_count: 12 }], snapshot_id: "snapshot", etag: "etag" }), children: async () => ({ items: [{ org_id: "team-1", name: "AI Centre", parent_id: "root-1", depth: 1, child_count: 0, direct_people_count: 4, descendant_people_count: 4 }], snapshot_id: "snapshot", etag: "etag" }), people: async () => ({items:[{person_id:"p1",display_name:"Maya Chen",observed_title:"Data Scientist",observed_classifications:[],org_id:"team-1",organization_name:"AI Centre",snapshot_id:"snapshot",snapshot_as_of:"2026-07-09",source_url:"https://geds.example/p1"}],total:1,limit:200,offset:0,available_classifications:[],snapshot_id:"snapshot",quality_status:"complete",etag:"etag"}) }
   render(<OrganizationExplorer client={client} />)
   fireEvent.click(await screen.findByRole("button", { name: /^Digital Services\./i }))
-  fireEvent.click(await screen.findByRole("button", { name: /^AI Centre\./i }))
+  const leaf=await screen.findByRole("button", { name: /^AI Centre\./i })
+  fireEvent.click(leaf)
+  expect(leaf).toHaveAttribute("aria-current","true")
   expect(await screen.findByText("Digital Services / AI Centre")).toBeInTheDocument()
-  expect(screen.getByText("No child teams")).toBeInTheDocument()
+  expect(await screen.findByText("Maya Chen")).toBeInTheDocument()
+  expect(screen.queryByText("No child teams")).not.toBeInTheDocument()
 })
 
 it("opens Team Profile only from the compact detail action",async()=>{
@@ -63,6 +66,7 @@ it("shows institution-scoped deduplicated matching teams and restores a result p
   const client={search,rootChildren:async()=>({items:[root],snapshot_id:"snapshot",etag:"etag"}),ancestors:async()=>({items:[root,branch,team],snapshot_id:"snapshot",etag:"etag"}),children:async(id:string)=>({items:id==="department-a"?[branch]:id==="branch"?[team]:[],snapshot_id:"snapshot",etag:"etag"})}
   render(<OrganizationExplorer client={client} rootOrg={root} query="Data Scientist" institutionName="Department A" onProfile={onProfile}/>)
   const result=await screen.findByRole("button",{name:/Open AI Team in hierarchy/i})
+  expect(screen.getByRole("heading",{name:"Teams matching “Data Scientist”"})).toBeVisible()
   expect(screen.getAllByText("AI Team")).toHaveLength(1)
   expect(screen.queryByText("Other Team")).not.toBeInTheDocument()
   const matchCard=result.closest("article")
