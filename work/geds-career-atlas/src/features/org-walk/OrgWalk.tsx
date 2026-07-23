@@ -1,11 +1,13 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useRef, useState } from "react"
+import { BreadcrumbTrail, type BreadcrumbTrailItem } from "../../components/BreadcrumbTrail"
 import { useLanguage } from "../../i18n/i18n"
 
 type OrgWalkProps = { path: string[] }
 
 export function OrgWalk({ path }: OrgWalkProps) {
   const {t,formatNumber}=useLanguage()
+  const breadcrumbItems: BreadcrumbTrailItem[] = path.map((label, index) => ({ key: `${index}-${label}`, label }))
   const scrollRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState(Math.max(0, Math.min(path.length - 1, 59)))
   const virtualizer = useVirtualizer({
@@ -17,7 +19,7 @@ export function OrgWalk({ path }: OrgWalkProps) {
   const items = virtualizer.getVirtualItems().length ? virtualizer.getVirtualItems() : path.slice(0, 60).map((_, index) => ({ index, key: index, start: index * 36, size: 36 }))
 
   return <section className="org-walk">
-    <nav aria-label={t("orgWalk.legacyPath")}>{path.join(" / ")}</nav>
+    <BreadcrumbTrail items={breadcrumbItems} label={t("orgWalk.legacyPath")} />
     <p className="org-walk-count">{t("orgWalk.legacyCount",{count:formatNumber(path.length)})}</p>
     <div ref={scrollRef} className="org-walk-scroll" role="tree" aria-label={t("orgWalk.legacyHierarchy")} onKeyDown={event => {
       if (event.key === "ArrowDown") { event.preventDefault(); setActive(value => Math.min(value + 1, path.length - 1)) }

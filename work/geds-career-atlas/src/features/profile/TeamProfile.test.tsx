@@ -10,6 +10,11 @@ it("does not imply a vacancy when no source marker exists",()=>{
 
 it("shows observed evidence without inventing a mandate or job",()=>{
   render(<TeamProfile name="AI Centre" roles={["Data Scientist","Data Scientist",""]} profile={{org_id:"ai",department_name:"Digital Services",canonical_path:["Digital Services","AI Centre"],direct_people_count:4,descendant_people_count:9,child_count:2,snapshot_id:"snapshot"}} />)
+  const breadcrumb = screen.getByRole("navigation", { name: "Selected organization path" })
+  expect(breadcrumb.querySelector("ol")).toBeInTheDocument()
+  expect(breadcrumb.querySelectorAll("li")).toHaveLength(2)
+  expect(breadcrumb.querySelector('[aria-current="page"]')).toHaveTextContent("AI Centre")
+  expect(screen.queryByText("Digital Services / AI Centre")).not.toBeInTheDocument()
   expect(screen.getByText("Observed roles")).toBeVisible()
   expect(screen.getByRole("button",{name:"Filter by Data Scientist"})).toHaveTextContent(/Data Scientist\s*·\s*2/)
   expect(screen.getByText(/No title recorded · 1/i)).toBeVisible()

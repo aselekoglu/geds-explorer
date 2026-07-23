@@ -1,9 +1,8 @@
 .org-virtual-space { position: relative; width: 100%; }
 .org-breadcrumb { display: flex; align-items: center; gap: 8px; margin: 14px 0; }
-.org-breadcrumb nav { color: #c4d7ea; font-size: 13px; }
-.org-breadcrumb button { display: none; border: 1px solid #35516e; border-radius: 6px; background: #0a1e35; color: var(--text); }
+.org-breadcrumb .breadcrumb-trail { flex: 1; }
+.org-breadcrumb__back { display: none; border: 1px solid #35516e; border-radius: 6px; background: #0a1e35; color: var(--text); }
 
 @media (max-width: 760px) {
-  .org-breadcrumb button { display: inline-grid; place-items: center; min-width: 44px; }
-  .org-breadcrumb nav { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .org-breadcrumb__back { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; }
 }

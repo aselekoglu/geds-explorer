@@ -1,4 +1,4 @@
-.filter-rail--functional select,.role-filters select,.saved-map button,.org-breadcrumb button,.constellation-heading button{border-color:var(--line);background:var(--surface2);color:var(--text)}
+.filter-rail--functional select,.role-filters select,.saved-map button,.org-breadcrumb__back,.constellation-heading button{border-color:var(--line);background:var(--surface2);color:var(--text)}
 :root,
 [data-theme="light"] {
   --warning: #805400;
@@ -6,7 +6,7 @@
 
 .quality-chip{border-color:var(--warning);background:var(--warning-soft);color:var(--warning)}
 .saved-map button:hover,.saved-map button:focus-visible{border-color:var(--accent);color:var(--accent)}
-.tour-list small,.org-explorer>nav,.org-breadcrumb nav{color:var(--muted)}
+.tour-list small,.org-explorer>nav{color:var(--muted)}
 .org-root-list button{border-color:var(--line);background:var(--surface);color:var(--text)}
 .org-root-list button:hover,.org-root-list button:focus-visible,.org-root-list button[aria-current=true]{border-color:var(--accent);background:var(--surface2)}
 .constellation-stage{background-image:radial-gradient(color-mix(in srgb,var(--line) 70%,transparent) 1px,transparent 1px)}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { expect, it, vi } from "vitest"
 import { OrganizationExplorer } from "./OrganizationExplorer"
 
@@ -23,7 +23,9 @@ it("opens a selected organization in the next hierarchy column", async () => {
   const leaf=await screen.findByRole("button", { name: /^AI Centre\./i })
   fireEvent.click(leaf)
   expect(leaf).toHaveAttribute("aria-current","true")
-  expect(await screen.findByText("Digital Services / AI Centre")).toBeInTheDocument()
+  const path=await screen.findByRole("navigation",{name:"Selected organization path"})
+  expect(within(path).getAllByRole("listitem")).toHaveLength(2)
+  expect(within(path).getByText("AI Centre")).toHaveAttribute("aria-current","page")
   expect(await screen.findByText("Maya Chen")).toBeInTheDocument()
   expect(screen.queryByText("No child teams")).not.toBeInTheDocument()
 })
@@ -50,7 +52,43 @@ it("restores a deep shared path from selected URL state",async()=>{
     children:async(id:string)=>({items:id==="root-1"?[branch]:id==="branch-1"?[team]:[],snapshot_id:"snapshot",etag:"etag"}),
   }
   render(<OrganizationExplorer client={client} selectedOrgId="team-1"/>)
-  expect(await screen.findByLabelText("Selected organization path")).toHaveTextContent("Department / Branch / Team")
+  const path=await screen.findByRole("navigation",{name:"Selected organization path"})
+  expect(within(path).getAllByRole("listitem")).toHaveLength(3)
+  expect(within(path).getByText("Team")).toHaveAttribute("aria-current","page")
+  expect(within(path).getByText("Team").closest("button")).toBeNull()
+
+  fireEvent.click(within(path).getByRole("button",{name:"Branch"}))
+
+  const truncatedPath=await screen.findByRole("navigation",{name:"Selected organization path"})
+  expect(within(truncatedPath).getAllByRole("listitem")).toHaveLength(2)
+  expect(within(truncatedPath).getByText("Branch")).toHaveAttribute("aria-current","page")
+  expect(within(truncatedPath).queryByText("Team")).not.toBeInTheDocument()
+})
+
+it("truncates a restored institution path using root-scoped column indices",async()=>{
+  const root={org_id:"department-a",name:"Department A",depth:0,child_count:1,direct_people_count:0,descendant_people_count:20}
+  const branch={org_id:"branch",name:"Digital Branch",parent_id:"department-a",depth:1,child_count:1,direct_people_count:2,descendant_people_count:10}
+  const team={org_id:"team",name:"AI Team",parent_id:"branch",depth:2,child_count:0,direct_people_count:4,descendant_people_count:4}
+  const client={
+    search:async()=>({items:[{entity_id:"p1",entity_kind:"person" as const,org_id:"team",title:"Data Scientist",organization_name:"AI Team",department_name:"Department A",score:100,confidence:"high" as const,evidence:[]}],snapshot_id:"snapshot",etag:"etag"}),
+    rootChildren:async()=>({items:[root],snapshot_id:"snapshot",etag:"etag"}),
+    ancestors:async()=>({items:[root,branch,team],snapshot_id:"snapshot",etag:"etag"}),
+    children:async(id:string)=>({items:id==="department-a"?[branch]:id==="branch"?[team]:[],snapshot_id:"snapshot",etag:"etag"}),
+  }
+  const {container}=render(<OrganizationExplorer client={client} rootOrg={root} query="Data Scientist" institutionName="Department A"/>)
+  fireEvent.click(await screen.findByRole("button",{name:/Open AI Team in hierarchy/i}))
+
+  const restoredPath=await screen.findByRole("navigation",{name:"Selected organization path"})
+  expect(within(restoredPath).getAllByRole("listitem")).toHaveLength(3)
+  expect(container.querySelector(".org-empty-column")).toHaveTextContent("AI Team")
+
+  fireEvent.click(within(restoredPath).getByRole("button",{name:"Digital Branch"}))
+
+  const truncatedPath=await screen.findByRole("navigation",{name:"Selected organization path"})
+  expect(within(truncatedPath).getAllByRole("listitem")).toHaveLength(2)
+  expect(within(truncatedPath).getByText("Digital Branch")).toHaveAttribute("aria-current","page")
+  expect(within(truncatedPath).queryByText("AI Team")).not.toBeInTheDocument()
+  expect(container.querySelector(".org-empty-column")).toBeNull()
 })
 
 it("shows institution-scoped deduplicated matching teams and restores a result path",async()=>{
@@ -74,6 +112,8 @@ it("shows institution-scoped deduplicated matching teams and restores a result p
   expect(onProfile).toHaveBeenCalledWith("team")
   onProfile.mockClear()
   fireEvent.click(result)
-  expect(await screen.findByLabelText("Selected organization path")).toHaveTextContent("Department A / Digital Branch / AI Team")
+  const path=await screen.findByRole("navigation",{name:"Selected organization path"})
+  expect(within(path).getAllByRole("listitem")).toHaveLength(3)
+  expect(within(path).getByText("AI Team")).toHaveAttribute("aria-current","page")
   expect(onProfile).not.toHaveBeenCalled()
 })
