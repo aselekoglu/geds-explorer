@@ -14,8 +14,7 @@ export function DataMethodology({ meta }: { meta: AtlasMeta }) {
   const { t, formatDate, formatNumber } = useLanguage()
   const quality = meta.quality_status.replaceAll("_", " ")
   return <section className="methodology" aria-labelledby="about-data-heading">
-    <p className="eyebrow">{t("about.eyebrow")}</p>
-    <h2 id="about-data-heading">{t("about.title")}</h2>
+    <h2 id="about-data-heading">{t("about.dataTitle")}</h2>
     <p className="methodology-intro">{t("about.intro")}</p>
     <dl className="methodology-facts">
       <div><dt>{t("about.snapshot")}</dt><dd>{t("about.asOf", { date: formatDate(meta.as_of_at) })}</dd></div>

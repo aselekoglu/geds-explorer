@@ -4,7 +4,7 @@ export const en = {
     explorer: "Organization Walk",
     constellation: "Constellation",
     tours: "Tours",
-    about: "About the data",
+    about: "About",
   },
   app: {
     skip: "Skip to content",
@@ -224,8 +224,11 @@ export const en = {
     noRoles: "No observed roles match these filters.",
   },
   about: {
-    eyebrow: "DATA METHOD",
-    title: "About the data",
+    eyebrow: "CAREER ATLAS",
+    pageTitle: "About",
+    generalIntro: "Career Atlas is a public, read-only way to explore how government teams and observed role titles connect. It is built to support curiosity and career research, never to replace official sources.",
+    loading: "Loading the data methodology…",
+    dataTitle: "About the data",
     intro: "A transparent guide to what this atlas knows, how it matches, and where it can be wrong.",
     snapshot: "Canonical snapshot",
     asOf: "As of {date}",

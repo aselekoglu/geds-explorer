@@ -82,6 +82,10 @@ def test_security_headers_and_bounded_input(career_client):
     assert response.status_code == 200
     assert response.json()["limit"] == 2000
     assert "default-src 'self'" in response.headers["content-security-policy"]
+    assert "script-src 'self' 'wasm-unsafe-eval'" in response.headers["content-security-policy"]
+    assert " 'unsafe-eval'" not in response.headers["content-security-policy"]
+    assert "connect-src 'self' blob:" in response.headers["content-security-policy"]
+    assert "img-src 'self' data: blob:" in response.headers["content-security-policy"]
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
     assert "access-control-allow-origin" not in response.headers

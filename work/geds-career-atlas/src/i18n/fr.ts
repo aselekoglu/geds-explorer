@@ -4,7 +4,7 @@ export const fr = {
     explorer: "Parcours organisationnel",
     constellation: "Constellation",
     tours: "Parcours",
-    about: "À propos des données",
+    about: "À propos",
   },
   app: {
     skip: "Aller au contenu",
@@ -224,8 +224,11 @@ export const fr = {
     noRoles: "Aucun rôle observé ne correspond à ces filtres.",
   },
   about: {
-    eyebrow: "MÉTHODE DES DONNÉES",
-    title: "À propos des données",
+    eyebrow: "ATLAS DES CARRIÈRES",
+    pageTitle: "À propos",
+    generalIntro: "L’Atlas des carrières est un outil public en lecture seule pour explorer les liens entre les équipes gouvernementales et les titres de rôles observés. Il favorise la recherche et la curiosité, sans remplacer les sources officielles.",
+    loading: "Chargement de la méthode des données…",
+    dataTitle: "À propos des données",
     intro: "Un guide transparent de ce que l’atlas sait, de sa méthode de correspondance et de ses limites.",
     snapshot: "Instantané canonique",
     asOf: "En date du {date}",

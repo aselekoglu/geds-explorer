@@ -1,0 +1,38 @@
+.lanyard-wrapper {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lanyard-wrapper canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none;
+}
+
+.lanyard-profile-host { pointer-events: none; }
+.lanyard-profile-content { pointer-events: auto; }
+
+.lanyard-wrapper--static {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 128px 9% 0 0;
+}
+
+.lanyard-wrapper--static .profile-card {
+  pointer-events: auto;
+}
+
+@media (max-width: 767px) {
+  .lanyard-wrapper--static { padding: 108px 5% 0 0; }
+  .lanyard-wrapper--static .profile-card {
+    width: 180px;
+  }
+}
