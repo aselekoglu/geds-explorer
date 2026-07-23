@@ -1,11 +1,24 @@
+:root,
+[data-theme="light"] {
+  --glow-gradient-teal: #1fa79d;
+  --glow-gradient-blue: #3a82c4;
+  --glow-gradient-amber: #d89a24;
+}
+
+[data-theme="dark"] {
+  --glow-gradient-teal: #61e0d5;
+  --glow-gradient-blue: #69b8ff;
+  --glow-gradient-amber: #ffc857;
+}
+
 .border-glow-card {
   --edge-proximity: 0;
   --cursor-angle: 45deg;
-  --edge-sensitivity: 34;
+  --edge-sensitivity: 15;
   --color-sensitivity: calc(var(--edge-sensitivity) + 20);
   --border-radius: 18px;
-  --glow-padding: 32px;
-  --cone-spread: 25;
+  --glow-padding: 56px;
+  --cone-spread: 27;
   position: relative;
   isolation: isolate;
   display: grid;
@@ -27,9 +40,9 @@
   transition: opacity .25s ease-out;
 }
 
-.border-glow-card:not(:hover):not(:focus-within)::before,
-.border-glow-card:not(:hover):not(:focus-within)::after,
-.border-glow-card:not(:hover):not(:focus-within) > .edge-light {
+.border-glow-card:not(.border-glow-card--sweeping):not(:hover):not(:focus-within)::before,
+.border-glow-card:not(.border-glow-card--sweeping):not(:hover):not(:focus-within)::after,
+.border-glow-card:not(.border-glow-card--sweeping):not(:hover):not(:focus-within) > .edge-light {
   opacity: 0;
   transition: opacity .65s ease-in-out;
 }

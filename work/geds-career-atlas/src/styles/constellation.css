@@ -24,3 +24,34 @@
 }
 
 .constellation-heading{justify-content:flex-start}.constellation-back{flex:0 0 auto}.constellation-error,.constellation-leaf-status,.constellation-pending{color:var(--muted);font-size:12px}.constellation-pending{margin:8px 0}.dot-field{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}.dot-field canvas{display:block;width:100%;height:100%}.constellation-stage>section,.constellation-stage>.constellation-info-panel{position:relative;z-index:1}.constellation-info-panel{position:absolute;right:16px;top:16px;z-index:5;width:min(290px,calc(100% - 32px));padding:14px;background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);color:var(--text)}.constellation-info-panel h2{margin:0 0 10px;font-size:16px;line-height:1.2;overflow-wrap:anywhere}.constellation-info-panel dl{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0}.constellation-info-panel dt{color:var(--muted);font-size:10px;line-height:1.2}.constellation-info-panel dd{margin:4px 0 0;font-weight:750}.constellation-info-panel button{width:100%;margin-top:12px;padding:8px;border:1px solid var(--accent);border-radius:6px;background:var(--surface2);color:var(--accent)}.constellation-info-panel__leaf{margin:10px 0 0;color:var(--muted);font-size:12px}@media(max-width:760px){.constellation-info-panel{top:auto;right:12px;bottom:12px;left:12px;width:auto;max-height:45%;overflow:auto}}
+
+.constellation-stage svg circle.constellation-bubble-surface {
+  fill: url(#constellation-bubble-surface);
+  stroke: color-mix(in srgb, var(--accent-strong) 76%, white);
+  stroke-width: 1.35;
+}
+
+.constellation-stage svg circle.constellation-bubble-sheen {
+  fill: url(#constellation-bubble-sheen);
+  opacity: .28;
+  pointer-events: none;
+}
+
+.constellation-stage svg circle.constellation-bubble-border {
+  fill: none;
+  stroke: url(#constellation-bubble-border);
+  stroke-width: 1.2px;
+  opacity: .52;
+  pointer-events: none;
+}
+
+.constellation-stage svg circle.constellation-bubble-surface.is-selected {
+  fill: url(#constellation-bubble-surface-selected);
+  stroke: var(--accent-strong);
+  stroke-width: 2.6;
+}
+
+.constellation-node:focus-visible > circle.constellation-bubble-surface {
+  stroke: var(--cyan);
+  stroke-width: 3;
+}

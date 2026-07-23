@@ -74,7 +74,7 @@ it("uses the requested Dot Field interaction tuning",async()=>{
   expect(field).toHaveAttribute("data-cursor-radius","600")
   expect(field).toHaveAttribute("data-wave-amplitude","1")
   expect(field).toHaveAttribute("data-glow-radius","110")
-  expect(field).toHaveAttribute("data-active-frame-rate","60")
+  expect(field).not.toHaveAttribute("data-active-frame-rate")
 })
 
 it("does not repeat the selected root organization inside its child bubble map",async()=>{

@@ -10,7 +10,7 @@ export function MatchCard({item}:{item:Item}){
   const {t}=useLanguage()
   const evidence=expanded?item.evidence:item.evidence.slice(0,3)
   const label=item.display_name||item.organization_name||item.title
-  return <BorderGlow as="article" aria-label={label} className={`match-card match-card--${item.entity_kind}`} glowIntensity={0.5} fillOpacity={0.045}>
+  return <BorderGlow as="article" aria-label={label} className={`match-card match-card--${item.entity_kind}`} fillOpacity={0.045}>
     <h2>{label}</h2>
     {item.entity_kind==="person"&&item.title&&<p className="match-title">{item.title}</p>}
     {item.department_name&&<p>{item.department_name}</p>}

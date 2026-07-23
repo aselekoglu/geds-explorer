@@ -37,10 +37,9 @@ it("opens details on one click and drills only on double click",()=>{
   expect(onDrill).toHaveBeenCalledWith(expect.objectContaining({id:"a"}))
 })
 
-it("keeps the premium bubble surface without global Magic Bento pointer attributes",()=>{
+it("renders a static layered premium bubble surface",()=>{
   const {container}=render(<Constellation nodes={[{id:"a",name:"AI Centre"}]}/>)
-  const svg=container.querySelector("svg")
-  expect(svg).not.toHaveAttribute("data-magic-bento-spotlight-radius")
+  expect(container.querySelector(".constellation-node")).not.toHaveAttribute("style")
   expect(container.querySelector(".constellation-bubble-surface")).toBeInTheDocument()
   expect(container.querySelector(".constellation-bubble-sheen")).toBeInTheDocument()
   expect(container.querySelector(".constellation-bubble-border")).toBeInTheDocument()

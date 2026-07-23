@@ -2,7 +2,7 @@ import { render } from "@testing-library/react"
 import { expect, it, vi } from "vitest"
 import { DotField } from "./DotField"
 
-it("coalesces pointer updates at 60fps, then stops until the field is dirty again",()=>{
+it("coalesces pointer updates into one native frame, then stops until the field is dirty again",()=>{
   const frames:Array<FrameRequestCallback>=[];const request=vi.fn((callback:FrameRequestCallback)=>{frames.push(callback);return frames.length})
   const intersections:Array<(entries:IntersectionObserverEntry[])=>void>=[]
   class TestIntersectionObserver { constructor(callback:(entries:IntersectionObserverEntry[])=>void){intersections.push(callback)} observe(){} disconnect(){} unobserve(){} }
@@ -15,13 +15,12 @@ it("coalesces pointer updates at 60fps, then stops until the field is dirty agai
   frames.shift()?.(100)
   expect(request).toHaveBeenCalledTimes(1)
   container.querySelector(".constellation-stage")!.dispatchEvent(new PointerEvent("pointermove",{clientX:10,clientY:10,bubbles:true}))
+  container.querySelector(".constellation-stage")!.dispatchEvent(new PointerEvent("pointermove",{clientX:14,clientY:14,bubbles:true}))
   expect(request).toHaveBeenCalledTimes(2)
   frames.shift()?.(110)
+  expect(request).toHaveBeenCalledTimes(2)
+  container.querySelector(".constellation-stage")!.dispatchEvent(new PointerEvent("pointermove",{clientX:18,clientY:18,bubbles:true}))
   expect(request).toHaveBeenCalledTimes(3)
-  frames.shift()?.(120)
-  expect(request).toHaveBeenCalledTimes(3)
-  container.querySelector(".constellation-stage")!.dispatchEvent(new PointerEvent("pointermove",{clientX:14,clientY:14,bubbles:true}))
-  expect(request).toHaveBeenCalledTimes(4)
   intersections[0]([{isIntersecting:false} as IntersectionObserverEntry])
   const pausedCalls=request.mock.calls.length
   frames.shift()?.(160)

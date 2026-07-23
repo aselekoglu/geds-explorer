@@ -1,4 +1,4 @@
-import { useCallback, useRef, type CSSProperties, type FocusEvent, type HTMLAttributes, type PointerEvent } from "react"
+import { useCallback, useEffect, useRef, type CSSProperties, type FocusEvent, type HTMLAttributes, type PointerEvent } from "react"
 
 type BorderGlowElement = "article" | "aside" | "div" | "section"
 
@@ -14,11 +14,14 @@ type BorderGlowProps = Omit<HTMLAttributes<HTMLElement>, "children"> & {
   coneSpread?: number
   colors?: string[]
   fillOpacity?: number
+  animated?: boolean
 }
 
+const defaultGradientColors = ["var(--glow-gradient-teal)", "var(--glow-gradient-blue)", "var(--glow-gradient-amber)"]
 const gradientPositions = ["80% 55%", "69% 34%", "8% 6%", "41% 38%", "86% 85%", "82% 18%", "51% 4%"]
 const gradientKeys = ["--gradient-one", "--gradient-two", "--gradient-three", "--gradient-four", "--gradient-five", "--gradient-six", "--gradient-seven"]
 const colorMap = [0, 1, 2, 0, 1, 2, 1]
+const sweepDuration = 1_100
 
 function parseHsl(value: string) {
   const match = value.match(/([\d.]+)\s*([\d.]+)%?\s*([\d.]+)%?/)
@@ -34,7 +37,7 @@ function buildGlowVars(glowColor: string, intensity: number) {
 }
 
 function buildGradientVars(colors: string[]) {
-  const palette = colors.length ? colors : ["#62d8ce"]
+  const palette = colors.length ? colors : defaultGradientColors
   const variables = Object.fromEntries(gradientKeys.map((key, index) => {
     const color = palette[Math.min(colorMap[index], palette.length - 1)]
     return [key, `radial-gradient(at ${gradientPositions[index]}, ${color} 0px, transparent 50%)`]
@@ -46,15 +49,16 @@ export function BorderGlow({
   as = "div",
   children,
   className = "",
-  edgeSensitivity = 34,
+  edgeSensitivity = 15,
   glowColor = "176 58 60",
   backgroundColor = "var(--surface)",
   borderRadius = 18,
-  glowRadius = 32,
-  glowIntensity = 0.72,
-  coneSpread = 25,
-  colors = ["#52cfc4", "#86bdb8", "#b8eee8"],
+  glowRadius = 56,
+  glowIntensity = 1.9,
+  coneSpread = 27,
+  colors = defaultGradientColors,
   fillOpacity = 0.12,
+  animated = true,
   style,
   onPointerMove,
   onFocusCapture,
@@ -62,7 +66,100 @@ export function BorderGlow({
   ...elementProps
 }: BorderGlowProps) {
   const cardRef = useRef<HTMLElement>(null)
+  const hasSweptRef = useRef(false)
   const Tag = as
+
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card || !animated || hasSweptRef.current) return
+    const element: HTMLElement = card
+
+    const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+    let frame = 0
+    let observer: IntersectionObserver | undefined
+    let started = false
+    let startTime: number | undefined
+    let disposed = false
+
+    function restoreInteractiveGlow() {
+      element.classList.remove("border-glow-card--sweeping")
+      if (!element.matches(":hover, :focus-within")) element.style.setProperty("--edge-proximity", "0")
+    }
+
+    function cancelSweep() {
+      if (frame) cancelAnimationFrame(frame)
+      frame = 0
+      started = false
+      startTime = undefined
+      restoreInteractiveGlow()
+    }
+
+    function finishSweep() {
+      frame = 0
+      started = false
+      hasSweptRef.current = true
+      observer?.disconnect()
+      observer = undefined
+      restoreInteractiveGlow()
+    }
+
+    function drawSweep(time: number) {
+      if (disposed || motionQuery?.matches) {
+        cancelSweep()
+        return
+      }
+      startTime ??= time
+      const progress = Math.min((time - startTime) / sweepDuration, 1)
+      element.style.setProperty("--cursor-angle", `${35 + progress * 360}deg`)
+      element.style.setProperty("--edge-proximity", "100")
+      if (progress >= 1) finishSweep()
+      else frame = requestAnimationFrame(drawSweep)
+    }
+
+    function startSweep() {
+      if (disposed || started || hasSweptRef.current || motionQuery?.matches) return
+      started = true
+      element.classList.add("border-glow-card--sweeping")
+      element.style.setProperty("--edge-proximity", "100")
+      frame = requestAnimationFrame(drawSweep)
+    }
+
+    function observeVisibility() {
+      if (disposed || hasSweptRef.current || motionQuery?.matches) return
+      if (!("IntersectionObserver" in window)) {
+        startSweep()
+        return
+      }
+      observer?.disconnect()
+      observer = new IntersectionObserver(entries => {
+        const entry = entries.find(item => item.target === element)
+        if (!entry) return
+        if (entry.isIntersecting && entry.intersectionRatio > 0) startSweep()
+        else if (started) cancelSweep()
+      }, { threshold: 0.01 })
+      observer.observe(element)
+    }
+
+    function handleMotionPreference() {
+      if (motionQuery?.matches) {
+        observer?.disconnect()
+        observer = undefined
+        cancelSweep()
+      } else {
+        observeVisibility()
+      }
+    }
+
+    motionQuery?.addEventListener?.("change", handleMotionPreference)
+    observeVisibility()
+
+    return () => {
+      disposed = true
+      motionQuery?.removeEventListener?.("change", handleMotionPreference)
+      observer?.disconnect()
+      cancelSweep()
+    }
+  }, [animated])
 
   const updateGlow = useCallback((x: number, y: number) => {
     const card = cardRef.current
