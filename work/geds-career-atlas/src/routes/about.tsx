@@ -9,13 +9,6 @@ const StaticProfileCard = lazy(() =>
   import("../features/about/profile-card/ProfileCard").then(module => ({ default: module.ProfileCard }))
 )
 
-function LanyardFallback() {
-  return <div className="lanyard-fallback" role="status" aria-label="Loading interactive lanyard">
-    <span className="lanyard-fallback__band" aria-hidden="true" />
-    <span className="lanyard-fallback__card" aria-hidden="true" />
-  </div>
-}
-
 class LanyardErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() { return { failed: true } }
@@ -40,13 +33,13 @@ export function AboutPage({ client }: { client: MetaClient }) {
       <header className="about-page__intro"><p className="eyebrow">{t("about.eyebrow")}</p><h1>{t("about.pageTitle")}</h1><p>{t("about.generalIntro")}</p></header>
       <aside className="about-page__developer" aria-label="Interactive developer lanyard">
         <LanyardErrorBoundary fallback={
-          <Suspense fallback={<LanyardFallback />}>
+          <Suspense fallback={null}>
             <div className="lanyard-wrapper lanyard-wrapper--static lanyard-fallback--unavailable" data-render-mode="error-fallback">
               <StaticProfileCard interactive={false} />
             </div>
           </Suspense>
         }>
-          <Suspense fallback={<LanyardFallback />}><Lanyard position={[0, 0, 45]} gravity={[0, -40, 0]} /></Suspense>
+          <Suspense fallback={null}><Lanyard position={[0, 0, 45]} gravity={[0, -40, 0]} /></Suspense>
         </LanyardErrorBoundary>
       </aside>
     </div>

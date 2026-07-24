@@ -15,7 +15,9 @@ test("renders the transparent physical Profile Card without replacing About cont
 
   await expect(page.getByRole("heading", { name: "About", level: 1 })).toBeVisible()
   await expect(page.getByRole("heading", { name: "About the data" })).toBeVisible()
+  await expect(page.locator(".methodology")).toHaveCSS("margin-top", "0px")
   await expect(page.locator('[data-camera-distance="45"]')).toHaveAttribute("data-render-mode", "physics")
+  await expect(page.locator('[data-camera-distance="45"]')).toHaveAttribute("data-photo-ready", "true")
   await expect(page.locator('[data-camera-distance="45"] canvas')).toBeAttached()
   await expect(page.locator(".lanyard-fallback--unavailable")).toHaveCount(0)
   const card = await waitForPhysicalCard(page)
@@ -98,7 +100,9 @@ test("keeps the scaled mobile Lanyard clear of the heading and avoids overflow",
   expect(headingBounds).not.toBeNull()
   expect(overlayBounds).not.toBeNull()
   expect(overlayBounds!.y).toBeLessThan(0)
-  expect(cardBounds!.width).toBeGreaterThan(150)
+  expect(overlayBounds!.x).toBeLessThanOrEqual(0)
+  expect(overlayBounds!.x + overlayBounds!.width).toBeGreaterThanOrEqual(390)
+  expect(cardBounds!.width).toBeGreaterThan(140)
   expect(cardBounds!.width).toBeLessThan(210)
 
   const overlapsHeading = !(

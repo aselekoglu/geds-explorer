@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react"
@@ -30,20 +29,10 @@ export type ProfileCardProps = {
   onDragCancel?: () => void
 }
 
-type PointerStyle = CSSProperties & {
-  "--profile-pointer-x": string
-  "--profile-pointer-y": string
-}
-
 type Gesture = ProfileCardPointer & {
   startX: number
   startY: number
   dragging: boolean
-}
-
-const centeredPointerStyle: PointerStyle = {
-  "--profile-pointer-x": "50%",
-  "--profile-pointer-y": "42%",
 }
 
 function pointerFromEvent(event: ReactPointerEvent<HTMLElement>): ProfileCardPointer {
@@ -96,14 +85,6 @@ export function ProfileCard({
     }
   }, [resetGesture])
 
-  const updateShine = (event: ReactPointerEvent<HTMLAnchorElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = rect.width > 0 ? Math.min(100, Math.max(0, ((event.clientX - rect.left) / rect.width) * 100)) : 50
-    const y = rect.height > 0 ? Math.min(100, Math.max(0, ((event.clientY - rect.top) / rect.height) * 100)) : 42
-    event.currentTarget.style.setProperty("--profile-pointer-x", `${x}%`)
-    event.currentTarget.style.setProperty("--profile-pointer-y", `${y}%`)
-  }
-
   const handlePointerDown = (event: ReactPointerEvent<HTMLAnchorElement>) => {
     if (!interactive || event.button !== 0) return
     gestureRef.current = {
@@ -120,7 +101,6 @@ export function ProfileCard({
   }
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLAnchorElement>) => {
-    updateShine(event)
     const gesture = gestureRef.current
     if (!interactive || !gesture || gesture.pointerId !== event.pointerId) return
 
@@ -163,7 +143,6 @@ export function ProfileCard({
     data-drag-state={dragging ? "dragging" : "idle"}
     data-profile-interactive={interactive ? "true" : "false"}
     data-profile-tilt="disabled"
-    style={centeredPointerStyle}
     onClick={handleClick}
     onDragStart={event => event.preventDefault()}
     onPointerDown={handlePointerDown}

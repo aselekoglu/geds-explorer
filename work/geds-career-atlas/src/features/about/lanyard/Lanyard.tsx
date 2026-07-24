@@ -16,6 +16,7 @@ import { MeshLineGeometry, MeshLineMaterial } from "meshline"
 import type { GLTF } from "three-stdlib"
 import * as THREE from "three"
 import ProfileCard, { type ProfileCardPointer } from "../profile-card/ProfileCard"
+import portrait from "../assets/ata-speaking-2.png"
 import cardGLB from "./card.glb"
 import lanyard from "./lanyard.png"
 import "./Lanyard.css"
@@ -67,6 +68,7 @@ type CardGLTF = GLTF & {
 
 type SmoothedRigidBody = RapierRigidBody & { lerped?: THREE.Vector3 }
 type BandMesh = THREE.Mesh<MeshLineGeometry, MeshLineMaterial>
+type DragBounds = { offsetX: number, offsetY: number, width: number, height: number }
 
 function supportsWebGL() {
   if (typeof document === "undefined") return false
@@ -94,6 +96,38 @@ function useReducedMotion() {
   }, [])
 
   return reducedMotion
+}
+
+function useImageReady(src: string, enabled: boolean) {
+  const [ready, setReady] = useState(() => !enabled)
+
+  useEffect(() => {
+    if (!enabled) {
+      setReady(true)
+      return
+    }
+
+    let mounted = true
+    const image = new Image()
+    const complete = () => {
+      const decoded = typeof image.decode === "function" ? image.decode().catch(() => undefined) : Promise.resolve()
+      void decoded.finally(() => { if (mounted) setReady(true) })
+    }
+
+    setReady(false)
+    image.addEventListener("load", complete, { once: true })
+    image.addEventListener("error", complete, { once: true })
+    image.src = src
+    if (image.complete) complete()
+
+    return () => {
+      mounted = false
+      image.removeEventListener("load", complete)
+      image.removeEventListener("error", complete)
+    }
+  }, [enabled, src])
+
+  return ready
 }
 
 function useLanyardActivity(target: React.RefObject<HTMLDivElement | null>) {
@@ -129,6 +163,7 @@ export default function Lanyard({
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768)
   const [webGLAvailable] = useState(supportsWebGL)
   const reducedMotion = useReducedMotion()
+  const photoReady = useImageReady(portrait, webGLAvailable && !reducedMotion)
   const isActive = useLanyardActivity(wrapperRef)
 
   useEffect(() => {
@@ -148,7 +183,18 @@ export default function Lanyard({
     </div>
   }
 
-  return <div ref={wrapperRef} className="lanyard-wrapper" data-camera-distance={position[2]} data-render-mode="physics">
+  if (!photoReady) {
+    return <div
+      ref={wrapperRef}
+      className="lanyard-wrapper"
+      data-camera-distance={position[2]}
+      data-render-mode="loading-photo"
+      data-photo-ready="false"
+      aria-busy="true"
+    />
+  }
+
+  return <div ref={wrapperRef} className="lanyard-wrapper" data-camera-distance={position[2]} data-render-mode="physics" data-photo-ready="true">
     <Canvas
       camera={{ position, fov }}
       dpr={[1, isMobile ? 1.5 : 2]}
@@ -192,12 +238,14 @@ function Band({
   const rot = useMemo(() => new THREE.Vector3(), [])
   const dir = useMemo(() => new THREE.Vector3(), [])
   const dragPointer = useRef<ProfileCardPointer | null>(null)
+  const dragBounds = useRef<DragBounds | null>(null)
   const dragPlaneZ = useRef(0)
   const segmentProps: RigidBodyProps = { type: "dynamic", canSleep: true, colliders: false, angularDamping: 4, linearDamping: 4 }
   const { nodes, materials } = useGLTF(cardGLB) as unknown as CardGLTF
   const texture = useTexture(lanyardImage || lanyard)
   const { camera, gl } = useThree()
   const cardScale = isMobile ? MOBILE_SCALE : 1
+  const originX = isMobile ? 2.5 : 4.5
   const profileCenterY = ATTACHMENT_Y + (PROFILE_CENTER_Y - ATTACHMENT_Y) * cardScale
   const metalGroupY = ATTACHMENT_Y + (METAL_GROUP_Y - ATTACHMENT_Y) * cardScale
 
@@ -227,17 +275,39 @@ function Band({
     return vec.copy(camera.position).add(dir.multiplyScalar((planeZ - camera.position.z) / dir.z))
   }
 
+  const keepCardInWrapper = (pointer: ProfileCardPointer): ProfileCardPointer => {
+    const bounds = dragBounds.current
+    if (!bounds) return pointer
+    const wrapper = gl.domElement.getBoundingClientRect()
+    const maxLeft = Math.max(wrapper.left, wrapper.right - bounds.width)
+    const maxTop = Math.max(wrapper.top, wrapper.bottom - bounds.height)
+    const cardLeft = THREE.MathUtils.clamp(pointer.clientX - bounds.offsetX, wrapper.left, maxLeft)
+    const cardTop = THREE.MathUtils.clamp(pointer.clientY - bounds.offsetY, wrapper.top, maxTop)
+    return {
+      ...pointer,
+      clientX: cardLeft + bounds.offsetX,
+      clientY: cardTop + bounds.offsetY,
+    }
+  }
+
   const handleDragStart = (pointer: ProfileCardPointer) => {
+    const element = gl.domElement.parentElement?.querySelector<HTMLElement>(".profile-card")
+    const bounds = element?.getBoundingClientRect()
+    dragBounds.current = bounds
+      ? { offsetX: pointer.clientX - bounds.left, offsetY: pointer.clientY - bounds.top, width: bounds.width, height: bounds.height }
+      : null
     const translation = card.current.translation()
     dragPlaneZ.current = translation.z
-    const worldPointer = pointerToWorld(pointer, dragPlaneZ.current)
+    const boundedPointer = keepCardInWrapper(pointer)
+    const worldPointer = pointerToWorld(boundedPointer, dragPlaneZ.current)
     if (!worldPointer) return
-    dragPointer.current = pointer
+    dragPointer.current = boundedPointer
     drag(new THREE.Vector3().copy(worldPointer).sub(new THREE.Vector3(translation.x, translation.y, translation.z)))
   }
 
   const stopDrag = () => {
     dragPointer.current = null
+    dragBounds.current = null
     drag(false)
   }
 
@@ -278,7 +348,7 @@ function Band({
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping
 
   return <>
-    <group position={[0, DESKTOP_ORIGIN_Y, 0]}>
+    <group position={[originX, DESKTOP_ORIGIN_Y, 0]}>
       <RigidBody ref={fixed} {...segmentProps} type="fixed" />
       <RigidBody position={[0.5, 0, 0]} ref={j1} {...segmentProps}><BallCollider args={[0.1]} /></RigidBody>
       <RigidBody position={[1, 0, 0]} ref={j2} {...segmentProps}><BallCollider args={[0.1]} /></RigidBody>
@@ -306,7 +376,7 @@ function Band({
         >
           <ProfileCard
             onDragStart={handleDragStart}
-            onDragMove={pointer => { dragPointer.current = pointer }}
+            onDragMove={pointer => { dragPointer.current = keepCardInWrapper(pointer) }}
             onDragEnd={stopDrag}
             onDragCancel={stopDrag}
           />

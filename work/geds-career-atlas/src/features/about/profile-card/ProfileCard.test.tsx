@@ -42,18 +42,6 @@ it("advertises a non-draggable, scroll-friendly static mode", () => {
   expect(card).toHaveAttribute("data-profile-interactive", "false")
 })
 
-it("updates shine variables without applying an independent transform", () => {
-  render(<ProfileCard />)
-  const card = screen.getByRole("link")
-  mockPointerCapture(card)
-
-  fireEvent.pointerMove(card, { pointerId: 3, clientX: 214.5, clientY: 99.5 })
-
-  expect(card.style.getPropertyValue("--profile-pointer-x")).toBe("75%")
-  expect(card.style.getPropertyValue("--profile-pointer-y")).toBe("25%")
-  expect(card.style.transform).toBe("")
-})
-
 it("separates a drag from navigation and allows the next genuine click", () => {
   const onDragStart = vi.fn()
   const onDragMove = vi.fn()
