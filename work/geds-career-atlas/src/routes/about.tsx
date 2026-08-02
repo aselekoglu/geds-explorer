@@ -34,7 +34,7 @@ export function AboutPage({ client }: { client: MetaClient }) {
       <aside className="about-page__developer" aria-label="Interactive developer lanyard">
         <LanyardErrorBoundary fallback={
           <Suspense fallback={null}>
-            <div className="lanyard-wrapper lanyard-wrapper--static lanyard-fallback--unavailable" data-render-mode="error-fallback">
+            <div className="signature-lanyard signature-lanyard--static lanyard-fallback--unavailable" data-render-mode="error-fallback">
               <StaticProfileCard interactive={false} />
             </div>
           </Suspense>

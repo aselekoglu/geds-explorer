@@ -1,0 +1,22 @@
+{
+  "retrieved_at": "2026-07-27",
+  "matching_rule": "A record is a Turkish-name signal only when at least one given-name token and one surname token match the Turkish population name corpus after exact ASCII-normalization. This is not a determination of nationality, citizenship, ethnicity, ancestry, or identity.",
+  "sources": {
+    "trnames": {
+      "publisher": "mkozturk/trnames",
+      "title": "Turkish name corpus with separate male, female, and surname lists",
+      "repository_url": "https://github.com/mkozturk/trnames",
+      "license": "MIT",
+      "data_description": "The repository states that probabilities were parsed from 49,611,709 people born between 1888 and 1991, excluding names observed fewer than 100 times.",
+      "files": {
+        "male_first": "analysis/sources/trnames/male_first.csv",
+        "female_first": "analysis/sources/trnames/female_first.csv",
+        "surnames": "analysis/sources/trnames/all_last.csv"
+      }
+    },
+    "official_reference_lists": {
+      "nvi_common_first_names_url": "https://nvi.gov.tr/kurumlar/nvi.gov.tr/Genel_Mudurluk/istatistikler/En_cok_Kullanilan_Ad_Istatistigi.pdf",
+      "tuik_common_surnames_2025_url": "https://nip.tuik.gov.tr/Export/ExportPdf?name=EnCokKullanilanSoyIsimler&value="
+    }
+  }
+}

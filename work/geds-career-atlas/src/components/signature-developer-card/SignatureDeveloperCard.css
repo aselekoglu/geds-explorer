@@ -1,0 +1,13 @@
+.signature-developer-card { position:relative;display:block;width:286px;aspect-ratio:.718;min-height:0;overflow:hidden;border:1px solid rgb(205 218 255 / 30%);border-radius:28px;color:#f7f8ff;background:#080914;box-shadow:0 24px 46px rgb(2 4 12 / 42%),inset 0 1px 0 rgb(255 255 255 / 16%);cursor:grab;isolation:isolate;outline:none;text-decoration:none;touch-action:none;user-select:none;-webkit-user-drag:none; }
+.signature-developer-card--dragging { cursor:grabbing; }
+.signature-developer-card--static { cursor:pointer;touch-action:pan-y; }
+.signature-developer-card:focus-visible { outline:3px solid var(--cyan,#67e8f9);outline-offset:5px; }
+.signature-developer-card__inside,.signature-developer-card__portrait,.signature-developer-card__details { position:absolute;inset:0;display:block;border-radius:inherit;pointer-events:none; }
+.signature-developer-card__inside { overflow:hidden;background:radial-gradient(circle at 72% 12%,rgb(118 116 255 / 34%),transparent 38%),linear-gradient(145deg,#291f38 0%,#10162d 48%,#07131f 100%); }
+.signature-developer-card__inside::after { content:"";position:absolute;inset:0;z-index:5;border-radius:inherit;box-shadow:inset 0 0 0 1px rgb(255 255 255 / 5%);pointer-events:none; }
+.signature-developer-card__details { inset:30px 18px auto;z-index:6;height:auto;text-align:center;text-shadow:0 2px 16px rgb(4 5 16 / 80%); }
+.signature-developer-card__name { display:block;font-size:27px;font-weight:650;letter-spacing:-.035em;line-height:1.02; }
+.signature-developer-card__title { display:block;margin-top:9px;color:rgb(223 230 255 / 82%);font-size:14px;font-weight:600;letter-spacing:.14em;text-transform:uppercase; }
+.signature-developer-card__portrait { inset:78px 0 -14px;z-index:2;overflow:hidden; }
+.signature-developer-card__portrait img { position:absolute;left:50%;bottom:-2%;width:116%;max-width:none;height:104%;object-fit:contain;object-position:center bottom;transform:translateX(-50%);filter:saturate(.92) contrast(1.03); }
+.signature-developer-card__initials { position:absolute;inset:0;display:grid;color:rgb(241 244 255 / 78%);font-size:72px;font-weight:750;place-items:center; }

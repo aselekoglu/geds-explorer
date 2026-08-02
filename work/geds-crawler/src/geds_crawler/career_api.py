@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -9,11 +8,12 @@ from fastapi.staticfiles import StaticFiles
 
 from .career_api_models import serialize
 from .career_repository import CareerRepository
+from .career_store import CareerReadStore
 
 
-def create_career_app(master_db: Path | str, frontend_dir: Path | str | None = None) -> FastAPI:
+def create_career_app(master_db: Path | str | CareerReadStore, frontend_dir: Path | str | None = None) -> FastAPI:
     app = FastAPI(title="GEDS Career Atlas API", docs_url="/api/docs", openapi_url="/api/openapi.json")
-    app.state.repository = CareerRepository(master_db)
+    app.state.repository = CareerRepository(master_db) if isinstance(master_db, (Path, str)) else master_db
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):

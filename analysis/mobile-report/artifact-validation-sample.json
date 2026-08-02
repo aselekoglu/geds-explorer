@@ -1,0 +1,452 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "title": "GEDS Turkish-name signals — mobile report",
+    "generatedAt": "2026-07-27T15:33:16.426649Z",
+    "sources": [
+      {
+        "id": "geds_turkish_name_signal_export",
+        "label": "GEDS canonical people snapshot plus Turkish-name corpus matching",
+        "query": {
+          "engine": "sqlite + deterministic CSV transformation",
+          "sql": "SELECT source_url, display_name, title, department_name, department_dn, org_unit, org_dn, org_path, canonical_path_json, last_seen_at, snapshot_id, missing_streak, presence_status FROM people_current WHERE presence_status = 'present';",
+          "description": "Starts from the canonical GEDS people_current snapshot, then retains rows where at least one given-name token and one surname token exactly match the trnames Turkish population corpus after ASCII normalization.",
+          "tables_used": [
+            "people_current",
+            "trnames male_first.csv",
+            "trnames female_first.csv",
+            "trnames all_last.csv"
+          ],
+          "filters": [
+            "presence_status = 'present'",
+            "both given-name and surname corpus tokens must match"
+          ],
+          "metric_definitions": {
+            "candidate_records": "Count of retained rows after deterministic token matching.",
+            "unique_geds_urls": "Distinct source_url count among retained rows."
+          }
+        }
+      }
+    ],
+    "cards": [
+      {
+        "id": "candidate_records",
+        "dataset": "headline_metrics",
+        "sourceId": "geds_turkish_name_signal_export",
+        "metrics": [
+          {
+            "label": "Candidate records",
+            "field": "candidate_records",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "unique_urls",
+        "dataset": "headline_metrics",
+        "sourceId": "geds_turkish_name_signal_export",
+        "metrics": [
+          {
+            "label": "Unique GEDS URLs",
+            "field": "unique_geds_urls",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "source_population",
+        "dataset": "headline_metrics",
+        "sourceId": "geds_turkish_name_signal_export",
+        "metrics": [
+          {
+            "label": "Present people scanned",
+            "field": "input_present_people",
+            "format": "number"
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "top_departments_chart",
+        "title": "Top 20 departments by matched records",
+        "type": "bar",
+        "dataset": "department_counts",
+        "sourceId": "geds_turkish_name_signal_export",
+        "encodings": {
+          "x": {
+            "field": "department_name",
+            "type": "nominal",
+            "title": "Department"
+          },
+          "y": {
+            "field": "candidates",
+            "type": "quantitative",
+            "title": "Matched records"
+          }
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "department_table",
+        "title": "Department totals",
+        "dataset": "department_counts",
+        "sourceId": "geds_turkish_name_signal_export",
+        "columns": [
+          {
+            "field": "department_name",
+            "label": "Department"
+          },
+          {
+            "field": "candidates",
+            "label": "Matched records",
+            "format": "number"
+          }
+        ],
+        "defaultSort": {
+          "field": "candidates",
+          "direction": "desc"
+        }
+      },
+      {
+        "id": "candidate_table",
+        "title": "All matched GEDS records (788)",
+        "dataset": "candidates",
+        "sourceId": "geds_turkish_name_signal_export",
+        "columns": [
+          {
+            "field": "display_name",
+            "label": "Name"
+          },
+          {
+            "field": "title",
+            "label": "Title"
+          },
+          {
+            "field": "department_name",
+            "label": "Department"
+          },
+          {
+            "field": "org_unit",
+            "label": "Org unit"
+          },
+          {
+            "field": "org_path",
+            "label": "Organization path"
+          },
+          {
+            "field": "last_seen_at",
+            "label": "Last seen"
+          },
+          {
+            "field": "matched_first_name",
+            "label": "Matched given name"
+          },
+          {
+            "field": "matched_surname",
+            "label": "Matched surname"
+          },
+          {
+            "field": "first_name_corpus_rank",
+            "label": "Given-name rank",
+            "format": "number"
+          },
+          {
+            "field": "surname_corpus_rank",
+            "label": "Surname rank",
+            "format": "number"
+          },
+          {
+            "field": "source_url",
+            "label": "GEDS URL",
+            "format": "link"
+          },
+          {
+            "field": "department_dn",
+            "label": "Department DN"
+          },
+          {
+            "field": "org_dn",
+            "label": "Organization DN"
+          },
+          {
+            "field": "canonical_path_json",
+            "label": "Canonical path JSON"
+          },
+          {
+            "field": "snapshot_id",
+            "label": "Snapshot ID"
+          },
+          {
+            "field": "missing_streak",
+            "label": "Missing streak",
+            "format": "number"
+          },
+          {
+            "field": "presence_status",
+            "label": "Presence status"
+          },
+          {
+            "field": "match_tier",
+            "label": "Match tier"
+          },
+          {
+            "field": "match_basis",
+            "label": "Match basis"
+          }
+        ],
+        "defaultSort": {
+          "field": "display_name",
+          "direction": "asc"
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "report_title",
+        "type": "markdown",
+        "body": "# GEDS Turkish-name signals — mobile report"
+      },
+      {
+        "id": "executive_summary",
+        "type": "markdown",
+        "sourceId": "geds_turkish_name_signal_export",
+        "body": "## Executive Summary\nThe July 2026 canonical GEDS snapshot contains **788 name-signal matches** across **788 unique public GEDS records**, from **193,163 present people** scanned. The full record table is included below for mobile lookup and opens each official GEDS page from its source URL."
+      },
+      {
+        "id": "headline_metrics",
+        "type": "metric-strip",
+        "cardIds": [
+          "candidate_records",
+          "unique_urls",
+          "source_population"
+        ]
+      },
+      {
+        "id": "distribution_heading",
+        "type": "markdown",
+        "sourceId": "geds_turkish_name_signal_export",
+        "body": "## Department distribution\nThe horizontal ranking is the clearest compact view for phone screens; exact counts follow in the table."
+      },
+      {
+        "id": "top_departments_chart_block",
+        "type": "chart",
+        "chartId": "top_departments_chart"
+      },
+      {
+        "id": "department_table_block",
+        "type": "table",
+        "tableId": "department_table"
+      },
+      {
+        "id": "records_heading",
+        "type": "markdown",
+        "sourceId": "geds_turkish_name_signal_export",
+        "body": "## Complete record list\nSwipe horizontally on the table when needed. Tap a GEDS URL to open its official directory record."
+      },
+      {
+        "id": "candidate_table_block",
+        "type": "table",
+        "tableId": "candidate_table"
+      },
+      {
+        "id": "caveat",
+        "type": "markdown",
+        "body": "## Important limitation\nThis is a name-pattern signal only. It does **not** establish nationality, citizenship, ethnicity, ancestry, or identity. A row is retained only when one given-name token and one surname token match the Turkish population corpus after exact ASCII normalization, so both false positives and false negatives remain possible. Snapshot: `2026-07-09T07:05:04.674049+00:00`; quality: `partial_overlay`."
+      },
+      {
+        "id": "sources_and_next_steps",
+        "type": "markdown",
+        "body": "## Sources and next step\nMatching corpus: [mkozturk/trnames](https://github.com/mkozturk/trnames) (MIT). Official reference links: [NVI common first names](https://nvi.gov.tr/kurumlar/nvi.gov.tr/Genel_Mudurluk/istatistikler/En_cok_Kullanilan_Ad_Istatistigi.pdf) and [TUİK common surnames](https://nip.tuik.gov.tr/Export/ExportPdf?name=EnCokKullanilanSoyIsimler&value=). Use this report for review or outreach research only after independently checking each public GEDS record."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-27T15:33:16.426649Z",
+    "status": "ready",
+    "datasets": {
+      "headline_metrics": [
+        {
+          "candidate_records": 788,
+          "unique_geds_urls": 788,
+          "input_present_people": 193163
+        }
+      ],
+      "department_counts": [
+        {
+          "department_name": "Employment and Social Development Canada",
+          "candidates": 66
+        },
+        {
+          "department_name": "Health Canada",
+          "candidates": 66
+        },
+        {
+          "department_name": "CANADA REVENUE AGENCY",
+          "candidates": 45
+        },
+        {
+          "department_name": "Global Affairs Canada",
+          "candidates": 42
+        },
+        {
+          "department_name": "Immigration, Refugees and Citizenship Canada",
+          "candidates": 36
+        },
+        {
+          "department_name": "Shared Services Canada",
+          "candidates": 35
+        },
+        {
+          "department_name": "Innovation, Science and Economic Development Canada - Innovation, Sciences et Développement économique Canada",
+          "candidates": 32
+        },
+        {
+          "department_name": "Environment and Climate Change Canada",
+          "candidates": 32
+        },
+        {
+          "department_name": "National Research Council Canada",
+          "candidates": 31
+        },
+        {
+          "department_name": "Fisheries and Oceans Canada",
+          "candidates": 28
+        },
+        {
+          "department_name": "Public Services and Procurement Canada",
+          "candidates": 27
+        },
+        {
+          "department_name": "Transport Canada",
+          "candidates": 25
+        },
+        {
+          "department_name": "Natural Resources Canada",
+          "candidates": 25
+        },
+        {
+          "department_name": "Agriculture and Agri-Food Canada",
+          "candidates": 24
+        },
+        {
+          "department_name": "Indigenous Services Canada",
+          "candidates": 19
+        },
+        {
+          "department_name": "House of Commons",
+          "candidates": 18
+        },
+        {
+          "department_name": "Canada Mortgage and Housing Corporation",
+          "candidates": 18
+        },
+        {
+          "department_name": "Justice Canada",
+          "candidates": 17
+        },
+        {
+          "department_name": "Statistics Canada",
+          "candidates": 16
+        },
+        {
+          "department_name": "Canada Border Services Agency",
+          "candidates": 15
+        }
+      ],
+      "candidates": [
+        {
+          "﻿source_url": "https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=Q049SkFORS5BQkFTQFRDLkdDLkNBLE9VPU5TU01NU1NPU0VPLVJTU04sT1U9TlNTTU1TU09ERy1SU1NCLE9VPU5TU09BU1NPQURNLVJTQlNTQlMsT1U9TlNTLVJTLE9VPU5PRE0tUkJTLE9VPVRDLVRDLE89R0MsQz1DQQ%3D%3D",
+          "display_name": "Abas, Jane",
+          "title": "Enforcement Investigator",
+          "department_name": "Transport Canada",
+          "department_dn": "OU=TC-TC,O=GC,C=CA",
+          "org_unit": "NCR - Safety and Security, Multi-Modal Safety and Security, Oversight Standards and Enforcement Operations",
+          "org_dn": "OU=NSSMMSSOSEO-RSSN,OU=NSSMMSSODG-RSSB,OU=NSSOASSOADM-RSBSSBS,OU=NSS-RS,OU=NODM-RBS,OU=TC-TC,O=GC,C=CA",
+          "org_path": "Transport Canada / NCR - Office of the Deputy Minister / NCR - Safety and Security / NCR - Safety and Security, Office of the ADM Safety and Security, Office of the Assistant Deputy Minister / NCR - Safety and Security, Multi-Modal Safety and Security, Office of the Director General / NCR - Safety and Security, Multi-Modal Safety and Security, Oversight Standards and Enforcement Operations",
+          "canonical_path_json": "[\"Transport Canada\",\"NCR - Office of the Deputy Minister\",\"NCR - Safety and Security\",\"NCR - Safety and Security, Office of the ADM Safety and Security, Office of the Assistant Deputy Minister\",\"NCR - Safety and Security, Multi-Modal Safety and Security, Office of the Director General\",\"NCR - Safety and Security, Multi-Modal Safety and Security, Oversight Standards and Enforcement Operations\"]",
+          "last_seen_at": "2026-07-09T07:02:47.294845+00:00",
+          "snapshot_id": "edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5",
+          "missing_streak": 0,
+          "presence_status": "present",
+          "matched_first_name": "Jane",
+          "matched_surname": "Abas",
+          "first_name_corpus_rank": 4314,
+          "surname_corpus_rank": 9415,
+          "match_tier": "corpus_both_ascii_normalized",
+          "match_basis": "trnames first-name corpus + trnames surname corpus; exact ASCII-normalized tokens"
+        },
+        {
+          "﻿source_url": "https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=Q049QUJBWkFcMkMgTVVOQSxPVT1QUk8tR0VTLE9VPUNUUy1TVE8sT1U9Q0lPLURQSSxPVT1DQy1DQUMsTz1HQyxDPUNB",
+          "display_name": "Abaza, Muna",
+          "title": "Quality Assurance Specialist",
+          "department_name": "Canada Council for the Arts",
+          "department_dn": "OU=CC-CAC,O=GC,C=CA",
+          "org_unit": "Business Analysis and Quality Assurance Support, Unit",
+          "org_dn": "OU=PRO-GES,OU=CTS-STO,OU=CIO-DPI,OU=CC-CAC,O=GC,C=CA",
+          "org_path": "Canada Council for the Arts / Office of the Chief Information and Security Officer / Corporate Technology Solutions, Section / Business Analysis and Quality Assurance Support, Unit",
+          "canonical_path_json": "[\"Canada Council for the Arts\",\"Office of the Chief Information and Security Officer\",\"Corporate Technology Solutions, Section\",\"Business Analysis and Quality Assurance Support, Unit\"]",
+          "last_seen_at": "2026-07-08T21:24:59.243810+00:00",
+          "snapshot_id": "edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5",
+          "missing_streak": 0,
+          "presence_status": "present",
+          "matched_first_name": "Muna",
+          "matched_surname": "Abaza",
+          "first_name_corpus_rank": 3555,
+          "surname_corpus_rank": 10613,
+          "match_tier": "corpus_both_ascii_normalized",
+          "match_basis": "trnames first-name corpus + trnames surname corpus; exact ASCII-normalized tokens"
+        },
+        {
+          "﻿source_url": "https://geds-sage.gc.ca/en/GEDS?pgid=015&dn=Q049QUJCQVNcMkMgQUxJLE9VPU1PTi1NT04sT1U9Uk8tQlIsT1U9T0FHLUJWRyxPPUdDLEM9Q0E%3D",
+          "display_name": "Abbas, Ali",
+          "title": "",
+          "department_name": "Office of the Auditor General of Canada",
+          "department_dn": "OU=OAG-BVG,O=GC,C=CA",
+          "org_unit": "Montréal",
+          "org_dn": "OU=MON-MON,OU=RO-BR,OU=OAG-BVG,O=GC,C=CA",
+          "org_path": "Office of the Auditor General of Canada / Regional Offices / Montréal",
+          "canonical_path_json": "[\"Office of the Auditor General of Canada\",\"Regional Offices\",\"Montréal\"]",
+          "last_seen_at": "2026-07-08T21:08:37.491513+00:00",
+          "snapshot_id": "edd5d0f4269da97163b33a5cf7dd8c850ad51331a913721e0ce7a07e1977fce5",
+          "missing_streak": 0,
+          "presence_status": "present",
+          "matched_first_name": "Ali",
+          "matched_surname": "Abbas",
+          "first_name_corpus_rank": 2,
+          "surname_corpus_rank": 8954,
+          "match_tier": "corpus_both_ascii_normalized",
+          "match_basis": "trnames first-name corpus + trnames surname corpus; exact ASCII-normalized tokens"
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "geds_turkish_name_signal_export",
+      "label": "GEDS canonical people snapshot plus Turkish-name corpus matching",
+      "query": {
+        "engine": "sqlite + deterministic CSV transformation",
+        "sql": "SELECT source_url, display_name, title, department_name, department_dn, org_unit, org_dn, org_path, canonical_path_json, last_seen_at, snapshot_id, missing_streak, presence_status FROM people_current WHERE presence_status = 'present';",
+        "description": "Starts from the canonical GEDS people_current snapshot, then retains rows where at least one given-name token and one surname token exactly match the trnames Turkish population corpus after ASCII normalization.",
+        "tables_used": [
+          "people_current",
+          "trnames male_first.csv",
+          "trnames female_first.csv",
+          "trnames all_last.csv"
+        ],
+        "filters": [
+          "presence_status = 'present'",
+          "both given-name and surname corpus tokens must match"
+        ],
+        "metric_definitions": {
+          "candidate_records": "Count of retained rows after deterministic token matching.",
+          "unique_geds_urls": "Distinct source_url count among retained rows."
+        }
+      }
+    }
+  ]
+}

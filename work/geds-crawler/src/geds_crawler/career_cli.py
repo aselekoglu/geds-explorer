@@ -11,6 +11,7 @@ from .canonicalizer import publish_canonical
 from .career_index import build_career_index
 from .career_api import create_career_app
 from .career_index import current_index_state
+from .public_projection import PublicProjectionError, export_public_projection, validate_public_projection
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,6 +25,13 @@ def main(argv: list[str] | None = None) -> int:
     index_parser = subparsers.add_parser("index")
     index_parser.add_argument("--master-db", type=Path, required=True)
     index_parser.add_argument("--taxonomy", type=Path, required=True)
+    export_parser = subparsers.add_parser("export")
+    export_parser.add_argument("--master-db", type=Path, required=True)
+    export_parser.add_argument("--output-dir", type=Path, required=True)
+    export_parser.add_argument("--allow-partial-preview", action="store_true")
+    validate_parser = subparsers.add_parser("validate")
+    validate_parser.add_argument("--projection-dir", type=Path, required=True)
+    validate_parser.add_argument("--allow-partial-preview", action="store_true")
     serve_parser = subparsers.add_parser("serve")
     serve_parser.add_argument("--master-db", type=Path, required=True)
     serve_parser.add_argument("--frontend-dir", type=Path)
@@ -71,6 +79,22 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc), file=sys.stderr)
             return 2
         print(json.dumps(report.__dict__, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "export":
+        try:
+            manifest = export_public_projection(args.master_db, args.output_dir, allow_partial_preview=args.allow_partial_preview)
+        except (PublicProjectionError, FileNotFoundError, sqlite3.Error) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(manifest.as_dict(), ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "validate":
+        try:
+            manifest = validate_public_projection(args.projection_dir, allow_partial_preview=args.allow_partial_preview)
+        except (PublicProjectionError, FileNotFoundError, sqlite3.Error) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(manifest.as_dict(), ensure_ascii=False, sort_keys=True))
         return 0
     if args.command == "serve":
         try:

@@ -66,6 +66,7 @@ def test_direct_team_people_contract_is_privacy_safe_and_get_only(career_client)
     assert response.headers["etag"]
     assert response.json()["total"] == 1
     assert response.json()["items"][0]["observed_classifications"] == ["IT-02"]
+    assert response.json()["items"][0]["display_name"] == "Ada"
     assert response.json()["items"][0]["source_url"].startswith("https://geds-sage.gc.ca/")
     assert not {"email", "phone", "fax", "address"} & set(response.json()["items"][0])
     assert career_client.post(f"/api/orgs/{root['org_id']}/people").status_code == 405

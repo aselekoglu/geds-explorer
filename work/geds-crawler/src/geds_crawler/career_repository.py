@@ -471,7 +471,7 @@ class CareerRepository:
             meta = self._meta(con)
             rows = con.execute(
                 """SELECT v.source_text,v.title,v.org_id,o.name organization_name,
-                          p.last_seen_at,p.source_url,v.confidence,v.reasons_json
+                          p.source_url,v.confidence,v.reasons_json
                    FROM vacancy_signals v
                    JOIN organizations_current o ON o.org_id=v.org_id AND o.snapshot_id=v.snapshot_id
                    JOIN people_current p ON v.entity_id='person:' || p.source_url AND p.snapshot_id=v.snapshot_id
@@ -485,7 +485,7 @@ class CareerRepository:
                 title=str(row["title"]),
                 org_id=str(row["org_id"]),
                 organization_name=str(row["organization_name"]),
-                observed_at=str(row["last_seen_at"]),
+                observed_at=str(meta["as_of_at"]).split("T", 1)[0],
                 source_url=str(row["source_url"]),
                 confidence=str(row["confidence"]),
                 reasons=tuple(json.loads(row["reasons_json"])),
@@ -592,7 +592,15 @@ class CareerRepository:
         return TourResult(tuple(items), str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, "tours", document["version"]))
 
     def _meta(self, con: sqlite3.Connection) -> dict[str, object]:
-        row = con.execute("""SELECT state.snapshot_id,state.taxonomy_version,s.quality_status,s.as_of_at,s.people_count,s.org_units_count,s.departments_count FROM career_index_state state JOIN canonical_snapshots s ON s.snapshot_id=state.snapshot_id WHERE state.singleton=1""").fetchone()
+        try:
+            row = con.execute(
+                """SELECT snapshot_id,taxonomy_version,quality_status,as_of_at,
+                          people_count,org_units_count,departments_count,
+                          projection_version,release_kind,publishable
+                   FROM public_meta WHERE singleton=1"""
+            ).fetchone()
+        except sqlite3.OperationalError:
+            row = con.execute("""SELECT state.snapshot_id,state.taxonomy_version,s.quality_status,s.as_of_at,s.people_count,s.org_units_count,s.departments_count FROM career_index_state state JOIN canonical_snapshots s ON s.snapshot_id=state.snapshot_id WHERE state.singleton=1""").fetchone()
         if row is None:
             raise ValueError("career index has not been built")
         return dict(row)

@@ -101,7 +101,7 @@ py -m geds_crawler.cli crawl `
 - `people_index.jsonl`
 - `crawl_report.md`
 
-The crawler does not store phone, email, fax, or address fields. Person rows keep only display name, title when visible, department, org context, official GEDS source URL, and crawl metadata.
+The crawler does not store phone, email, fax, or address fields. The public projection may include the observed person display name and title, department/org context, and official GEDS source URL; crawl and control-plane metadata remain private.
 
 ## Pagination Backfill Operator Workflow
 
@@ -171,7 +171,7 @@ Use `--host 0.0.0.0` only for trusted-LAN review. The public app is read-only bu
 Trust boundaries:
 
 - The canonical SQLite database and generated `dist\` assets are build/runtime artifacts and must not be committed.
-- Public payloads contain organization IDs, observed titles, aggregate counts, evidence, and official GEDS source URLs. They contain no email, phone, fax, address, or personal display-name fields.
+- Public payloads contain organization IDs, observed display names and titles, aggregate counts, evidence, and official GEDS source URLs. They contain no email, phone, fax, address, last-seen, crawl, or control-plane metadata.
 - Matching is deterministic and versioned. Confidence and evidence describe relevance, not eligibility, responsibility, hiring intent, or a job opening.
 - A GEDS `vacant` marker is always labelled as an unverified directory signal. It is not a verified GC Jobs competition and never creates an Apply action.
 - GC Jobs ingestion and a verified Opportunity Engine are intentionally deferred to a later, separately approved design.

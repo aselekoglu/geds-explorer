@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import { DEVELOPER_URL, ProfileCard } from "./ProfileCard"
+import { SignatureDeveloperCard } from "./SignatureDeveloperCard"
+
+const profile = { name: "Ada Lovelace", title: "Developer", href: "https://example.test", portraitSrc: "/portrait.png" }
 
 function mockPointerCapture(card: HTMLElement) {
   Object.defineProperties(card, {
@@ -21,32 +23,36 @@ function mockPointerCapture(card: HTMLElement) {
 }
 
 it("renders only the approved accessible developer content", () => {
-  const { container } = render(<ProfileCard />)
-  const card = screen.getByRole("link", { name: /visit ata selekoglu's website/i })
+  const { container } = render(<SignatureDeveloperCard profile={profile} />)
+  const card = screen.getByRole("link", { name: /visit ada lovelace's website/i })
 
-  expect(card).toHaveAttribute("href", DEVELOPER_URL)
+  expect(card).toHaveAttribute("href", profile.href)
   expect(card).toHaveAttribute("target", "_blank")
   expect(card).toHaveAttribute("rel", "noreferrer")
   expect(card).toHaveAttribute("data-profile-tilt", "disabled")
-  expect(screen.getByText("Ata Selekoglu")).toBeVisible()
+  expect(screen.getByText("Ada Lovelace")).toBeVisible()
   expect(screen.getByText("Developer")).toBeVisible()
-  expect(container.querySelector(".profile-card__portrait img")).toHaveAttribute("src", expect.stringContaining("ata-speaking-2"))
-  expect(container.querySelector(".pc-handle, .pc-status, .pc-contact-btn, .pc-mini-avatar, .pc-behind")).toBeNull()
+  expect(container.querySelector(".signature-developer-card__portrait img")).toHaveAttribute("src", profile.portraitSrc)
 })
 
 it("advertises a non-draggable, scroll-friendly static mode", () => {
-  render(<ProfileCard interactive={false} />)
+  render(<SignatureDeveloperCard profile={profile} interactive={false} />)
   const card = screen.getByRole("link")
 
-  expect(card).toHaveClass("profile-card--static")
+  expect(card).toHaveClass("signature-developer-card--static")
   expect(card).toHaveAttribute("data-profile-interactive", "false")
+})
+
+it("uses initials when a consumer does not provide a portrait", () => {
+  render(<SignatureDeveloperCard profile={{ name: "Grace Hopper", title: "Engineer", href: "https://example.test" }} />)
+  expect(screen.getByText("GH")).toBeVisible()
 })
 
 it("separates a drag from navigation and allows the next genuine click", () => {
   const onDragStart = vi.fn()
   const onDragMove = vi.fn()
   const onDragEnd = vi.fn()
-  render(<ProfileCard onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} />)
+  render(<SignatureDeveloperCard profile={profile} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} />)
   const card = screen.getByRole("link")
   mockPointerCapture(card)
 
@@ -72,7 +78,7 @@ it("separates a drag from navigation and allows the next genuine click", () => {
 
 it("cancels an active drag on window blur", () => {
   const onDragCancel = vi.fn()
-  render(<ProfileCard onDragCancel={onDragCancel} />)
+  render(<SignatureDeveloperCard profile={profile} onDragCancel={onDragCancel} />)
   const card = screen.getByRole("link")
   mockPointerCapture(card)
 
