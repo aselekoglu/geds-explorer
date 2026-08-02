@@ -41,7 +41,7 @@ class NeonPreviewProjectionImportTarget(NeonProjectionImportTarget):
                     release_id,schema_version,projection_version,snapshot_id,as_of_at,quality_status,
                     release_kind,publishable,taxonomy_version,departments_count,organizations_count,
                     people_count,career_entities_count,data_sha256,status
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'staging')""",
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'staging')""",
                 (
                     plan.release_id,
                     manifest.schema_version,
