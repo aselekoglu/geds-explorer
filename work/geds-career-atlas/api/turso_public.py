@@ -8,10 +8,17 @@ lookups suitable for the remote SQLite projection.
 
 from __future__ import annotations
 
+import os
 import re
+import sys
 from typing import Any
 
 from fastapi import Query
+
+
+API_DIR = os.path.dirname(__file__)
+if API_DIR not in sys.path:
+    sys.path.insert(0, API_DIR)
 
 import turso_index as _turso
 
