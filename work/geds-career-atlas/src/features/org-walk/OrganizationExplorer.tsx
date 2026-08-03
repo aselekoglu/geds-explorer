@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { OrgNode, OrgPage, SearchResult } from "../../api/types"
 import { useLanguage } from "../../i18n/i18n"
 import { OrgBreadcrumb } from "./OrgBreadcrumb"
@@ -15,6 +15,7 @@ export function OrganizationExplorer({ client, onProfile, selectedOrgId,rootOrg,
   const [error, setError] = useState(false)
   const [matches,setMatches]=useState<Match[]>([])
   const [searchState,setSearchState]=useState<"idle"|"loading"|"empty"|"error">("idle")
+  const columnsRef = useRef<HTMLDivElement>(null)
   const { t } = useLanguage()
   useEffect(() => {
     const controller = new AbortController()
@@ -43,6 +44,13 @@ export function OrganizationExplorer({ client, onProfile, selectedOrgId,rootOrg,
     }).catch(value=>{if(value.name!=="AbortError"){setMatches([]);setSearchState("error")}})
     return()=>controller.abort()
   },[client,query,institutionName])
+  useLayoutEffect(() => {
+    const columnsElement = columnsRef.current
+    if (!columnsElement || columns.length < 2) return
+    const left = columnsElement.scrollWidth
+    if (typeof columnsElement.scrollTo === "function") columnsElement.scrollTo({ left, behavior: "smooth" })
+    else columnsElement.scrollLeft = left
+  }, [columns])
   async function drill(node: OrgNode, columnIndex: number) {
     if(node.child_count===0){setColumns(current=>[...current.slice(0,columnIndex+1),{parent:node,items:[],leaf:true}]);return}
     const page = await client.children(node.org_id)
@@ -74,6 +82,6 @@ export function OrganizationExplorer({ client, onProfile, selectedOrgId,rootOrg,
       const selected=breadcrumbColumns[index]
       if(selected)setColumns(current=>current.slice(0,selected.columnIndex+1))
     }}/>
-    <div className="org-columns">{columns.map((column,columnIndex)=>column.leaf&&column.parent&&client.people?<BorderGlow key={`${column.parent.org_id}-people`} className="org-people-column" fillOpacity={0.055}><header><span>{t("people.title")}</span><strong>{column.parent.name}</strong></header><PeopleInTeam orgId={column.parent.org_id} client={{people:(orgId,peopleQuery,signal)=>client.people!(orgId,peopleQuery,signal)}}/></BorderGlow>:column.leaf?<div key={`${column.parent?.org_id}-leaf`} className="org-empty-column" role="status"><strong>{column.parent?.name}</strong><span>{t("people.empty")}</span></div>:<OrgColumn key={column.parent?.org_id??"root"} label={column.parent?t("orgWalk.teamLabel",{name:column.parent.name}):t("orgWalk.top")} items={column.items} columnIndex={columnIndex} expandedId={columns[columnIndex+1]?.parent?.org_id} onDrill={(node,index)=>void drill(node,index)} onProfile={orgId=>onProfile?.(orgId)} onBack={index=>setColumns(current=>current.slice(0,index))}/>)}</div>
+    <div ref={columnsRef} className="org-columns">{columns.map((column,columnIndex)=>column.leaf&&column.parent&&client.people?<BorderGlow key={`${column.parent.org_id}-people`} className="org-people-column" fillOpacity={0.055}><header><span>{t("people.title")}</span><strong>{column.parent.name}</strong></header><PeopleInTeam orgId={column.parent.org_id} client={{people:(orgId,peopleQuery,signal)=>client.people!(orgId,peopleQuery,signal)}}/></BorderGlow>:column.leaf?<div key={`${column.parent?.org_id}-leaf`} className="org-empty-column" role="status"><strong>{column.parent?.name}</strong><span>{t("people.empty")}</span></div>:<OrgColumn key={column.parent?.org_id??"root"} label={column.parent?t("orgWalk.teamLabel",{name:column.parent.name}):t("orgWalk.top")} items={column.items} columnIndex={columnIndex} expandedId={columns[columnIndex+1]?.parent?.org_id} onDrill={(node,index)=>void drill(node,index)} onProfile={orgId=>onProfile?.(orgId)} onBack={index=>setColumns(current=>current.slice(0,index))}/>)}</div>
   </section>
 }

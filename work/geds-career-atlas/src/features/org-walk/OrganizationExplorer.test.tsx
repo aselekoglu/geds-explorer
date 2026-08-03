@@ -8,6 +8,25 @@ it("loads the canonical root organizations from the public API", async () => {
   expect(await screen.findByRole("button", { name: /^Digital Services\./i })).toBeInTheDocument()
 })
 
+it("scrolls to the newest column when a child organization opens", async () => {
+  const scrollTo = vi.fn()
+  const previousScrollTo = HTMLElement.prototype.scrollTo
+  Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: scrollTo })
+  try {
+    const client = {
+      rootChildren: async () => ({ items: [{ org_id: "root-1", name: "Digital Services", depth: 0, child_count: 1, direct_people_count: 2, descendant_people_count: 12 }], snapshot_id: "snapshot", etag: "etag" }),
+      children: async () => ({ items: [{ org_id: "team-1", name: "AI Centre", parent_id: "root-1", depth: 1, child_count: 0, direct_people_count: 4, descendant_people_count: 4 }], snapshot_id: "snapshot", etag: "etag" })
+    }
+    const { container } = render(<OrganizationExplorer client={client} />)
+    fireEvent.click(await screen.findByRole("button", { name: /^Digital Services\./i }))
+    await screen.findByRole("button", { name: /^AI Centre\./i })
+    const columns = container.querySelector<HTMLElement>(".org-columns")
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: columns?.scrollWidth, behavior: "smooth" })
+  } finally {
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: previousScrollTo })
+  }
+})
+
 it("starts inside the selected institution root",async()=>{
   const rootOrg={org_id:"department-a",name:"Department A",depth:0,child_count:1,direct_people_count:0,descendant_people_count:10}
   const children=vi.fn().mockResolvedValue({items:[{org_id:"team",name:"Team",parent_id:"department-a",depth:1,child_count:0,direct_people_count:2,descendant_people_count:2}],snapshot_id:"snapshot",etag:"etag"})
