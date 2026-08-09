@@ -43,7 +43,7 @@ export function App() {
   const [view, setView] = useState<PublicView>(initial.view)
   const [departments, setDepartments] = useState<DepartmentPage["items"]>([])
   const [meta, setMeta] = useState<AtlasMeta | null>(null)
-  const [searchExpanded, setSearchExpanded] = useState(Boolean(initial.query))
+  const [exploreExpanded, setExploreExpanded] = useState(Boolean(initial.query || initial.scope.department))
   const searchRef = useRef<HTMLInputElement>(null)
   const client = useMemo(() => new CareerApiClient(), [])
   const { language, setLanguage, t } = useLanguage()
@@ -66,7 +66,7 @@ export function App() {
       setSelectedOrgId(next.focus)
       setScopeState(next.scope)
       setView(next.view)
-      if (next.query) setSearchExpanded(true)
+      if (next.query || next.scope.department) setExploreExpanded(true)
     }
     addEventListener("popstate", restore)
     addEventListener("hashchange", restore)
@@ -107,7 +107,7 @@ export function App() {
   function applyRoleQuery(title: string) {
     const value = title.trim()
     setQuery(value)
-    setSearchExpanded(true)
+    setExploreExpanded(true)
     setSelectedOrgId(null)
     writeUrl(params => {
       value ? params.set("q", value) : params.delete("q")
@@ -190,10 +190,10 @@ export function App() {
           </header>
           <div className="task-header__controls">
             <form className="service-search" role="search" onSubmit={event => event.preventDefault()}>
-              <button type="button" className="service-search__toggle" aria-expanded={searchExpanded} aria-controls="geds-search-panel" onClick={() => { const next = !searchExpanded; setSearchExpanded(next); if (next) requestAnimationFrame(() => searchRef.current?.focus()) }}>
-                <span>{t("app.searchLabel")}</span><DisclosureChevron/>
+              <button type="button" className="service-search__toggle" aria-expanded={exploreExpanded} aria-controls="geds-search-explore-panel" onClick={() => { const next = !exploreExpanded; setExploreExpanded(next); if (next) requestAnimationFrame(() => searchRef.current?.focus()) }}>
+                <span>{t("app.discoverEyebrow")}</span><DisclosureChevron/>
               </button>
-              <div id="geds-search-panel" className="service-search__body" hidden={!searchExpanded}>
+              <div id="geds-search-explore-panel" className="service-search__body" hidden={!exploreExpanded}>
                 <label htmlFor="geds-search">{t("app.searchLabel")}</label>
                 <p id="geds-search-hint">{t("app.searchHint")}</p>
                 <div className="service-search__field">
@@ -201,9 +201,9 @@ export function App() {
                   <input ref={searchRef} id="geds-search" type="search" value={query} onChange={event => updateQuery(event.target.value)} onKeyDown={event => { if (event.key === "Escape" && query) { event.preventDefault(); clearSearch() } }} placeholder={t("app.placeholder")} aria-describedby="geds-search-hint" autoComplete="off" spellCheck={false}/>
                   {query && <button type="button" className="service-search__clear" aria-label={t("app.clearSearch")} onClick={clearSearch}><CloseIcon/><span>{t("app.clear")}</span></button>}
                 </div>
+                <FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status ?? "loading"} onChange={updateScope}/>
               </div>
             </form>
-            <FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status ?? "loading"} onChange={updateScope}/>
           </div>
         </div>
       </section>}

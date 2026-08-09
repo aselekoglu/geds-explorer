@@ -521,6 +521,10 @@ select:focus-visible {
   gap: .3rem;
 }
 
+.service-search__body > .filter-rail {
+  margin-top: .75rem;
+}
+
 .service-search__body[hidden],
 .people-controls[hidden] {
   display: none;

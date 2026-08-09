@@ -22,14 +22,16 @@ test("supports skip link, visible focus, action-list semantics, and reduced moti
   expect(Number.parseFloat(duration)).toBeLessThanOrEqual(0.001)
 })
 
-test("keeps optional GEDS search visually collapsed until requested", async ({ page }) => {
+test("keeps Search and explore controls visually collapsed until requested", async ({ page }) => {
   await page.goto("/#explorer")
-  const toggle = page.getByRole("button", { name: "Search GEDS data" })
+  const toggle = page.getByRole("button", { name: "Search and explore" })
   const searchbox = page.getByRole("searchbox", { name: "Search GEDS data" })
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
   await expect(searchbox).toBeHidden()
+  await expect(page.getByLabel("Institution")).toBeHidden()
   await toggle.click()
   await expect(toggle).toHaveAttribute("aria-expanded", "true")
   await expect(searchbox).toBeVisible()
   await expect(searchbox).toBeFocused()
+  await expect(page.getByLabel("Institution")).toBeVisible()
 })
