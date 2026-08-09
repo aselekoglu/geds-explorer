@@ -366,8 +366,14 @@ select:focus-visible {
 }
 
 .product-nav a:hover {
-  background: var(--surface2);
+  background: transparent;
+  box-shadow: none;
   color: var(--text);
+}
+
+.product-nav a:hover::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .product-nav a.active::after,
@@ -1911,7 +1917,7 @@ select:focus-visible {
 }
 
 .service-footer a,
-.service-footer a:visited {
+.service-footer a:visited:not(.product-brand):not(.product-nav a) {
   color: #ffffff;
   font-size: .82rem;
   font-weight: 600;

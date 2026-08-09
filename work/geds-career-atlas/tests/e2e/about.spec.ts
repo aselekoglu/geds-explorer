@@ -53,6 +53,31 @@ test("renders the physical Profile Card in a clearly separated project section",
   expect(pageErrors).toEqual([])
 })
 
+test("keeps footer navigation links on the same dark-surface color", async ({ page }) => {
+  await page.goto("/#about")
+
+  const colors = await page.locator(".service-footer nav a").evaluateAll(links => links.map(link => getComputedStyle(link).color))
+  expect(colors).toEqual(["rgb(255, 255, 255)", "rgb(255, 255, 255)", "rgb(255, 255, 255)"])
+})
+
+test("uses a horizontal red indicator for hovered primary navigation items", async ({ page }) => {
+  await page.goto("/#about")
+  const item = page.locator(".product-nav a").filter({ hasText: "Discover" })
+  await item.hover()
+  await page.waitForTimeout(200)
+
+  const styles = await item.evaluate(element => {
+    const indicator = getComputedStyle(element, "::after")
+    return {
+      boxShadow: getComputedStyle(element).boxShadow,
+      height: indicator.height,
+      bottom: indicator.bottom,
+      opacity: indicator.opacity,
+    }
+  })
+  expect(styles).toEqual({ boxShadow: "none", height: "4px", bottom: "0px", opacity: "1" })
+})
+
 test("drags the DOM badge without navigating, then keeps click and keyboard activation", async ({ context, page }) => {
   await context.route("https://aselekoglu.github.io/**", route => route.fulfill({
     status: 200,
