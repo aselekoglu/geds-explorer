@@ -65,15 +65,15 @@ it("dismisses selected facts when the map background is clicked",async()=>{
   expect(screen.queryByText("People in this team")).not.toBeInTheDocument()
 })
 
-it("uses the requested Dot Field interaction tuning",async()=>{
+it("uses restrained Dot Field interaction tuning",async()=>{
   render(<ConstellationPage client={{constellationSlice:async()=>page([rootNode])}}/>)
   const stage=await screen.findByTestId("constellation-stage")
   const field=stage.querySelector(".dot-field")
-  expect(field).toHaveAttribute("data-bulge-strength","58")
-  expect(field).toHaveAttribute("data-dot-spacing","18")
-  expect(field).toHaveAttribute("data-cursor-radius","600")
-  expect(field).toHaveAttribute("data-wave-amplitude","1")
-  expect(field).toHaveAttribute("data-glow-radius","110")
+  expect(field).toHaveAttribute("data-bulge-strength","18")
+  expect(field).toHaveAttribute("data-dot-spacing","22")
+  expect(field).toHaveAttribute("data-cursor-radius","280")
+  expect(field).toHaveAttribute("data-wave-amplitude","0.35")
+  expect(field).toHaveAttribute("data-glow-radius","80")
   expect(field).not.toHaveAttribute("data-active-frame-rate")
 })
 

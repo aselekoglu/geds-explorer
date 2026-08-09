@@ -83,8 +83,6 @@ type CardGLTF = GLTF & {
 
 type SmoothedRigidBody = RapierRigidBody & { lerped?: THREE.Vector3 }
 type BandMesh = THREE.Mesh<MeshLineGeometry, MeshLineMaterial>
-type DragBounds = { offsetX: number, offsetY: number, width: number, height: number }
-
 function supportsWebGL() {
   if (typeof document === "undefined") return false
   try {
@@ -260,7 +258,6 @@ function Band({
   const rot = useMemo(() => new THREE.Vector3(), [])
   const dir = useMemo(() => new THREE.Vector3(), [])
   const dragPointer = useRef<SignatureDeveloperCardPointer | null>(null)
-  const dragBounds = useRef<DragBounds | null>(null)
   const dragPlaneZ = useRef(0)
   const segmentProps: RigidBodyProps = { type: "dynamic", canSleep: true, colliders: false, angularDamping: 4, linearDamping: 4 }
   const { nodes, materials } = useGLTF(cardModelSrc) as unknown as CardGLTF
@@ -297,39 +294,17 @@ function Band({
     return vec.copy(camera.position).add(dir.multiplyScalar((planeZ - camera.position.z) / dir.z))
   }
 
-  const keepCardInWrapper = (pointer: SignatureDeveloperCardPointer): SignatureDeveloperCardPointer => {
-    const bounds = dragBounds.current
-    if (!bounds) return pointer
-    const wrapper = gl.domElement.getBoundingClientRect()
-    const maxLeft = Math.max(wrapper.left, wrapper.right - bounds.width)
-    const maxTop = Math.max(wrapper.top, wrapper.bottom - bounds.height)
-    const cardLeft = THREE.MathUtils.clamp(pointer.clientX - bounds.offsetX, wrapper.left, maxLeft)
-    const cardTop = THREE.MathUtils.clamp(pointer.clientY - bounds.offsetY, wrapper.top, maxTop)
-    return {
-      ...pointer,
-      clientX: cardLeft + bounds.offsetX,
-      clientY: cardTop + bounds.offsetY,
-    }
-  }
-
   const handleDragStart = (pointer: SignatureDeveloperCardPointer) => {
-    const element = gl.domElement.parentElement?.querySelector<HTMLElement>(".signature-developer-card")
-    const bounds = element?.getBoundingClientRect()
-    dragBounds.current = bounds
-      ? { offsetX: pointer.clientX - bounds.left, offsetY: pointer.clientY - bounds.top, width: bounds.width, height: bounds.height }
-      : null
     const translation = card.current.translation()
     dragPlaneZ.current = translation.z
-    const boundedPointer = keepCardInWrapper(pointer)
-    const worldPointer = pointerToWorld(boundedPointer, dragPlaneZ.current)
+    const worldPointer = pointerToWorld(pointer, dragPlaneZ.current)
     if (!worldPointer) return
-    dragPointer.current = boundedPointer
+    dragPointer.current = pointer
     drag(new THREE.Vector3().copy(worldPointer).sub(new THREE.Vector3(translation.x, translation.y, translation.z)))
   }
 
   const stopDrag = () => {
     dragPointer.current = null
-    dragBounds.current = null
     drag(false)
   }
 
@@ -398,7 +373,7 @@ function Band({
         >
           {renderCard({
             onDragStart: handleDragStart,
-            onDragMove: pointer => { dragPointer.current = keepCardInWrapper(pointer) },
+            onDragMove: pointer => { dragPointer.current = pointer },
             onDragEnd: stopDrag,
             onDragCancel: stopDrag,
           })}

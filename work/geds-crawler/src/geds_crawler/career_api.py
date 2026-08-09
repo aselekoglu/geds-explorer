@@ -18,7 +18,7 @@ def create_career_app(master_db: Path | str | CareerReadStore, frontend_dir: Pat
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         response = await call_next(request)
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' blob:; img-src 'self' data: blob:"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; font-src 'self' data:; connect-src 'self' blob:; img-src 'self' data: blob:"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response

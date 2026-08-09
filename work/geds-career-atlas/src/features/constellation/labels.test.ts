@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { institutionAbbreviation, wrapBubbleLabel } from "./labels"
+import { abbreviationFitsBubble, institutionAbbreviation, wrapBubbleLabel } from "./labels"
 
 describe("institutionAbbreviation", () => {
   it("uses reviewed Government of Canada abbreviations", () => {
@@ -18,5 +18,12 @@ describe("wrapBubbleLabel", () => {
   it("wraps whole words without adding an ellipsis", () => {
     expect(wrapBubbleLabel("Chairperson's Office", 12)).toEqual(["Chairperson's", "Office"])
     expect(wrapBubbleLabel("Dispute Resolution and Regulatory Implementation", 18, 3).join(" ")).not.toContain("...")
+  })
+})
+
+describe("abbreviationFitsBubble",()=>{
+  it("reveals a compact institution abbreviation once zoom creates enough room",()=>{
+    expect(abbreviationFitsBubble("ESDC",3,1)).toBe(false)
+    expect(abbreviationFitsBubble("ESDC",3,8)).toBe(true)
   })
 })

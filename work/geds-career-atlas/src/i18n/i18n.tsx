@@ -26,6 +26,15 @@ export function flatten(dictionary: Dictionary, prefix = ""): Record<string, str
   }, {})
 }
 
+const fallbackMessages = flatten(en)
+const fallbackLanguageContext: LanguageContextValue = {
+  language: "en",
+  setLanguage: () => undefined,
+  t: (key: string, values: Values = {}) => Object.entries(values).reduce((copy, [name, replacement]) => copy.replaceAll(`{${name}}`, String(replacement)), fallbackMessages[key] ?? key),
+  formatNumber: (number: number) => new Intl.NumberFormat("en-CA").format(number),
+  formatDate: (date: string | Date) => new Intl.DateTimeFormat("en-CA", { dateStyle: "long", timeZone: "UTC" }).format(new Date(date)),
+}
+
 const getInitialLanguage = (): Language => new URLSearchParams(location.search).get("lang") === "fr" ? "fr" : "en"
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
@@ -54,14 +63,5 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 }
 
 export function useLanguage() {
-  const value = useContext(LanguageContext)
-  if (value) return value
-  const messages = flatten(en)
-  return {
-    language: "en" as const,
-    setLanguage: () => undefined,
-    t: (key: string, values: Values = {}) => Object.entries(values).reduce((copy, [name, replacement]) => copy.replaceAll(`{${name}}`, String(replacement)), messages[key] ?? key),
-    formatNumber: (number: number) => new Intl.NumberFormat("en-CA").format(number),
-    formatDate: (date: string | Date) => new Intl.DateTimeFormat("en-CA", { dateStyle: "long", timeZone: "UTC" }).format(new Date(date)),
-  }
+  return useContext(LanguageContext) ?? fallbackLanguageContext
 }

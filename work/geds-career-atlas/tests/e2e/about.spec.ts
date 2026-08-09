@@ -8,7 +8,7 @@ async function waitForPhysicalCard(page: Page) {
   return card
 }
 
-test("renders the transparent physical Profile Card without replacing About content", async ({ page }) => {
+test("renders the physical Profile Card in a clearly separated project section", async ({ page }) => {
   const pageErrors: string[] = []
   page.on("pageerror", error => pageErrors.push(error.message))
   const response = await page.goto("/#about")
@@ -27,23 +27,28 @@ test("renders the transparent physical Profile Card without replacing About cont
 
   const layout = await page.locator(".about-page__developer").evaluate(element => {
     const style = getComputedStyle(element)
-    const pageStyle = getComputedStyle(element.closest(".about-page")!)
+    const projectStyle = getComputedStyle(element.closest(".about-page__project")!)
     return {
       background: style.backgroundImage,
       borderTopWidth: style.borderTopWidth,
       boxShadow: style.boxShadow,
-      pageDisplay: pageStyle.display,
+      position: style.position,
+      projectDisplay: projectStyle.display,
+      projectBorderTopWidth: projectStyle.borderTopWidth,
     }
   })
   expect(layout).toEqual({
     background: "none",
     borderTopWidth: "0px",
     boxShadow: "none",
-    pageDisplay: "block",
+    position: "absolute",
+    projectDisplay: "grid",
+    projectBorderTopWidth: "1px",
   })
 
   const csp = response?.headers()["content-security-policy"] ?? ""
   expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval'")
+  expect(csp).toContain("font-src 'self' data:")
   expect(csp).not.toContain(" 'unsafe-eval'")
   expect(pageErrors).toEqual([])
 })
@@ -57,6 +62,7 @@ test("drags the DOM badge without navigating, then keeps click and keyboard acti
   const popups: Page[] = []
   page.on("popup", popup => popups.push(popup))
   await page.goto("/#about")
+  await page.locator(".about-page__project").scrollIntoViewIfNeeded()
   const card = await waitForPhysicalCard(page)
   const initial = await card.boundingBox()
   expect(initial).not.toBeNull()
@@ -86,7 +92,35 @@ test("drags the DOM badge without navigating, then keeps click and keyboard acti
   await keyboardPopup.close()
 })
 
-test("keeps the scaled mobile Lanyard clear of the heading and avoids overflow", async ({ page }) => {
+test("lets the lanyard cross the project content while staying in the foreground", async ({ page }) => {
+  await page.goto("/#about")
+  const project = page.locator(".about-page__project")
+  await project.scrollIntoViewIfNeeded()
+  const card = await waitForPhysicalCard(page)
+  const initial = await card.boundingBox()
+  expect(initial).not.toBeNull()
+
+  const startX = initial!.x + initial!.width / 2
+  const startY = initial!.y + initial!.height / 2
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(startX - 280, startY + 80, { steps: 12 })
+  await expect(card).toHaveAttribute("data-drag-state", "dragging")
+  const during = await card.boundingBox()
+  expect(during).not.toBeNull()
+  expect(during!.x).toBeLessThan(initial!.x - 20)
+
+  const layers = await page.locator(".about-page__developer").evaluate(element => ({
+    developerZ: Number.parseInt(getComputedStyle(element).zIndex, 10),
+    contentZ: Number.parseInt(getComputedStyle(element.closest(".about-page__project")!.querySelector("header")!).zIndex, 10),
+    overflow: getComputedStyle(element).overflow,
+  }))
+  expect(layers.developerZ).toBeGreaterThan(layers.contentZ)
+  expect(layers.overflow).toBe("visible")
+  await page.mouse.up()
+})
+
+test("keeps the scaled mobile Lanyard inside the project section and avoids overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto("/#about")
 
@@ -95,15 +129,19 @@ test("keeps the scaled mobile Lanyard clear of the heading and avoids overflow",
   const card = await waitForPhysicalCard(page)
   const cardBounds = await card.boundingBox()
   const headingBounds = await page.getByRole("heading", { name: "About", level: 1 }).boundingBox()
-  const overlayBounds = await page.locator(".about-page__developer").boundingBox()
+  const developerBounds = await page.locator(".about-page__developer").boundingBox()
+  const projectBounds = await page.locator(".about-page__project").boundingBox()
+  const projectHeadingBounds = await page.getByRole("heading", { name: /The person behind GEDS Explorer/, level: 2 }).boundingBox()
   expect(cardBounds).not.toBeNull()
   expect(headingBounds).not.toBeNull()
-  expect(overlayBounds).not.toBeNull()
-  expect(overlayBounds!.y).toBeLessThan(0)
-  expect(overlayBounds!.x).toBeLessThanOrEqual(0)
-  expect(overlayBounds!.x + overlayBounds!.width).toBeGreaterThanOrEqual(390)
+  expect(developerBounds).not.toBeNull()
+  expect(projectBounds).not.toBeNull()
+  expect(projectHeadingBounds).not.toBeNull()
+  expect(developerBounds!.y).toBeGreaterThan(projectHeadingBounds!.y + projectHeadingBounds!.height)
+  expect(developerBounds!.x).toBeGreaterThanOrEqual(projectBounds!.x)
+  expect(developerBounds!.x + developerBounds!.width).toBeLessThanOrEqual(projectBounds!.x + projectBounds!.width)
   expect(cardBounds!.width).toBeGreaterThan(140)
-  expect(cardBounds!.width).toBeLessThan(210)
+  expect(cardBounds!.width).toBeLessThan(300)
 
   const overlapsHeading = !(
     cardBounds!.x >= headingBounds!.x + headingBounds!.width ||

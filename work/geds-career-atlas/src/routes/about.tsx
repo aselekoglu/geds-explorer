@@ -29,9 +29,13 @@ export function AboutPage({ client }: { client: MetaClient }) {
     return () => controller.abort()
   }, [client])
   return <section id="about" className="about-page">
-    <div className="about-page__hero">
-      <header className="about-page__intro"><p className="eyebrow">{t("about.eyebrow")}</p><h1>{t("about.pageTitle")}</h1><p>{t("about.generalIntro")}</p></header>
-      <aside className="about-page__developer" aria-label="Interactive developer lanyard">
+    <header className="about-page__intro"><p className="service-kicker">{t("about.eyebrow")}</p><h1>{t("about.pageTitle")}</h1><p>{t("about.generalIntro")}</p></header>
+    <div className="about-page__content">
+      {meta ? <DataMethodology meta={meta} /> : <p className="about-page__loading" role="status">{t("about.loading")}</p>}
+    </div>
+    <section className="about-page__project" aria-labelledby="project-heading">
+      <header><p className="service-kicker">{t("about.projectEyebrow")}</p><h2 id="project-heading">{t("about.projectTitle")}</h2><p>{t("about.projectIntro")}</p></header>
+      <aside className="about-page__developer" aria-label={t("about.developerLabel")}>
         <LanyardErrorBoundary fallback={
           <Suspense fallback={null}>
             <div className="signature-lanyard signature-lanyard--static lanyard-fallback--unavailable" data-render-mode="error-fallback">
@@ -42,9 +46,6 @@ export function AboutPage({ client }: { client: MetaClient }) {
           <Suspense fallback={null}><Lanyard position={[0, 0, 45]} gravity={[0, -40, 0]} /></Suspense>
         </LanyardErrorBoundary>
       </aside>
-    </div>
-    <div className="about-page__content">
-      {meta ? <DataMethodology meta={meta} /> : <p className="about-page__loading" role="status">{t("about.loading")}</p>}
-    </div>
+    </section>
   </section>
 }

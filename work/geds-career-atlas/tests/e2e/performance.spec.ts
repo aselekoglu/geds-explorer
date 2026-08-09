@@ -36,7 +36,7 @@ test("cached initial Discover is useful under 2.5 seconds and feedback appears u
       document.querySelector("input")!.addEventListener("input", () => {
         const started = performance.now()
         const check = () => {
-          if (!document.body.textContent?.includes("Finding matching teams")) return
+          if (!document.body.textContent?.includes("Finding related government teams")) return
           state.__feedbackMs = performance.now() - started
           observer.disconnect()
         }
@@ -45,8 +45,9 @@ test("cached initial Discover is useful under 2.5 seconds and feedback appears u
         check()
       }, { once: true })
     })
-    await page.getByRole("textbox", { name: "Career interest" }).fill("AI")
-    await expect(page.getByText(/Finding matching teams/)).toBeVisible()
+    await page.getByRole("button", { name: "Search GEDS data" }).click()
+    await page.getByRole("searchbox", { name: "Search GEDS data" }).fill("AI")
+    await expect(page.getByText(/Finding related government teams/)).toBeVisible()
     feedback.push(await page.evaluate(() => (window as Window & { __feedbackMs: number }).__feedbackMs))
   }
   console.info(`PERF filter-feedback-ms=${feedback.join(",")}`)

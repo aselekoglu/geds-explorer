@@ -204,7 +204,7 @@ def _direct_interpretation(query: str, active: dict[str, Any]) -> dict[str, Any]
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
-    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self' data: blob:"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
@@ -531,4 +531,3 @@ def vacancy_signals(limit: int = Query(50, ge=1, le=200)):
         return {"items": items, "limit": _bounded(limit, MAX_PAGE_SIZE), "snapshot_id": active["snapshot_id"], "quality_status": active["quality_status"], "etag": _etag(active, "vacancy-signals", limit)}
 
     return _read(read)
-

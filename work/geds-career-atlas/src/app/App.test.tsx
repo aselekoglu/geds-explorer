@@ -18,6 +18,17 @@ it("does not reserve an empty profile column",()=>{
   expect(container.querySelector(".detail-panel")).not.toBeInTheDocument()
 })
 
+it("keeps the global GEDS search collapsed until requested",async()=>{
+  history.replaceState(null,"","/#discover")
+  render(<App/>)
+  const toggle=screen.getByRole("button",{name:"Search GEDS data"})
+  expect(toggle).toHaveAttribute("aria-expanded","false")
+  expect(screen.queryByRole("searchbox",{name:"Search GEDS data"})).not.toBeInTheDocument()
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute("aria-expanded","true")
+  await waitFor(()=>expect(screen.getByRole("searchbox",{name:"Search GEDS data"})).toHaveFocus())
+})
+
 it("clears a stale team profile when institution changes",async()=>{
   history.replaceState(null,"","/?focus=old-team&department=Department%20A#discover")
   vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL)=>{

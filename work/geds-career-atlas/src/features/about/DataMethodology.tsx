@@ -1,4 +1,5 @@
 import { useLanguage } from "../../i18n/i18n"
+import { localizeQualityStatus } from "../../i18n/labels"
 
 export type AtlasMeta = {
   snapshot_id: string
@@ -12,7 +13,7 @@ export type AtlasMeta = {
 
 export function DataMethodology({ meta }: { meta: AtlasMeta }) {
   const { t, formatDate, formatNumber } = useLanguage()
-  const quality = meta.quality_status.replaceAll("_", " ")
+  const quality = localizeQualityStatus(meta.quality_status, t)
   return <section className="methodology" aria-labelledby="about-data-heading">
     <h2 id="about-data-heading">{t("about.dataTitle")}</h2>
     <p className="methodology-intro">{t("about.intro")}</p>

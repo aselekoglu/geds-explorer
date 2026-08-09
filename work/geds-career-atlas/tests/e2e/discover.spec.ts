@@ -9,7 +9,7 @@ test("broad interest illuminates explainable government teams", async ({ page })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await expect(page.getByRole("button", { name: /apply/i })).toHaveCount(0)
 
-  await page.getByRole("button", { name: "Français" }).click()
+  await page.getByRole("link", { name: "Français" }).click()
   await expect(page.getByRole("link", { name: "Découvrir" })).toBeVisible()
   await expect(page).toHaveURL(/q=AI/)
   await expect(page).toHaveURL(/lang=fr/)

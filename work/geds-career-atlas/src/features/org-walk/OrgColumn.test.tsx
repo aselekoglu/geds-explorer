@@ -31,9 +31,12 @@ it("keeps drill and profile actions as independent sibling controls",()=>{
   fireEvent.click(screen.getByRole("button",{name:/^Organization 42\. 3 teams/}))
   expect(onDrill).toHaveBeenCalledWith(items[42],0)
   expect(onProfile).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole("button",{name:"Open Organization 42 profile"}))
+  const profileButton=screen.getByRole("button",{name:"Open Organization 42 profile"})
+  fireEvent.click(profileButton)
   expect(onProfile).toHaveBeenCalledWith("org-42")
   expect(onDrill).toHaveBeenCalledTimes(1)
+  expect(profileButton).not.toHaveTextContent("Profile")
+  expect(profileButton.querySelector(".profile-info-icon")).toBeInTheDocument()
 })
 
 it("marks the selected row even when it is a leaf",()=>{

@@ -45,8 +45,8 @@ test("dot field renders and empty map space dismisses selected facts", async ({ 
   const canvas = stage.locator(".dot-field canvas")
   await expect(canvas).toBeVisible()
   const field = stage.locator(".dot-field")
-  await expect(field).toHaveAttribute("data-bulge-strength", "58")
-  await expect(field).toHaveAttribute("data-dot-spacing", "18")
+  await expect(field).toHaveAttribute("data-bulge-strength", "18")
+  await expect(field).toHaveAttribute("data-dot-spacing", "22")
 
   const option=stage.getByRole("option").first()
   await option.focus()

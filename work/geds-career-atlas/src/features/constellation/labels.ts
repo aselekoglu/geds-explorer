@@ -35,3 +35,9 @@ export function wrapBubbleLabel(name: string, maxCharacters: number, maxLines = 
   }
   return lines
 }
+
+export function abbreviationFitsBubble(abbreviation:string,radius:number,zoomLevel:number,fontSize=12):boolean{
+  const availableWidth=radius*Math.max(.1,zoomLevel)*1.6
+  const estimatedTextWidth=abbreviation.length*fontSize*.58
+  return availableWidth>=Math.max(fontSize*1.3,estimatedTextWidth)
+}

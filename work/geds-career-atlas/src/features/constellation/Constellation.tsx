@@ -1,10 +1,13 @@
 import { select, zoom, zoomIdentity, type ZoomBehavior } from "d3"
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { useLanguage } from "../../i18n/i18n"
+import { localizeQualityStatus } from "../../i18n/labels"
 import { buildPackLayout } from "./layout"
-import { institutionAbbreviation, wrapBubbleLabel } from "./labels"
+import { abbreviationFitsBubble, institutionAbbreviation, wrapBubbleLabel } from "./labels"
 
 export type ConstellationNode = { id: string; name: string; value?: number; child_count?:number; direct_people_count?:number; descendant_people_count?:number; quality_status?: string; vacancy_count?: number; has_more?: boolean }
+
+const ABBREVIATION_FONT_SIZE=12
 
 export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLevel = false }: { nodes: ConstellationNode[]; focus?: string; onFocus?: (id: string) => void; onDrill?:(node:ConstellationNode)=>void;onSelect?:(node:ConstellationNode)=>void; topLevel?: boolean }) {
   const { t } = useLanguage()
@@ -13,15 +16,16 @@ export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLev
   const zoomBehaviorRef=useRef<ZoomBehavior<SVGSVGElement,unknown>|null>(null)
   const [zoomLevel,setZoomLevel]=useState(1)
   const nodeKey=useMemo(()=>nodes.map(node=>node.id).join("|"),[nodes])
-  const positioned = buildPackLayout(nodes, 620, 620)
-  const details = new Map(nodes.map(node => [node.id, node]))
+  const positioned=useMemo(()=>buildPackLayout(nodes,620,620),[nodes])
+  const details=useMemo(()=>new Map(nodes.map(node=>[node.id,node])),[nodes])
   useEffect(()=>{
     const svg=svgRef.current
     const viewport=viewportRef.current
     if(!svg||!viewport)return
     const behavior=zoom<SVGSVGElement,unknown>().scaleExtent([.7,8]).on("zoom",event=>{
       select(viewport).attr("transform",event.transform.toString())
-    }).on("end",event=>setZoomLevel(event.transform.k))
+      setZoomLevel(event.transform.k)
+    })
     zoomBehaviorRef.current=behavior
     select(svg).call(behavior).on("dblclick.zoom",null)
     return()=>{select(svg).on(".zoom",null);zoomBehaviorRef.current=null}
@@ -45,7 +49,7 @@ export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLev
         <button type="button" className="constellation-reset" onClick={resetView}>{t("constellation.zoomReset")}</button>
       </div>
     </div>
-    <svg ref={svgRef} viewBox="0 0 620 620" role="group" aria-labelledby="constellation-title constellation-description">
+    <svg ref={svgRef} viewBox="0 0 620 620" preserveAspectRatio="xMidYMid meet" role="group" aria-labelledby="constellation-title constellation-description">
       <title id="constellation-title">{t("constellation.graphicTitle")}</title>
       <desc id="constellation-description">{t("constellation.graphicDescription")}</desc>
       <defs>
@@ -75,16 +79,17 @@ export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLev
       <g ref={viewportRef} className="constellation-viewport">{positioned.map(node => {
         const detail = details.get(node.id)
         const classes = [node.id === focus ? "is-selected" : "", detail?.quality_status && detail.quality_status !== "complete" ? "has-quality-warning" : "", detail?.vacancy_count ? "has-vacancy" : ""].filter(Boolean).join(" ")
-        const description = [detail?.quality_status ? t("constellation.quality", { status: detail.quality_status.replaceAll("_", " ") }) : "", detail?.vacancy_count ? t("discover.vacancy") : "", detail?.has_more ? t("constellation.moreAvailable") : ""].filter(Boolean).join(". ")
+        const description = [detail?.quality_status ? t("constellation.quality", { status: localizeQualityStatus(detail.quality_status,t) }) : "", detail?.vacancy_count ? t("discover.vacancy") : "", detail?.has_more ? t("constellation.moreAvailable") : ""].filter(Boolean).join(". ")
         const displayName = topLevel ? institutionAbbreviation(node.name) : node.name
         const lines = topLevel ? [displayName] : wrapBubbleLabel(displayName, Math.min(22, Math.max(9, Math.floor(node.r / 4.5))), node.r > 100 ? 4 : 3)
+        const showLabel=topLevel?abbreviationFitsBubble(displayName,node.r,zoomLevel,ABBREVIATION_FONT_SIZE):(node.r>45||node.id===focus)
         return <g key={node.id} className="constellation-node" data-quality={detail?.quality_status} role="button" tabIndex={0} aria-label={node.name} aria-keyshortcuts="Enter Space ArrowRight" aria-describedby={node.id===focus?`constellation-facts-${node.id}`:undefined} onClick={() => detail&&selectNode(detail)} onDoubleClick={() => detail&&drill(detail)} onKeyDown={event => detail&&keySelect(event, detail)}>
           <title>{[node.name, description].filter(Boolean).join(". ")}</title>
-          <circle className="constellation-hit-target" cx={node.x} cy={node.y} r={Math.max(22,node.r)} />
-          <circle className={`constellation-bubble-surface ${classes}`.trim()} cx={node.x} cy={node.y} r={Math.max(7, node.r)} />
-          <circle className="constellation-bubble-sheen" cx={node.x} cy={node.y} r={Math.max(7, node.r-1)} />
-          <circle className="constellation-bubble-border" cx={node.x} cy={node.y} r={Math.max(7, node.r-1)} />
-          {(node.r > 45 || node.id === focus) && <text x={node.x} y={node.y} textAnchor="middle" fill="#f4f8ff" aria-hidden="true">{lines.map((line,index)=><tspan key={`${line}-${index}`} x={node.x} dy={index===0?`${-(lines.length-1)*0.55}em`:"1.1em"}>{line}</tspan>)}</text>}
+          <circle className="constellation-hit-target" cx={node.x} cy={node.y} r={node.r} />
+          <circle className={`constellation-bubble-surface ${classes}`.trim()} cx={node.x} cy={node.y} r={node.r} />
+          <circle className="constellation-bubble-sheen" cx={node.x} cy={node.y} r={Math.max(0,node.r-.75)} />
+          <circle className="constellation-bubble-border" cx={node.x} cy={node.y} r={Math.max(0,node.r-.75)} />
+          {showLabel&&<text className={topLevel?"constellation-abbreviation":undefined} x={node.x} y={node.y} textAnchor="middle" fill="#f4f8ff" aria-hidden="true" style={topLevel?{fontSize:`${ABBREVIATION_FONT_SIZE/zoomLevel}px`}:undefined}>{lines.map((line,index)=><tspan key={`${line}-${index}`} x={node.x} dy={index===0?`${-(lines.length-1)*0.55}em`:"1.1em"}>{line}</tspan>)}</text>}
         </g>
       })}</g>
     </svg>

@@ -1,7 +1,7 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test"
 
 export async function waitForAtlas(page: Page) {
-  await expect(page).toHaveTitle("GEDS Career Atlas")
+  await expect(page).toHaveTitle(/— GEDS Explorer$/)
   await expect(page.getByRole("heading", { name: /Government at a glance|Where .* appears/ })).toBeVisible()
 }
 

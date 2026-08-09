@@ -38,15 +38,22 @@ it("shows observed people, classifications, and official GEDS links without cont
   expect(screen.queryByText(/email|phone/i)).not.toBeInTheDocument()
 })
 
-it("refetches with search and classification filters",async()=>{
+it("keeps optional search collapsed, hides classification, and refetches by name",async()=>{
   const client={people:vi.fn().mockResolvedValue(page())}
   render(<PeopleInTeam orgId="ai" client={client}/>)
   await screen.findByText("Ada Lovelace")
 
+  expect(screen.queryByRole("searchbox",{name:/Search people/i})).not.toBeInTheDocument()
+  expect(screen.queryByRole("combobox",{name:/Observed classification/i})).not.toBeInTheDocument()
+  const toggle=screen.getByRole("button",{name:"Search people"})
+  expect(toggle).toHaveAttribute("aria-expanded","false")
+  fireEvent.click(toggle)
   fireEvent.change(screen.getByRole("searchbox",{name:/Search people/i}),{target:{value:"Ada"}})
-  fireEvent.change(screen.getByRole("combobox",{name:/Observed classification/i}),{target:{value:"IT-02"}})
 
-  await waitFor(()=>expect(client.people).toHaveBeenLastCalledWith("ai",expect.objectContaining({q:"Ada",classification:"IT-02"}),expect.any(AbortSignal)))
+  expect(toggle).toHaveAttribute("aria-expanded","true")
+  await waitFor(()=>expect(screen.getByRole("searchbox",{name:/Search people/i})).toHaveFocus())
+  await waitFor(()=>expect(client.people).toHaveBeenLastCalledWith("ai",expect.objectContaining({q:"Ada"}),expect.any(AbortSignal)))
+  expect(client.people).not.toHaveBeenLastCalledWith("ai",expect.objectContaining({classification:expect.anything()}),expect.any(AbortSignal))
 })
 
 it("does not render a guessed link when the official source is unavailable",async()=>{

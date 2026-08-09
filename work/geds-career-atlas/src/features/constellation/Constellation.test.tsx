@@ -44,3 +44,10 @@ it("renders a static layered premium bubble surface",()=>{
   expect(container.querySelector(".constellation-bubble-sheen")).toBeInTheDocument()
   expect(container.querySelector(".constellation-bubble-border")).toBeInTheDocument()
 })
+
+it("keeps each pointer target inside its visible packed bubble",()=>{
+  const {container}=render(<Constellation topLevel nodes={[{id:"large",name:"Large Agency",value:1000},{id:"small",name:"Small Agency",value:0}]}/>)
+  for(const node of container.querySelectorAll(".constellation-node")){
+    expect(node.querySelector(".constellation-hit-target")?.getAttribute("r")).toBe(node.querySelector(".constellation-bubble-surface")?.getAttribute("r"))
+  }
+})

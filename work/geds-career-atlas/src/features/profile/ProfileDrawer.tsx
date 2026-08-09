@@ -44,7 +44,7 @@ export function ProfileDrawer({ open, onClose, children, label = "Team profile",
   if (!open) return null
   return <div className="detail-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
     <aside ref={panelRef} className="detail-panel detail-panel--open" role="dialog" aria-modal="true" aria-label={label} onKeyDown={handleKeyDown}>
-      <button ref={closeRef} className="close" type="button" aria-label={t("app.close")} onClick={onClose}>×</button>
+      <button ref={closeRef} className="close" type="button" aria-label={t("app.close")} onClick={onClose}><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/></svg></button>
       {children}
     </aside>
   </div>
