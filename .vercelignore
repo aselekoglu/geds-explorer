@@ -1,0 +1,10 @@
+.pytest_cache
+**/.pytest_cache
+outputs
+**/node_modules
+**/dist
+**/test-results
+**/__pycache__
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
