@@ -1,0 +1,23 @@
+# Government of Canada open-source readiness
+
+This is a project readiness record, not a Government of Canada compliance, certification, accreditation, or endorsement claim. It separates documented project evidence from obligations that depend on a department, contract, deployment, or data custodian.
+
+| Area | Requirement or expectation | Current implementation evidence | Owner / verification status |
+| --- | --- | --- | --- |
+| Open source licensing | Publish a clear license and preserve upstream notices. | Root [`LICENSE`](../LICENSE) applies Apache-2.0; dependency licenses remain upstream obligations; no project `NOTICE` is currently required. | Maintainer; verify NOTICE/attribution before each redistribution. |
+| Privacy and data handling | Identify personal-information handling, minimize collection, and keep use/disclosure decisions documented. | Crawler docs and tests exclude phone, email, fax, and address fields; public projection is read-only and limited. | Maintainer + data custodian; verify any new source, field, retention period, or deployment through a privacy review. |
+| Security reporting | Provide a private reporting path and responsible-disclosure expectations. | [`SECURITY.md`](../SECURITY.md) points to private GitHub reporting, asks for authorized testing, sanitized evidence, and coordinated disclosure. | Maintainer; verify the private channel works and define response targets before production use. |
+| Security engineering | Apply security controls appropriate to the system and deployment. | Control-plane loopback warning and separate public read-only boundary are documented in [`work/geds-crawler/SECURITY.md`](../work/geds-crawler/SECURITY.md). | Deployment owner; verify authentication, TLS, logging, patching, threat model, and authorization for each environment. |
+| Accessibility | Use the Government of Canada accessibility standard as a review baseline; do not infer certification from tests. | Frontend has unit/E2E coverage and accessibility-focused dependencies; contribution checklist requires keyboard and accessible-name review. | Frontend owner; verify against the [Standard on Web Accessibility](https://www.tbs-sct.canada.ca/pol/doc-eng.aspx?id=27100), including manual review and target environment. |
+| Official languages | Consider English/French service and content obligations where the deployment is a Government of Canada program or service. | Career Atlas has English/French product copy and contribution guidance asks for parity. | Product/deployment owner; verify language obligations, translations, and approval with the responsible institution. |
+| Supply-chain hygiene | Keep dependencies attributable, review updates, and retain reproducible verification evidence. | Lockfiles are committed; package-specific test/typecheck/build commands and generated-artifact exclusions are documented. | Maintainer; verify dependency advisories, provenance, update review, Python/npm lockfile changes, and release scanning. |
+| Open-source governance | Make contribution, review, and decision records visible and reproducible. | [`CONTRIBUTING.md`](../CONTRIBUTING.md), PR template, checklist, Code of Conduct, and decision-record convention are present. | Maintainer; verify branch protection, review requirements, and issue/private-reporting configuration on GitHub. |
+| Official digital guidance | Use Government of Canada digital guidance as a reference when the project is proposed for government use. | README and SECURITY link to [Online security and privacy](https://www.canada.ca/en/government/system/digital-government/online-security-privacy.html), [Digital Standards](https://www.canada.ca/en/government/system/digital-government/government-canada-digital-standards.html), and [Canadian Centre for Cyber Security guidance](https://www.cyber.gc.ca/en/guidance). | Sponsoring institution / contract authority; verify which policy instruments apply; repository authors cannot self-attest. |
+
+## Release gate
+
+Before a Government of Canada deployment or contract deliverable, the responsible institution should confirm the applicable privacy, security, accessibility, official-languages, records, procurement, and hosting requirements. Record the decision, scope, evidence, exceptions, and approving authority; do not replace that process with this checklist.
+
+## Evidence maintenance
+
+Re-run package tests and `git diff --check` for changes. Review this record whenever data fields, external sources, deployment exposure, dependencies, or language/accessibility behavior changes. Mark an item “to verify” when evidence depends on an environment or institution not controlled by this repository.
