@@ -18,15 +18,19 @@ it("does not reserve an empty profile column",()=>{
   expect(container.querySelector(".detail-panel")).not.toBeInTheDocument()
 })
 
-it("keeps Search and explore controls collapsed until requested",async()=>{
+it("collapses the full Search and explore header until requested",async()=>{
   history.replaceState(null,"","/#discover")
-  render(<App/>)
+  const {container}=render(<App/>)
   const toggle=screen.getByRole("button",{name:"Search and explore"})
   expect(toggle).toHaveAttribute("aria-expanded","false")
+  expect(container.querySelector(".task-header__content")).toHaveAttribute("hidden")
+  expect(screen.queryByRole("heading",{level:1,name:"Explore Government of Canada organizations"})).not.toBeInTheDocument()
   expect(screen.queryByRole("searchbox",{name:"Search GEDS data"})).not.toBeInTheDocument()
-  expect(screen.getByLabelText("Institution").closest(".service-search__body")).toHaveAttribute("hidden")
+  expect(screen.getByLabelText("Institution")).not.toBeVisible()
   fireEvent.click(toggle)
   expect(toggle).toHaveAttribute("aria-expanded","true")
+  expect(container.querySelector(".task-header__content")).not.toHaveAttribute("hidden")
+  expect(screen.getByRole("heading",{level:1,name:"Explore Government of Canada organizations"})).toBeVisible()
   await waitFor(()=>expect(screen.getByRole("searchbox",{name:"Search GEDS data"})).toHaveFocus())
   expect(screen.getByLabelText("Institution")).toBeVisible()
 })

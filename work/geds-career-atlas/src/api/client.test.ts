@@ -13,3 +13,12 @@ it("requests direct team people with encoded public filters", async () => {
   expect(fetchMock.mock.calls[0][0]).toContain("classification=IT-02")
   expect(fetchMock.mock.calls[0][0]).toContain("sort=title")
 })
+
+it("requests the bounded role sample used by the profile overview", async () => {
+  const fetchMock=vi.fn().mockResolvedValue(new Response(JSON.stringify({items:[],limit:200,snapshot_id:"snapshot",quality_status:"complete",etag:"etag"}),{status:200}))
+  vi.stubGlobal("fetch",fetchMock)
+
+  await new CareerApiClient().roles("team/id")
+
+  expect(fetchMock).toHaveBeenCalledWith("/api/roles?org_id=team%2Fid&limit=200",expect.any(Object))
+})

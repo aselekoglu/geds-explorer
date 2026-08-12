@@ -182,18 +182,20 @@ export function App() {
 
     <main id="main">
       {view !== "about" && <section className="task-header">
-        <div className="service-container task-header__layout">
-          <header className="task-header__intro">
-            <p className="service-kicker">{taskCopy.eyebrow}</p>
-            <h1>{taskCopy.title}</h1>
-            <p>{taskCopy.intro}</p>
-          </header>
-          <div className="task-header__controls">
-            <form className="service-search" role="search" onSubmit={event => event.preventDefault()}>
-              <button type="button" className="service-search__toggle" aria-expanded={exploreExpanded} aria-controls="geds-search-explore-panel" onClick={() => { const next = !exploreExpanded; setExploreExpanded(next); if (next) requestAnimationFrame(() => searchRef.current?.focus()) }}>
-                <span>{t("app.discoverEyebrow")}</span><DisclosureChevron/>
-              </button>
-              <div id="geds-search-explore-panel" className="service-search__body" hidden={!exploreExpanded}>
+        <div className="service-container task-header__disclosure">
+          <button type="button" className="task-header__toggle" aria-expanded={exploreExpanded} aria-controls="geds-search-explore-panel" onClick={() => { const next = !exploreExpanded; setExploreExpanded(next); if (next) requestAnimationFrame(() => searchRef.current?.focus()) }}>
+            <span>{t("app.discoverEyebrow")}</span><DisclosureChevron/>
+          </button>
+          <div id="geds-search-explore-panel" className="task-header__content" hidden={!exploreExpanded}>
+            <div className="task-header__layout">
+              <header className="task-header__intro">
+                <p className="service-kicker">{taskCopy.eyebrow}</p>
+                <h1>{taskCopy.title}</h1>
+                <p>{taskCopy.intro}</p>
+              </header>
+              <div className="task-header__controls">
+                <form className="service-search" role="search" onSubmit={event => event.preventDefault()}>
+                  <div className="service-search__body">
                 <label htmlFor="geds-search">{t("app.searchLabel")}</label>
                 <p id="geds-search-hint">{t("app.searchHint")}</p>
                 <div className="service-search__field">
@@ -202,14 +204,16 @@ export function App() {
                   {query && <button type="button" className="service-search__clear" aria-label={t("app.clearSearch")} onClick={clearSearch}><CloseIcon/><span>{t("app.clear")}</span></button>}
                 </div>
                 <FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status ?? "loading"} onChange={updateScope}/>
+                  </div>
+                </form>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       </section>}
 
-      <div className="service-workspace">
-        {view === "discover" && <div className={`discover-workspace${query ? " discover-workspace--searching" : ""}`}>
+      <div className={`service-workspace${view === "discover" ? " service-workspace--discover" : ""}`}>
+        {view === "discover" && <div className={`discover-workspace${query ? " discover-workspace--searching" : ""}${exploreExpanded ? "" : " discover-workspace--header-collapsed"}`}>
           {query && <DiscoverPage search={query} client={client} scope={scope} onScopeChange={updateScope} onProfile={selectOrg}/>}
           <ConstellationPage client={client} query={query} focus={selectedOrgId ?? undefined} onProfile={selectOrg} scope={scope} rootOrgId={selectedDepartment?.department_id}/>
         </div>}

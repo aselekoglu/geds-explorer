@@ -22,15 +22,20 @@ test("supports skip link, visible focus, action-list semantics, and reduced moti
   expect(Number.parseFloat(duration)).toBeLessThanOrEqual(0.001)
 })
 
-test("keeps Search and explore controls visually collapsed until requested", async ({ page }) => {
+test("keeps the full Search and explore header visually collapsed until requested", async ({ page }) => {
   await page.goto("/#explorer")
   const toggle = page.getByRole("button", { name: "Search and explore" })
+  const headerContent = page.locator(".task-header__content")
   const searchbox = page.getByRole("searchbox", { name: "Search GEDS data" })
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await expect(headerContent).toBeHidden()
+  await expect(page.getByRole("heading", { level: 1, name: "Browse the government directory" })).toBeHidden()
   await expect(searchbox).toBeHidden()
   await expect(page.getByLabel("Institution")).toBeHidden()
   await toggle.click()
   await expect(toggle).toHaveAttribute("aria-expanded", "true")
+  await expect(headerContent).toBeVisible()
+  await expect(page.getByRole("heading", { level: 1, name: "Browse the government directory" })).toBeVisible()
   await expect(searchbox).toBeVisible()
   await expect(searchbox).toBeFocused()
   await expect(page.getByLabel("Institution")).toBeVisible()

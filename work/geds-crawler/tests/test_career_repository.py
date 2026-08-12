@@ -211,6 +211,30 @@ def test_role_explorer_rows_preserve_original_titles_and_category_evidence(repos
     assert by_title["Data Scientist"].confidence in {"high", "medium", "exploratory"}
 
 
+def test_role_explorer_prioritizes_recorded_titles_before_missing_titles(repository):
+    org_id = repository.children(parent_id=None, limit=20).items[0].org_id
+    snapshot_id = repository.departments().snapshot_id
+    with repository.connect() as con:
+        row = con.execute("SELECT * FROM career_entities WHERE snapshot_id=? AND entity_kind='person' LIMIT 1", (snapshot_id,)).fetchone()
+        columns = [item[1] for item in con.execute("PRAGMA table_info(career_entities)")]
+    writable = sqlite3.connect(repository.master_db)
+    writable.execute("PRAGMA query_only=OFF")
+    values = dict(row)
+    for index in range(60):
+        values.update(entity_id=f"person:missing-{index}", title="", org_id=org_id)
+        writable.execute(
+            f"INSERT INTO career_entities ({','.join(columns)}) VALUES ({','.join('?' for _ in columns)})",
+            [values[column] for column in columns],
+        )
+    writable.commit(); writable.close()
+
+    roles = repository.roles(org_id=org_id, limit=50)
+
+    assert roles.items
+    assert roles.items[0].title
+    assert any(item.title == "Data Scientist" for item in roles.items)
+
+
 def test_root_constellation_returns_only_root_organizations(repository):
     result = repository.constellation_slice(root_id=None, max_depth=1, limit=2000)
 

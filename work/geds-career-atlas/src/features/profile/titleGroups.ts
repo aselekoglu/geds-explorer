@@ -11,5 +11,5 @@ export function groupObservedTitles(titles:string[]):TitleGroup[]{
     if(current)current.count+=1
     else groups.set(key,{key,label:normalized||"No title recorded",count:1,empty:!normalized})
   }
-  return [...groups.values()].sort((a,b)=>Number(a.empty)-Number(b.empty)||a.label.localeCompare(b.label))
+  return [...groups.values()].sort((a,b)=>Number(a.empty)-Number(b.empty)||b.count-a.count||a.label.localeCompare(b.label))
 }

@@ -441,7 +441,7 @@ class CareerRepository:
             params: list[object] = [meta["snapshot_id"]]
             if org_id is not None:
                 sql += " AND e.org_id=?"; params.append(org_id)
-            sql += " ORDER BY e.title,e.entity_id LIMIT ?"; params.append(limit)
+            sql += " ORDER BY CASE WHEN trim(COALESCE(e.title,''))='' THEN 1 ELSE 0 END,e.title COLLATE NOCASE,e.entity_id LIMIT ?"; params.append(limit)
             rows = con.execute(sql, params).fetchall()
             match_map: dict[str, dict[str, object]] = {}
             if rows:

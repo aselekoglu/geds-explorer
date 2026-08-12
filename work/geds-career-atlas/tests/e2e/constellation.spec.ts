@@ -27,6 +27,23 @@ test("mobile constellation is list-first without page overflow", async ({ page }
   expect(result).toEqual({ overflow: false, listFirst: true })
 })
 
+test("collapsed Search and explore gives the constellation most of the desktop viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/#discover")
+  const stage = page.getByTestId("constellation-stage")
+  const taskHeader = page.locator(".task-header")
+  await expect(page.getByRole("button", { name: "Search and explore" })).toHaveAttribute("aria-expanded", "false")
+  const dimensions = await page.evaluate(() => {
+    const stage = document.querySelector<HTMLElement>("[data-testid=constellation-stage]")!.getBoundingClientRect()
+    const header = document.querySelector<HTMLElement>(".task-header")!.getBoundingClientRect()
+    return { stageHeight: stage.height, stageWidth: stage.width, headerHeight: header.height, viewportWidth: innerWidth }
+  })
+  expect(dimensions.headerHeight).toBeLessThanOrEqual(72)
+  expect(dimensions.stageHeight).toBeGreaterThanOrEqual(600)
+  expect(dimensions.stageWidth).toBeGreaterThanOrEqual(dimensions.viewportWidth - 40)
+  await expect(stage).toBeVisible()
+})
+
 test("constellation opens details on click and drills only on double click", async ({ page }) => {
   await page.goto("/#constellation")
   const stage=page.getByTestId("constellation-stage")

@@ -12,3 +12,10 @@ it("groups case and whitespace variants and sorts empty last",()=>{
     {key:"",label:"No title recorded",count:2,empty:true},
   ])
 })
+
+it("orders observed roles by frequency before name",()=>{
+  expect(groupObservedTitles(["Analyst","Manager","manager","MANAGER"])).toEqual([
+    {key:"manager",label:"Manager",count:3,empty:false},
+    {key:"analyst",label:"Analyst",count:1,empty:false},
+  ])
+})
