@@ -2342,6 +2342,72 @@ select:focus-visible {
   }
 }
 
+/* Search results stay readable while the hierarchy keeps its workbench model. */
+.org-explorer--searching .org-match-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.org-explorer--searching .org-match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.75rem;
+  align-items: stretch;
+  gap: .5rem;
+}
+
+.org-explorer--searching .org-match__primary {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  padding: .75rem .85rem;
+  text-align: left;
+}
+
+.org-explorer--searching .org-match__profile {
+  min-height: 4.5rem;
+  justify-content: center;
+  padding: .5rem;
+}
+
+.org-columns--single {
+  display: grid;
+  grid-template-columns: minmax(0, 36rem);
+  align-items: start;
+  overflow: visible;
+}
+
+.org-columns--single .org-column-shell,
+.org-columns--single .org-people-column,
+.org-columns--single .org-empty-column {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 60rem) {
+  .org-explorer--searching .org-match-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 47.5rem) {
+  .org-explorer--searching .org-match-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .org-columns--single {
+    display: block;
+    grid-template-columns: none;
+    overflow: visible;
+  }
+
+  .org-columns--single .org-column-shell,
+  .org-columns--single .org-people-column,
+  .org-columns--single .org-empty-column {
+    width: 100%;
+    min-width: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
