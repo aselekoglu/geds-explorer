@@ -32,3 +32,12 @@ def test_turso_result_behaves_like_the_api_rows():
     assert result.fetchone() == {"id": 1}
     assert result.fetchall() == [{"id": 2}]
     assert result.fetchone() is None
+
+
+def test_turso_result_supports_shared_query_positional_access():
+    module = _module()
+    row = module.TursoResult([{"count": 7}]).fetchone()
+
+    assert row is not None
+    assert row["count"] == 7
+    assert row[0] == 7

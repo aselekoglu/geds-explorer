@@ -18,12 +18,21 @@ class TursoError(RuntimeError):
     """Raised when a read-only Turso request cannot be completed."""
 
 
+class TursoRow(dict[str, Any]):
+    """Mapping row with the positional access used by the shared API queries."""
+
+    def __getitem__(self, key: str | int) -> Any:
+        if isinstance(key, int):
+            return tuple(self.values())[key]
+        return super().__getitem__(key)
+
+
 class TursoResult:
     def __init__(self, rows: list[dict[str, Any]]) -> None:
-        self._rows = rows
+        self._rows = [row if isinstance(row, TursoRow) else TursoRow(row) for row in rows]
         self._position = 0
 
-    def fetchone(self) -> dict[str, Any] | None:
+    def fetchone(self) -> TursoRow | None:
         if self._position >= len(self._rows):
             return None
         row = self._rows[self._position]
