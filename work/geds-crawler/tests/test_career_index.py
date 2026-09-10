@@ -86,6 +86,18 @@ def test_rebuild_replaces_the_same_snapshot_index(canonical_master):
         assert con.execute("SELECT COUNT(*) FROM career_matches").fetchone()[0] >= 1
 
 
+def test_people_names_are_in_public_fts_index(canonical_master):
+    build_career_index(canonical_master, TAXONOMY_PATH)
+
+    with sqlite3.connect(canonical_master) as con:
+        rows = con.execute(
+            "SELECT entity_id FROM career_entities_fts WHERE career_entities_fts MATCH ?",
+            ("Ada*",),
+        ).fetchall()
+
+    assert any(row[0].startswith("person:") for row in rows)
+
+
 def test_failed_build_preserves_previous_index_state(canonical_master, tmp_path):
     build_career_index(canonical_master, TAXONOMY_PATH)
     before = current_index_state(canonical_master)

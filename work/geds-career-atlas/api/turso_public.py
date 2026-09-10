@@ -32,21 +32,42 @@ def _match_query(value: str) -> str:
     return " AND ".join('"' + token.replace('"', '""') + '"*' for token in tokens)
 
 
-def _turso_search(con: Any, query: str, limit: int, active: dict[str, Any]) -> dict[str, Any]:
+def _turso_search(con: Any, query: str, limit: int, active: dict[str, Any], department: str | None = None, entity_kind: str | None = None) -> dict[str, Any]:
     match_query = _match_query(query)
     if not match_query:
         return _public._search_result(
-            [], active, limit, "search", query, limit,
+            [], active, limit, "search", query, limit, department or "all", entity_kind or "all",
             interpretation=_public._direct_interpretation(query, active),
+            total=0,
         )
 
     schema = _public._schema()
-    fts_rows = con.execute(
-        f"""SELECT entity_id,title,organization_name,ancestor_text
+    count_result = con.execute(
+        f"""SELECT COUNT(*)
             FROM {schema}.career_entities_fts
-            WHERE career_entities_fts MATCH %s
+            JOIN {schema}.career_entities e ON e.entity_id={schema}.career_entities_fts.entity_id AND e.snapshot_id=%s
+            LEFT JOIN {schema}.organizations_current o ON o.snapshot_id=e.snapshot_id AND o.org_id=e.org_id
+            LEFT JOIN {schema}.departments_current d ON d.snapshot_id=o.snapshot_id AND d.department_dn=o.department_dn
+            WHERE {schema}.career_entities_fts MATCH %s
+              AND (%s IS NULL OR e.entity_kind=%s)
+              AND (%s IS NULL OR d.name=%s)""",
+        (active["snapshot_id"], match_query, entity_kind, entity_kind, department, department),
+    )
+    if hasattr(count_result, "fetchone"):
+        total = int(count_result.fetchone()[0])
+    else:
+        total = len(count_result.fetchall())
+    fts_rows = con.execute(
+        f"""SELECT f.entity_id,f.display_name,f.title,f.organization_name,f.ancestor_text,e.entity_kind,COALESCE(d.name,'') AS department_name
+            FROM {schema}.career_entities_fts f
+            JOIN {schema}.career_entities e ON e.entity_id=f.entity_id AND e.snapshot_id=%s
+            LEFT JOIN {schema}.organizations_current o ON o.snapshot_id=e.snapshot_id AND o.org_id=e.org_id
+            LEFT JOIN {schema}.departments_current d ON d.snapshot_id=o.snapshot_id AND d.department_dn=o.department_dn
+            WHERE {schema}.career_entities_fts MATCH %s
+              AND (%s IS NULL OR e.entity_kind=%s)
+              AND (%s IS NULL OR d.name=%s)
             LIMIT %s""",
-        (match_query, limit),
+        (active["snapshot_id"], match_query, entity_kind, entity_kind, department, department, limit),
     ).fetchall()
     entity_ids = [str(row["entity_id"]) for row in fts_rows]
     org_ids = [entity_id[4:] for entity_id in entity_ids if entity_id.startswith("org:")]
@@ -114,8 +135,8 @@ def _turso_search(con: Any, query: str, limit: int, active: dict[str, Any]) -> d
                 continue
             display_name = str(row["display_name"])
             title = str(row["title"] or "")
-            field = "title" if folded_query in title.casefold() else "organization"
-            source_text = title if field == "title" else str(row["organization_name"] or "")
+            field = "display_name" if folded_query in display_name.casefold() else "title" if folded_query in title.casefold() else "organization"
+            source_text = display_name if field == "display_name" else title if field == "title" else str(row["organization_name"] or "")
             items.append(_public._search_item(
                 {
                     "entity_id": entity_id,
@@ -132,8 +153,9 @@ def _turso_search(con: Any, query: str, limit: int, active: dict[str, Any]) -> d
             ))
 
     return _public._search_result(
-        items, active, limit, "search", query, limit,
+        items, active, limit, "search", query, limit, department or "all", entity_kind or "all",
         interpretation=_public._direct_interpretation(query, active),
+        total=total,
     )
 
 
@@ -143,12 +165,12 @@ for route in list(app.router.routes):
 
 
 @app.get("/api/search")
-def search(q: str = Query(min_length=1, max_length=240), limit: int = Query(20, ge=1, le=200)):
+def search(q: str = Query(min_length=1, max_length=240), limit: int = Query(20, ge=1, le=200), department: str | None = Query(None, max_length=200), entity_kind: str | None = Query(None, pattern=r"^(?:organization|person)$")):
     bounded_limit = _public._bounded(limit, _public.MAX_PAGE_SIZE)
 
     def read(con):
         active = _public._active(con)
-        return _turso_search(con, q, bounded_limit, active)
+        return _turso_search(con, q, bounded_limit, active, department, entity_kind)
 
     return _public._read(read)
 

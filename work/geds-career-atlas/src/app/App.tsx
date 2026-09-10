@@ -45,6 +45,7 @@ export function App() {
   const [meta, setMeta] = useState<AtlasMeta | null>(null)
   const [exploreExpanded, setExploreExpanded] = useState(Boolean(initial.query || initial.scope.department))
   const searchRef = useRef<HTMLInputElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
   const client = useMemo(() => new CareerApiClient(), [])
   const { language, setLanguage, t } = useLanguage()
   const selectedDepartment = useMemo(() => departments.find(item => item.name === scope.department), [departments, scope.department])
@@ -156,15 +157,15 @@ export function App() {
   }
 
   return <div className="app-shell">
-    <a className="skip-link" href="#main">{t("app.skip")}</a>
+     <a className="skip-link" href="#main" onClick={event => { event.preventDefault(); mainRef.current?.focus() }}>{t("app.skip")}</a>
     <header className="service-header">
       <div className="service-header__context service-container">
         <p><span>{t("app.dataSourcePrefix")}</span> <a href={officialGedsUrl} target="_blank" rel="noreferrer">{t("app.government")}</a></p>
         <div className="service-header__context-actions">
           <span className="independent-label">{t("app.independentShort")}</span>
           <a className="language" href={languageHref()} lang={otherLanguage} hrefLang={otherLanguage} onClick={event => { event.preventDefault(); setLanguage(otherLanguage) }}>{language === "en" ? "Français" : "English"}</a>
-        </div>
-      </div>
+           </div>
+         </div>
       <div className="identity-rule" aria-hidden="true" />
       <div className="product-header service-container">
         <a className="product-brand" href="#discover" onClick={() => setView("discover")} aria-label={t("app.homeLabel")}>
@@ -180,7 +181,7 @@ export function App() {
       </div>
     </header>
 
-    <main id="main">
+     <main id="main" ref={mainRef} tabIndex={-1}>
       {view !== "about" && <section className="task-header">
         <div className="service-container task-header__disclosure">
           <button type="button" className="task-header__toggle" aria-expanded={exploreExpanded} aria-controls="geds-search-explore-panel" onClick={() => { const next = !exploreExpanded; setExploreExpanded(next); if (next) requestAnimationFrame(() => searchRef.current?.focus()) }}>
@@ -206,9 +207,10 @@ export function App() {
                 <FilterRail departments={departments} value={scope} qualityStatus={meta?.quality_status ?? "loading"} onChange={updateScope}/>
                   </div>
                 </form>
-              </div>
             </div>
           </div>
+           </div>
+          {!exploreExpanded && <div className="task-header__collapsed-summary"><p className="service-kicker">{taskCopy.eyebrow}</p><h1>{taskCopy.title}</h1><p>{taskCopy.intro}</p></div>}
         </div>
       </section>}
 

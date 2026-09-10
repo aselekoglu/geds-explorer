@@ -15,6 +15,11 @@ export function TeamProfile({ name, roles, profile, relatedTeams = [], peopleCli
   const [copied, setCopied] = useState(false)
   const breadcrumbItems: BreadcrumbTrailItem[] = profile?.canonical_path.map((label, index) => ({ key: `${index}-${label}`, label })) ?? []
   const qualityStatus = profile?.quality_status && profile.quality_status !== "complete" ? localizeQualityStatus(profile.quality_status,t) : ""
+  function relatedTeamHref(orgId: string) {
+    const params = new URLSearchParams(location.search)
+    params.set("focus", orgId)
+    return `${location.pathname}?${params}${location.hash || "#discover"}`
+  }
   async function copyIssueReport() {
     if (!profile) return
     const report = [`Organization ID: ${profile.org_id}`, `Snapshot ID: ${profile.snapshot_id}`, `Observed organization: ${name}`, `Observed titles: ${roles.join(" | ")}`, `Source URL: ${profile.source_url ?? "unavailable"}`, "Correction description:", ""].join("\n")
@@ -26,7 +31,7 @@ export function TeamProfile({ name, roles, profile, relatedTeams = [], peopleCli
     {profile && <><BreadcrumbTrail items={breadcrumbItems} label={t("orgWalk.path")} /><dl><div><dt>{t("profile.observedPeople")}</dt><dd>{formatNumber(profile.direct_people_count)}</dd></div><div><dt>{t("profile.branchPeople")}</dt><dd>{formatNumber(profile.descendant_people_count)}</dd></div><div><dt>{t("profile.childTeams")}</dt><dd>{formatNumber(profile.child_count)}</dd></div></dl>{profile.snapshot_as_of && <p>{t("profile.snapshot", { date: formatDate(profile.snapshot_as_of) })}</p>}{qualityStatus && <aside className="profile-quality-note" role="note"><strong>{t("profile.qualityStatus",{status:qualityStatus})}</strong><span>{t("profile.qualityScope")}</span></aside>}{profile.source_url && <p><a href={profile.source_url} target="_blank" rel="noreferrer">{t("profile.officialOrg")}</a></p>}</>}
     <h3>{t("profile.rolesTitle")}</h3><p>{t("profile.rolesIntro")}</p><GroupedRoles titles={roles} onRoleQuery={onRoleQuery}/>
     {profile?.child_count===0&&peopleClient&&<PeopleInTeam orgId={profile.org_id} client={peopleClient}/>}
-    {relatedTeams.length > 0 && <section><h3>{t("profile.relatedTitle")}</h3><ul>{relatedTeams.map(team => <li key={team.org_id}><a href={`?focus=${encodeURIComponent(team.org_id)}`}>{team.name}</a></li>)}</ul></section>}
+     {relatedTeams.length > 0 && <section><h3>{t("profile.relatedTitle")}</h3><ul>{relatedTeams.map(team => <li key={team.org_id}><a href={relatedTeamHref(team.org_id)}>{team.name}</a></li>)}</ul></section>}
     {profile && <><button type="button" onClick={() => void copyIssueReport()}>{t("profile.issueCopy")}</button>{copied && <p role="status">{t("profile.issueCopied")}</p>}<CareerConversationLeads leads={profile.conversation_leads ?? []} vacancies={profile.vacancy_signals ?? []} snapshotAsOf={profile.snapshot_as_of ?? profile.snapshot_id} /></>}
   </section>
 }

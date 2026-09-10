@@ -22,16 +22,22 @@ class LanyardErrorBoundary extends Component<{ children: ReactNode, fallback: Re
 
 export function AboutPage({ client }: { client: MetaClient }) {
   const [meta, setMeta] = useState<AtlasMeta | null>(null)
+  const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
   const { t } = useLanguage()
   useEffect(() => {
     const controller = new AbortController()
-    client.meta(controller.signal).then(setMeta).catch(() => undefined)
+    setMeta(null)
+    setError(false)
+    client.meta(controller.signal).then(setMeta).catch(reason => {
+      if (reason?.name !== "AbortError") setError(true)
+    })
     return () => controller.abort()
-  }, [client])
+  }, [client, retry])
   return <section id="about" className="about-page">
     <header className="about-page__intro"><p className="service-kicker">{t("about.eyebrow")}</p><h1>{t("about.pageTitle")}</h1><p>{t("about.generalIntro")}</p></header>
     <div className="about-page__content">
-      {meta ? <DataMethodology meta={meta} /> : <p className="about-page__loading" role="status">{t("about.loading")}</p>}
+      {meta ? <DataMethodology meta={meta} /> : error ? <div className="about-page__error" role="alert"><p>{t("about.error")}</p><button type="button" onClick={() => setRetry(value => value + 1)}>{t("about.retry")}</button></div> : <p className="about-page__loading" role="status">{t("about.loading")}</p>}
     </div>
     <section className="about-page__project" aria-labelledby="project-heading">
       <header><p className="service-kicker">{t("about.projectEyebrow")}</p><h2 id="project-heading">{t("about.projectTitle")}</h2><p>{t("about.projectIntro")}</p></header>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { QueryInterpretation, SearchResult } from "../../api/types"
 import { useLanguage } from "../../i18n/i18n"
 import type { DiscoverScope } from "./FilterRail"
@@ -6,7 +6,7 @@ import { InterpretationChips } from "./InterpretationChips"
 import { MatchCard } from "./MatchCard"
 
 type Item = SearchResult["items"][number]
-type Client = { search: (q: string, signal?: AbortSignal) => Promise<{ items: Item[]; interpretation?: QueryInterpretation }> }
+type Client = { search: (q: string, optionsOrSignal?: { department?: string; entity_kind?: "organization" | "person" } | AbortSignal, signal?: AbortSignal) => Promise<{ items: Item[]; total?: number; interpretation?: QueryInterpretation }> }
 export type SearchKind = "all" | "topics" | "teams" | "people"
 
 export function DiscoverPage({ search, client, scope = { department: "" }, onScopeChange, onProfile }: {
@@ -21,6 +21,8 @@ export function DiscoverPage({ search, client, scope = { department: "" }, onSco
   const [kind, setKind] = useState<SearchKind>("all")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [total, setTotal] = useState(0)
+  const queryKeyRef = useRef("")
   const { t, formatNumber } = useLanguage()
 
   useEffect(() => {
@@ -28,16 +30,24 @@ export function DiscoverPage({ search, client, scope = { department: "" }, onSco
     if (!search) {
       setItems([])
       setInterpretation(undefined)
+      setTotal(0)
       setLoading(false)
       return () => controller.abort()
     }
-    setItems([])
-    setInterpretation(undefined)
+    const queryKey = `${search}\u0000${scope.department}`
+    if (queryKeyRef.current !== queryKey) {
+      queryKeyRef.current = queryKey
+      setItems([])
+      setInterpretation(undefined)
+      setTotal(0)
+    }
     setLoading(true)
     const timer = setTimeout(() => {
       setError("")
-      client.search(search, controller.signal).then(result => {
+      const entity_kind = kind === "teams" ? "organization" : kind === "people" ? "person" : undefined
+      client.search(search, { department: scope.department || undefined, entity_kind }, controller.signal).then(result => {
         setItems(result.items)
+        setTotal(result.total ?? result.items.length)
         setInterpretation(result.interpretation)
       }).catch(value => {
         if (value?.name !== "AbortError") setError(t("discover.error"))
@@ -49,7 +59,7 @@ export function DiscoverPage({ search, client, scope = { department: "" }, onSco
       clearTimeout(timer)
       controller.abort()
     }
-  }, [search, client, t])
+  }, [search, client, kind, scope.department, t])
 
   const visibleItems = items.filter(item =>
     (!scope.department || item.department_name === scope.department) &&
@@ -65,7 +75,7 @@ export function DiscoverPage({ search, client, scope = { department: "" }, onSco
   }
   const resultSummary = kind === "topics"
     ? t("discover.topicCount", { count: formatNumber(topicCount) })
-    : t("discover.resultsCount", { count: formatNumber(visibleItems.length) })
+    : t("discover.resultsCount", { count: formatNumber(total) })
   const showNoMatch = !loading && !error && search && visibleItems.length === 0 && (!showTopics || topicCount === 0)
 
   return <section aria-labelledby="discover-results-title" className="discover-results">

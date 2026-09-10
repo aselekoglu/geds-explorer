@@ -1105,6 +1105,10 @@ select:focus-visible {
   letter-spacing: 0;
 }
 
+.constellation-stage svg text.is-selected {
+  fill: var(--accent-contrast);
+}
+
 .constellation-toolbar {
   right: .75rem;
   bottom: .75rem;
@@ -1364,6 +1368,24 @@ select:focus-visible {
   padding: .35rem;
   background: var(--surface);
   scrollbar-color: var(--line-strong) transparent;
+}
+
+.org-load-more,
+.people-load-more {
+  width: calc(100% - .7rem);
+  min-height: 2.75rem;
+  margin: .35rem;
+  border: 1px solid var(--line-strong);
+  border-radius: .125rem;
+  background: var(--surface2);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.org-load-more:hover:not(:disabled),
+.people-load-more:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--surface3);
 }
 
 .org-card {
@@ -1970,7 +1992,7 @@ select:focus-visible {
     grid-row: 1;
   }
 
-  .task-header__layout {
+.task-header__layout {
     grid-template-columns: 1fr;
     gap: 1.75rem;
   }
@@ -1978,6 +2000,21 @@ select:focus-visible {
   .task-header__intro {
     max-width: 48rem;
   }
+}
+
+.task-header__collapsed-summary {
+  max-width: 58rem;
+  padding: 1rem 0 1.35rem;
+}
+
+.task-header__collapsed-summary h1 {
+  margin: 0;
+}
+
+.task-header__collapsed-summary > p:last-child {
+  max-width: 56ch;
+  margin: .8rem 0 0;
+  color: var(--muted);
 }
 
 @media (max-width: 58rem) {

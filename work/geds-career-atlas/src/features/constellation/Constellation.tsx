@@ -5,11 +5,11 @@ import { localizeQualityStatus } from "../../i18n/labels"
 import { buildPackLayout } from "./layout"
 import { abbreviationFitsBubble, institutionAbbreviation, wrapBubbleLabel } from "./labels"
 
-export type ConstellationNode = { id: string; name: string; value?: number; child_count?:number; direct_people_count?:number; descendant_people_count?:number; quality_status?: string; vacancy_count?: number; has_more?: boolean }
+export type ConstellationNode = { id: string; name: string; value?: number; child_count?:number; direct_people_count?:number; descendant_people_count?:number; match_count?:number; quality_status?: string; vacancy_count?: number; has_more?: boolean }
 
 const ABBREVIATION_FONT_SIZE=12
 
-export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLevel = false }: { nodes: ConstellationNode[]; focus?: string; onFocus?: (id: string) => void; onDrill?:(node:ConstellationNode)=>void;onSelect?:(node:ConstellationNode)=>void; topLevel?: boolean }) {
+export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLevel = false, queryMode = false }: { nodes: ConstellationNode[]; focus?: string; onFocus?: (id: string) => void; onDrill?:(node:ConstellationNode)=>void;onSelect?:(node:ConstellationNode)=>void; topLevel?: boolean; queryMode?: boolean }) {
   const { t } = useLanguage()
   const svgRef=useRef<SVGSVGElement>(null)
   const viewportRef=useRef<SVGGElement>(null)
@@ -51,7 +51,7 @@ export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLev
     </div>
     <svg ref={svgRef} viewBox="0 0 620 620" preserveAspectRatio="xMidYMid meet" role="group" aria-labelledby="constellation-title constellation-description">
       <title id="constellation-title">{t("constellation.graphicTitle")}</title>
-      <desc id="constellation-description">{t("constellation.graphicDescription")}</desc>
+       <desc id="constellation-description">{t("constellation.graphicDescription",{measure:t(queryMode?"constellation.matchStrength":"constellation.peopleMeasure")})}</desc>
       <defs>
         <radialGradient id="constellation-bubble-surface" cx="30%" cy="22%" r="92%">
           <stop offset="0%" stopColor="color-mix(in srgb, var(--accent) 86%, white)"/>
@@ -89,7 +89,7 @@ export function Constellation({ nodes, focus, onFocus, onDrill, onSelect, topLev
           <circle className={`constellation-bubble-surface ${classes}`.trim()} cx={node.x} cy={node.y} r={node.r} />
           <circle className="constellation-bubble-sheen" cx={node.x} cy={node.y} r={Math.max(0,node.r-.75)} />
           <circle className="constellation-bubble-border" cx={node.x} cy={node.y} r={Math.max(0,node.r-.75)} />
-          {showLabel&&<text className={topLevel?"constellation-abbreviation":undefined} x={node.x} y={node.y} textAnchor="middle" fill="#f4f8ff" aria-hidden="true" style={topLevel?{fontSize:`${ABBREVIATION_FONT_SIZE/zoomLevel}px`}:undefined}>{lines.map((line,index)=><tspan key={`${line}-${index}`} x={node.x} dy={index===0?`${-(lines.length-1)*0.55}em`:"1.1em"}>{line}</tspan>)}</text>}
+           {showLabel&&<text className={`${topLevel?"constellation-abbreviation":""}${node.id===focus?" is-selected":""}`.trim()} x={node.x} y={node.y} textAnchor="middle" fill="#f4f8ff" aria-hidden="true" style={topLevel?{fontSize:`${ABBREVIATION_FONT_SIZE/zoomLevel}px`}:undefined}>{lines.map((line,index)=><tspan key={`${line}-${index}`} x={node.x} dy={index===0?`${-(lines.length-1)*0.55}em`:"1.1em"}>{line}</tspan>)}</text>}
         </g>
       })}</g>
     </svg>

@@ -36,17 +36,47 @@ def test_meta_and_search_contract(career_client):
     search = career_client.get("/api/search", params={"q": "AI", "limit": 20})
     assert search.status_code == 200
     assert search.json()["items"][0]["evidence"]
+    assert search.json()["total"] >= len(search.json()["items"])
     assert search.headers["etag"]
+
+
+def test_search_filters_are_applied_before_limit(career_client):
+    person = career_client.get(
+        "/api/search",
+        params={"q": "Ada", "entity_kind": "person", "limit": 1},
+    )
+    assert person.status_code == 200
+    assert person.json()["total"] == 1
+    assert [item["entity_kind"] for item in person.json()["items"]] == ["person"]
+
+    organization = career_client.get(
+        "/api/search",
+        params={"q": "Ada", "entity_kind": "organization", "limit": 1},
+    )
+    assert organization.status_code == 200
+    assert organization.json()["total"] == 0
+    assert organization.json()["items"] == []
+
+    wrong_department = career_client.get(
+        "/api/search",
+        params={"q": "Ada", "department": "Other", "limit": 1},
+    )
+    assert wrong_department.status_code == 200
+    assert wrong_department.json()["total"] == 0
 
 
 def test_org_root_and_child_contract(career_client):
     roots = career_client.get("/api/orgs/root/children", params={"limit": 200})
     assert roots.status_code == 200
     assert roots.json()["items"]
+    assert roots.json()["total"] >= len(roots.json()["items"])
+    assert roots.json()["offset"] == 0
+    assert roots.json()["has_more"] is False
     assert roots.headers["etag"]
 
     children = career_client.get(f"/api/orgs/{roots.json()['items'][0]['org_id']}/children")
     assert children.status_code == 200
+    assert {"total", "offset", "has_more"} <= children.json().keys()
 
 
 def test_unknown_organization_ancestors_returns_404(career_client):

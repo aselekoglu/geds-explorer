@@ -36,20 +36,20 @@ def create_career_app(master_db: Path | str | CareerReadStore, frontend_dir: Pat
         return JSONResponse(repository(request).meta())
 
     @app.get("/api/search")
-    def search(request: Request, q: str = Query(min_length=1, max_length=240), limit: int = Query(20, ge=1, le=200)):
-        return payload(repository(request).search(query=q, limit=limit))
+    def search(request: Request, q: str = Query(min_length=1, max_length=240), limit: int = Query(20, ge=1, le=200), department: str | None = Query(None, max_length=200), entity_kind: str | None = Query(None, pattern=r"^(?:organization|person)$")):
+        return payload(repository(request).search(query=q, limit=limit, department=department, entity_kind=entity_kind))
 
     @app.get("/api/departments")
     def departments(request: Request):
         return payload(repository(request).departments())
 
     @app.get("/api/orgs/root/children")
-    def root_children(request: Request, limit: int = Query(50, ge=1, le=200)):
-        return payload(repository(request).children(parent_id=None, limit=limit))
+    def root_children(request: Request, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0, le=1000000)):
+        return payload(repository(request).children(parent_id=None, limit=limit, offset=offset))
 
     @app.get("/api/orgs/{org_id}/children")
-    def children(request: Request, org_id: str, limit: int = Query(50, ge=1, le=200)):
-        return payload(repository(request).children(parent_id=org_id, limit=limit))
+    def children(request: Request, org_id: str, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0, le=1000000)):
+        return payload(repository(request).children(parent_id=org_id, limit=limit, offset=offset))
 
     @app.get("/api/orgs/{org_id}/ancestors")
     def ancestors(request: Request, org_id: str):

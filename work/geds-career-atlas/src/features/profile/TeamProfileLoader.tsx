@@ -11,7 +11,9 @@ export function TeamProfileLoader({ orgId, client,onRoleQuery }: { orgId: string
   const [error, setError] = useState(false)
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([client.profile(orgId, controller.signal), client.roles(orgId, controller.signal), client.children?.(orgId,controller.signal)??Promise.resolve({items:[],snapshot_id:"",etag:""} as OrgPage)]).then(([profile, roles, children]) => setData({ profile, roles, children:children.items })).catch(value => { if (value.name !== "AbortError") setError(true) })
+    setData(null)
+    setError(false)
+    Promise.all([client.profile(orgId, controller.signal), client.roles(orgId, controller.signal), client.children?.(orgId,controller.signal)??Promise.resolve({items:[],snapshot_id:"",etag:""} as OrgPage)]).then(([profile, roles, children]) => setData({ profile, roles, children:children.items })).catch(value => { if ((value as {name?:string})?.name !== "AbortError") setError(true) })
     return () => controller.abort()
   }, [client, orgId])
   if (error) return <p role="status">{t("profile.unavailable")}</p>

@@ -23,15 +23,27 @@ export function PeopleInTeam({orgId,client}:{orgId:string;client:PeopleClient}){
   const [searchExpanded,setSearchExpanded]=useState(false)
   const [data,setData]=useState<PeoplePage|null>(null)
   const [error,setError]=useState(false)
+  const [moreError,setMoreError]=useState(false)
+  const [loadingMore,setLoadingMore]=useState(false)
   const [retry,setRetry]=useState(0)
   const searchPanelId=useId()
   const searchInputId=useId()
   const searchInputRef=useRef<HTMLInputElement>(null)
   useEffect(()=>{
-    const controller=new AbortController();setData(null);setError(false)
+    const controller=new AbortController();setData(null);setError(false);setMoreError(false)
     client.people(orgId,{q:query,sort:"title",limit:200,offset:0},controller.signal).then(setData).catch(value=>{if(value?.name!=="AbortError")setError(true)})
     return()=>controller.abort()
   },[client,orgId,query,retry])
+  async function loadMore(){
+    if(!data||loadingMore||data.items.length>=data.total)return
+    setLoadingMore(true);setMoreError(false)
+    try {
+      const page=await client.people(orgId,{q:query,sort:"title",limit:200,offset:data.items.length})
+      setData(current=>current?{...current,items:[...current.items,...page.items],total:page.total,limit:page.limit,offset:page.offset,available_classifications:page.available_classifications,etag:page.etag}:page)
+    } catch (value) {
+      if((value as {name?:string})?.name!=="AbortError")setMoreError(true)
+    } finally { setLoadingMore(false) }
+  }
   const groups=useMemo(()=>groupPeople(data?.items??[]),[data])
   const personRow=(person:PublicPerson)=><li className="person-row" key={person.person_id}><div><strong>{person.display_name}</strong><span className="classification-list">{person.observed_classifications.map(value=><span className="classification-badge" aria-label={t("people.classificationObserved",{value})} title={t("people.classificationHelp")} key={value}>{value}</span>)}</span></div>{person.source_url?<a href={person.source_url} target="_blank" rel="noopener noreferrer">{t("people.official")}</a>:<span className="source-unavailable">{t("people.unavailable")}</span>}</li>
   return <section className="people-in-team" aria-labelledby="people-in-team-title">
@@ -41,6 +53,6 @@ export function PeopleInTeam({orgId,client}:{orgId:string;client:PeopleClient}){
       <div id={searchPanelId} className="people-controls" hidden={!searchExpanded}><label htmlFor={searchInputId}>{t("people.search")}<input ref={searchInputRef} id={searchInputId} type="search" value={query} onChange={event=>setQuery(event.target.value)}/></label></div>
     </div>
     {error&&<div role="alert"><p>{t("people.error")}</p><button type="button" onClick={()=>setRetry(value=>value+1)}>{t("people.retry")}</button></div>}{!error&&!data&&<p role="status">{t("people.loading")}</p>}
-    {data&&<><p className="people-count" role="status">{t("people.count",{count:formatNumber(data.total)})}</p>{groups.length===0?<p>{t("people.empty")}</p>:<div className="people-title-groups">{groups.map(group=>group.empty?<details className="people-title-group people-title-group--empty" key={group.key}><summary>{t("profile.noTitle")} · {group.people.length}</summary><ul>{group.people.map(personRow)}</ul></details>:<section className="people-title-group" key={group.key}><h4><span>{group.label}</span> · {group.people.length}</h4><ul>{group.people.map(personRow)}</ul></section>)}</div>}</>}
+     {data&&<><p className="people-count" role="status">{t("people.count",{count:formatNumber(data.total)})}</p>{groups.length===0?<p>{t("people.empty")}</p>:<div className="people-title-groups">{groups.map(group=>group.empty?<details className="people-title-group people-title-group--empty" key={group.key}><summary>{t("profile.noTitle")} · {group.people.length}</summary><ul>{group.people.map(personRow)}</ul></details>:<section className="people-title-group" key={group.key}><h4><span>{group.label}</span> · {group.people.length}</h4><ul>{group.people.map(personRow)}</ul></section>)}</div>}{moreError&&<div role="alert"><p>{t("people.error")}</p><button type="button" onClick={()=>void loadMore()}>{t("people.retry")}</button></div>}{data.items.length<data.total&&<button type="button" className="people-load-more" onClick={()=>void loadMore()} disabled={loadingMore}>{loadingMore?t("people.loadingMore"):t("people.loadMore")}</button>}</>}
   </section>
 }

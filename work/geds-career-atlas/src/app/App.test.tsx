@@ -24,7 +24,7 @@ it("collapses the full Search and explore header until requested",async()=>{
   const toggle=screen.getByRole("button",{name:"Search and explore"})
   expect(toggle).toHaveAttribute("aria-expanded","false")
   expect(container.querySelector(".task-header__content")).toHaveAttribute("hidden")
-  expect(screen.queryByRole("heading",{level:1,name:"Explore Government of Canada organizations"})).not.toBeInTheDocument()
+  expect(screen.getByRole("heading",{level:1,name:"Explore Government of Canada organizations"})).toBeVisible()
   expect(screen.queryByRole("searchbox",{name:"Search GEDS data"})).not.toBeInTheDocument()
   expect(screen.getByLabelText("Institution")).not.toBeVisible()
   fireEvent.click(toggle)

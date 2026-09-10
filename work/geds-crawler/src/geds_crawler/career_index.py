@@ -230,8 +230,9 @@ def _create_next_tables(con: sqlite3.Connection) -> None:
           FOREIGN KEY (snapshot_id) REFERENCES canonical_snapshots(snapshot_id)
         );
         CREATE VIRTUAL TABLE career_entities_fts_next USING fts5(
-          entity_id UNINDEXED,
-          title,
+           entity_id UNINDEXED,
+           display_name,
+           title,
           organization_name,
           ancestor_text,
           tokenize='unicode61 remove_diacritics 2'
@@ -284,10 +285,10 @@ def _insert_entity(con: sqlite3.Connection, entity: _IndexEntity) -> None:
     )
     con.execute(
         """
-        INSERT INTO career_entities_fts_next (entity_id, title, organization_name, ancestor_text)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO career_entities_fts_next (entity_id, display_name, title, organization_name, ancestor_text)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (entity.entity_id, entity.title, entity.organization_name, entity.ancestor_text),
+        (entity.entity_id, entity.display_name, entity.title, entity.organization_name, entity.ancestor_text),
     )
 
 

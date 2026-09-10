@@ -12,7 +12,7 @@ export type AtlasMeta = {
 }
 
 export function DataMethodology({ meta }: { meta: AtlasMeta }) {
-  const { t, formatDate, formatNumber } = useLanguage()
+  const { language, t, formatDate, formatNumber } = useLanguage()
   const quality = localizeQualityStatus(meta.quality_status, t)
   return <section className="methodology" aria-labelledby="about-data-heading">
     <h2 id="about-data-heading">{t("about.dataTitle")}</h2>
@@ -27,6 +27,6 @@ export function DataMethodology({ meta }: { meta: AtlasMeta }) {
     <article><h3>{t("about.privacyTitle")}</h3><p>{t("about.privacy")}</p></article>
     <article><h3>{t("about.vacancyTitle")}</h3><p>{t("about.vacancy")}</p></article>
     <article><h3>{t("about.limitsTitle")}</h3><p>{t("about.limits")}</p></article>
-    <a href="https://geds-sage.gc.ca/en/GEDS" target="_blank" rel="noreferrer">{t("about.official")}</a>
+     <a href={language === "en" ? "https://geds-sage.gc.ca/en/GEDS" : "https://geds-sage.gc.ca/fr/SAGE"} target="_blank" rel="noreferrer">{t("about.official")}</a>
   </section>
 }

@@ -39,6 +39,7 @@ class SearchResult:
     quality_status: str
     etag: str
     interpretation: dict[str, object] = field(default_factory=dict)
+    total: int = 0
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,9 @@ class OrgPage:
     snapshot_id: str
     quality_status: str
     etag: str
+    total: int = 0
+    offset: int = 0
+    has_more: bool = False
 
 
 @dataclass(frozen=True)
@@ -167,7 +171,14 @@ class CareerRepository:
         with self.connect() as con:
             return self._meta(con)
 
-    def search(self, *, query: str, limit: int = 20) -> SearchResult:
+    def search(
+        self,
+        *,
+        query: str,
+        limit: int = 20,
+        department: str | None = None,
+        entity_kind: str | None = None,
+    ) -> SearchResult:
         limit = _bounded(limit, MAX_PAGE_SIZE)
         taxonomy = load_taxonomy(self.taxonomy_path)
         interpretation = taxonomy.interpret(query)
@@ -177,14 +188,25 @@ class CareerRepository:
             if interpretation.category_ids:
                 placeholders = ",".join("?" for _ in interpretation.category_ids)
                 candidate_limit = max(50, limit * 4)
+                ranked_filters = ["e.snapshot_id = ?"]
+                ranked_params: list[object] = [meta["snapshot_id"]]
+                if entity_kind is not None:
+                    ranked_filters.append("e.entity_kind = ?")
+                    ranked_params.append(entity_kind)
+                if department is not None:
+                    ranked_filters.append("d.name = ?")
+                    ranked_params.append(department)
                 rows = con.execute(
                     f"""
                     WITH ranked AS (
-                      SELECT entity_id,SUM(score) total_score
-                      FROM career_matches
-                      WHERE category_id IN ({placeholders})
-                      GROUP BY entity_id
-                      ORDER BY total_score DESC,entity_id ASC
+                      SELECT m.entity_id,SUM(m.score) total_score
+                      FROM career_matches m
+                      JOIN career_entities e ON e.entity_id=m.entity_id
+                      LEFT JOIN organizations_current o ON o.org_id=e.org_id AND o.snapshot_id=e.snapshot_id
+                      LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=o.snapshot_id
+                      WHERE m.category_id IN ({placeholders}) AND {" AND ".join(ranked_filters)}
+                      GROUP BY m.entity_id
+                      ORDER BY total_score DESC,m.entity_id ASC
                       LIMIT ?
                     )
                     SELECT e.entity_id, e.entity_kind, e.org_id, e.title, e.organization_name,e.ancestor_text,COALESCE(d.name,'') department_name,
@@ -201,36 +223,49 @@ class CareerRepository:
                     WHERE m.category_id IN ({placeholders})
                     ORDER BY ranked.total_score DESC,e.entity_id ASC,m.category_id ASC
                     """,
-                    (*interpretation.category_ids, candidate_limit, *interpretation.category_ids),
+                    (*interpretation.category_ids, *ranked_params, candidate_limit, *interpretation.category_ids),
                 ).fetchall()
-            direct_orgs = con.execute(
-                """SELECT o.org_id,o.name,COALESCE(d.name,'') department_name,o.canonical_path_json
+            direct_orgs = []
+            if entity_kind in (None, "organization"):
+                org_sql = """SELECT o.org_id,o.name,COALESCE(d.name,'') department_name,o.canonical_path_json
                    FROM organizations_current o LEFT JOIN departments_current d ON d.department_dn=o.department_dn AND d.snapshot_id=o.snapshot_id
-                   WHERE o.snapshot_id=? AND (instr(lower(o.name),lower(?))>0 OR instr(lower(o.canonical_path_json),lower(?))>0)
-                   ORDER BY CASE WHEN lower(o.name)=lower(?) THEN 0 ELSE 1 END,o.name COLLATE NOCASE LIMIT ?""",
-                (meta["snapshot_id"], query, query, query, limit),
-            ).fetchall()
+                   WHERE o.snapshot_id=? AND (instr(lower(o.name),lower(?))>0 OR instr(lower(o.canonical_path_json),lower(?))>0)"""
+                org_params: list[object] = [meta["snapshot_id"], query, query]
+                if department is not None:
+                    org_sql += " AND d.name=?"
+                    org_params.append(department)
+                org_sql += " ORDER BY CASE WHEN lower(o.name)=lower(?) THEN 0 ELSE 1 END,o.name COLLATE NOCASE LIMIT ?"
+                org_params.extend((query, limit))
+                direct_orgs = con.execute(org_sql, org_params).fetchall()
             fts_query = f'"{query.replace(chr(34), chr(34) * 2)}"'
-            direct_people = con.execute(
-                """SELECT p.source_url,p.display_name,COALESCE(p.title,'') title,o.org_id,COALESCE(o.name,p.org_unit) organization_name,COALESCE(d.name,p.department_name) department_name
+            direct_people = []
+            if entity_kind in (None, "person"):
+                people_sql = """SELECT p.source_url,p.display_name,COALESCE(p.title,'') title,o.org_id,COALESCE(o.name,p.org_unit) organization_name,COALESCE(d.name,p.department_name) department_name
                    FROM career_entities_fts
                    JOIN career_entities e ON e.entity_id=career_entities_fts.entity_id
                    JOIN people_current p ON e.entity_kind='person' AND p.source_url=substr(e.entity_id,8) AND p.snapshot_id=e.snapshot_id
                    LEFT JOIN organizations_current o ON o.org_dn=p.org_dn AND o.snapshot_id=p.snapshot_id
                    LEFT JOIN departments_current d ON d.department_dn=p.department_dn AND d.snapshot_id=p.snapshot_id
-                   WHERE career_entities_fts MATCH ? AND e.snapshot_id=? AND p.presence_status='present'
-                   ORDER BY bm25(career_entities_fts),CASE WHEN lower(p.display_name)=lower(?) THEN 0 ELSE 1 END,p.display_name COLLATE NOCASE LIMIT ?""",
-                (fts_query, meta["snapshot_id"], query, limit),
-            ).fetchall()
-            direct_people += con.execute(
-                """SELECT p.source_url,p.display_name,COALESCE(p.title,'') title,o.org_id,COALESCE(o.name,p.org_unit) organization_name,COALESCE(d.name,p.department_name) department_name
+                   WHERE career_entities_fts MATCH ? AND e.snapshot_id=? AND p.presence_status='present'"""
+                people_params: list[object] = [fts_query, meta["snapshot_id"]]
+                if department is not None:
+                    people_sql += " AND COALESCE(d.name,p.department_name)=?"
+                    people_params.append(department)
+                people_sql += " ORDER BY bm25(career_entities_fts),CASE WHEN lower(p.display_name)=lower(?) THEN 0 ELSE 1 END,p.display_name COLLATE NOCASE LIMIT ?"
+                people_params.extend((query, limit))
+                direct_people = con.execute(people_sql, people_params).fetchall()
+                like_sql = """SELECT p.source_url,p.display_name,COALESCE(p.title,'') title,o.org_id,COALESCE(o.name,p.org_unit) organization_name,COALESCE(d.name,p.department_name) department_name
                    FROM people_current p
                    LEFT JOIN organizations_current o ON o.org_dn=p.org_dn AND o.snapshot_id=p.snapshot_id
                    LEFT JOIN departments_current d ON d.department_dn=p.department_dn AND d.snapshot_id=p.snapshot_id
-                   WHERE p.snapshot_id=? AND p.presence_status='present' AND p.display_name LIKE ('%' || ? || '%') COLLATE NOCASE
-                   LIMIT ?""",
-                (meta["snapshot_id"], query, limit),
-            ).fetchall()
+                   WHERE p.snapshot_id=? AND p.presence_status='present' AND p.display_name LIKE ('%' || ? || '%') COLLATE NOCASE"""
+                like_params: list[object] = [meta["snapshot_id"], query]
+                if department is not None:
+                    like_sql += " AND COALESCE(d.name,p.department_name)=?"
+                    like_params.append(department)
+                like_sql += " LIMIT ?"
+                like_params.append(limit)
+                direct_people += con.execute(like_sql, like_params).fetchall()
         grouped: dict[str, dict] = {}
         for row in rows:
             entry = grouped.setdefault(str(row["entity_id"]), {"row": row, "score": 0, "evidence": []})
@@ -281,18 +316,33 @@ class CareerRepository:
                 direct = SearchItem(direct.entity_id,direct.entity_kind,direct.org_id,direct.title,direct.organization_name,max(direct.score,existing.score),direct.confidence,existing.evidence+direct.evidence,existing.vacancy_signal,direct.department_name,direct.display_name,direct.source_url)
             merged[entity_id] = direct
         ranked = tuple(sorted(merged.values(), key=lambda item: (-item.score, item.entity_id))[:limit])
-        return SearchResult(ranked, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, query, limit), _interpretation_payload(interpretation))
+        return SearchResult(
+            ranked,
+            limit,
+            str(meta["snapshot_id"]),
+            str(meta["quality_status"]),
+            _etag(meta, query, limit, department or "all", entity_kind or "all"),
+            _interpretation_payload(interpretation),
+            len(merged),
+        )
 
-    def children(self, *, parent_id: str | None, limit: int = 50) -> OrgPage:
+    def children(self, *, parent_id: str | None, limit: int = 50, offset: int = 0) -> OrgPage:
         limit = _bounded(limit, MAX_PAGE_SIZE)
+        offset = max(0, int(offset))
         with self.connect() as con:
             meta = self._meta(con)
             if parent_id is None:
-                rows = con.execute("""SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.direct_people_count,o.descendant_people_count FROM organizations_current o WHERE o.snapshot_id=? AND o.parent_dn IS NULL ORDER BY o.name,o.org_id LIMIT ?""", (meta["snapshot_id"], limit)).fetchall()
+                where = "o.snapshot_id=? AND o.parent_dn IS NULL"
+                params: tuple[object, ...] = (meta["snapshot_id"],)
+                rows = con.execute(f"""SELECT o.org_id,o.name,NULL parent_id,o.depth,o.child_count,o.direct_people_count,o.descendant_people_count FROM organizations_current o WHERE {where} ORDER BY o.name,o.org_id LIMIT ? OFFSET ?""", (*params, limit, offset)).fetchall()
+                total = int(con.execute(f"SELECT COUNT(*) FROM organizations_current o WHERE {where}", params).fetchone()[0])
             else:
-                rows = con.execute("""SELECT child.org_id,child.name,parent.org_id parent_id,child.depth,child.child_count,child.direct_people_count,child.descendant_people_count FROM organizations_current child JOIN organizations_current parent ON parent.org_dn=child.parent_dn WHERE child.snapshot_id=? AND parent.org_id=? ORDER BY child.name,child.org_id LIMIT ?""", (meta["snapshot_id"], parent_id, limit)).fetchall()
+                where = "child.snapshot_id=? AND parent.org_id=?"
+                params = (meta["snapshot_id"], parent_id)
+                rows = con.execute(f"""SELECT child.org_id,child.name,parent.org_id parent_id,child.depth,child.child_count,child.direct_people_count,child.descendant_people_count FROM organizations_current child JOIN organizations_current parent ON parent.org_dn=child.parent_dn WHERE {where} ORDER BY child.name,child.org_id LIMIT ? OFFSET ?""", (*params, limit, offset)).fetchall()
+                total = int(con.execute(f"SELECT COUNT(*) FROM organizations_current child JOIN organizations_current parent ON parent.org_dn=child.parent_dn WHERE {where}", params).fetchone()[0])
         items = tuple(OrgNode(org_id=str(r["org_id"]), name=str(r["name"]), parent_id=r["parent_id"], depth=int(r["depth"]), child_count=int(r["child_count"]), direct_people_count=int(r["direct_people_count"]), descendant_people_count=int(r["descendant_people_count"])) for r in rows)
-        return OrgPage(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, parent_id or "root", limit))
+        return OrgPage(items, limit, str(meta["snapshot_id"]), str(meta["quality_status"]), _etag(meta, parent_id or "root", limit, offset), total, offset, offset + len(items) < total)
 
     def team_profile(self, org_id: str) -> TeamProfile:
         with self.connect() as con:
@@ -431,7 +481,7 @@ class CareerRepository:
                 raise KeyError(org_id)
             chain = con.execute("""WITH RECURSIVE lineage AS (SELECT org_dn,parent_dn,0 ordinal FROM organizations_current WHERE org_dn=? UNION ALL SELECT parent.org_dn,parent.parent_dn,lineage.ordinal+1 FROM organizations_current parent JOIN lineage ON parent.org_dn=lineage.parent_dn) SELECT o.org_id,o.name,p.org_id parent_id,o.depth,o.child_count,o.direct_people_count,o.descendant_people_count,lineage.ordinal FROM lineage JOIN organizations_current o ON o.org_dn=lineage.org_dn LEFT JOIN organizations_current p ON p.org_dn=o.parent_dn ORDER BY lineage.ordinal DESC""", (row["org_dn"],)).fetchall()
         items = tuple(OrgNode(org_id=str(r["org_id"]), name=str(r["name"]), parent_id=r["parent_id"], depth=int(r["depth"]), child_count=int(r["child_count"]), direct_people_count=int(r["direct_people_count"]), descendant_people_count=int(r["descendant_people_count"])) for r in chain)
-        return OrgPage(items, len(items), profile.snapshot_id, profile.quality_status, _etag(meta, "ancestors", org_id))
+        return OrgPage(items, len(items), profile.snapshot_id, profile.quality_status, _etag(meta, "ancestors", org_id), len(items), 0, False)
 
     def roles(self, *, org_id: str | None = None, limit: int = 50) -> SearchResult:
         limit = _bounded(limit, MAX_PAGE_SIZE)

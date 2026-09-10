@@ -178,11 +178,12 @@ def _search_item(row: dict[str, Any], score: int, evidence: list[dict[str, Any]]
     }
 
 
-def _search_result(items: list[dict[str, Any]], active: dict[str, Any], limit: int, *etag_parts: object, interpretation: dict[str, Any] | None = None) -> dict[str, Any]:
+def _search_result(items: list[dict[str, Any]], active: dict[str, Any], limit: int, *etag_parts: object, interpretation: dict[str, Any] | None = None, total: int | None = None) -> dict[str, Any]:
     items.sort(key=lambda item: (-int(item["score"]), str(item["entity_id"])))
     return {
         "items": items[:limit],
         "limit": limit,
+        "total": len(items) if total is None else total,
         "snapshot_id": str(active["snapshot_id"]),
         "quality_status": str(active["quality_status"]),
         "etag": _etag(active, *etag_parts),
@@ -229,8 +230,9 @@ def departments():
     return _read(read)
 
 
-def _children(parent_id: str | None, limit: int):
+def _children(parent_id: str | None, limit: int, offset: int):
     limit = _bounded(limit, MAX_PAGE_SIZE)
+    offset = max(0, int(offset))
 
     def read(con):
         active = _active(con)
@@ -238,35 +240,40 @@ def _children(parent_id: str | None, limit: int):
         if parent_id is None:
             rows = con.execute(
                 f"""SELECT o.org_id,o.name,NULL AS parent_id,o.depth,o.child_count,o.direct_people_count,
-                          o.descendant_people_count,o.descendant_org_count
+                           o.descendant_people_count,o.descendant_org_count
                    FROM {schema}.organizations_current o
                    WHERE o.release_id=%s AND o.parent_dn IS NULL
-                   ORDER BY o.name,o.org_id LIMIT %s""",
-                (active["release_id"], limit),
+                   ORDER BY o.name,o.org_id LIMIT %s OFFSET %s""",
+                 (active["release_id"], limit, offset),
             ).fetchall()
+            total = con.execute(f"SELECT COUNT(*) FROM {schema}.organizations_current o WHERE o.release_id=%s AND o.parent_dn IS NULL", (active["release_id"],)).fetchone()[0]
         else:
             rows = con.execute(
                 f"""SELECT child.org_id,child.name,parent.org_id AS parent_id,child.depth,child.child_count,
-                          child.direct_people_count,child.descendant_people_count,child.descendant_org_count
+                           child.direct_people_count,child.descendant_people_count,child.descendant_org_count
                    FROM {schema}.organizations_current child
                    JOIN {schema}.organizations_current parent ON parent.release_id=child.release_id AND parent.org_dn=child.parent_dn
                    WHERE child.release_id=%s AND parent.org_id=%s
-                   ORDER BY child.name,child.org_id LIMIT %s""",
-                (active["release_id"], parent_id, limit),
+                   ORDER BY child.name,child.org_id LIMIT %s OFFSET %s""",
+                 (active["release_id"], parent_id, limit, offset),
             ).fetchall()
-        return {"items": [_node(dict(row), str(active["quality_status"])) for row in rows], "limit": limit, "snapshot_id": active["snapshot_id"], "quality_status": active["quality_status"], "etag": _etag(active, "children", parent_id or "root", limit)}
+            total = con.execute(f"""SELECT COUNT(*)
+                FROM {schema}.organizations_current child
+                JOIN {schema}.organizations_current parent ON parent.release_id=child.release_id AND parent.org_dn=child.parent_dn
+                WHERE child.release_id=%s AND parent.org_id=%s""", (active["release_id"], parent_id)).fetchone()[0]
+        return {"items": [_node(dict(row), str(active["quality_status"])) for row in rows], "total": int(total), "limit": limit, "offset": offset, "has_more": offset + len(rows) < int(total), "snapshot_id": active["snapshot_id"], "quality_status": active["quality_status"], "etag": _etag(active, "children", parent_id or "root", limit, offset)}
 
     return _read(read)
 
 
 @app.get("/api/orgs/root/children")
-def root_children(limit: int = Query(50, ge=1, le=200)):
-    return _children(None, limit)
+def root_children(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0, le=1000000)):
+    return _children(None, limit, offset)
 
 
 @app.get("/api/orgs/{org_id}/children")
-def children(org_id: str, limit: int = Query(50, ge=1, le=200)):
-    return _children(org_id, limit)
+def children(org_id: str, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0, le=1000000)):
+    return _children(org_id, limit, offset)
 
 
 @app.get("/api/orgs/{org_id}/ancestors")
@@ -382,38 +389,62 @@ def people(
 
 
 @app.get("/api/search")
-def search(q: str = Query(min_length=1, max_length=240), limit: int = Query(20, ge=1, le=200)):
+def search(q: str = Query(min_length=1, max_length=240), limit: int = Query(20, ge=1, le=200), department: str | None = Query(None, max_length=200), entity_kind: str | None = Query(None, pattern=r"^(?:organization|person)$")):
     limit = _bounded(limit, MAX_PAGE_SIZE)
 
     def read(con):
         active = _active(con)
         schema = _schema()
         items: list[dict[str, Any]] = []
-        org_rows = con.execute(
-            f"""SELECT o.org_id,o.name,d.name AS department_name FROM {schema}.organizations_current o
+        total = 0
+        org_rows = []
+        if entity_kind in (None, "organization"):
+            org_sql = f"""SELECT o.org_id,o.name,d.name AS department_name FROM {schema}.organizations_current o
                LEFT JOIN {schema}.departments_current d ON d.release_id=o.release_id AND d.department_dn=o.department_dn
                WHERE o.release_id=%s AND (o.name ILIKE %s OR o.canonical_path_json ILIKE %s)
-               ORDER BY o.name LIMIT %s""",
-            (active["release_id"], f"%{q}%", f"%{q}%", limit),
-        ).fetchall()
+            """
+            org_params: list[Any] = [active["release_id"], f"%{q}%", f"%{q}%"]
+            if department is not None:
+                org_sql += " AND d.name=%s"
+                org_params.append(department)
+            count_params = list(org_params)
+            total += int(con.execute(
+                f"SELECT COUNT(*) FROM {schema}.organizations_current o LEFT JOIN {schema}.departments_current d ON d.release_id=o.release_id AND d.department_dn=o.department_dn WHERE o.release_id=%s AND (o.name ILIKE %s OR o.canonical_path_json ILIKE %s)"
+                + (" AND d.name=%s" if department is not None else ""),
+                count_params,
+            ).fetchone()[0])
+            org_sql += " ORDER BY o.name LIMIT %s"
+            org_params.append(limit)
+            org_rows = con.execute(org_sql, org_params).fetchall()
         for row in org_rows:
             exact = str(row["name"]).casefold() == q.casefold()
             items.append(_search_item({"entity_id": f"org:{row['org_id']}", "entity_kind": "organization", "org_id": row["org_id"], "title": "", "organization_name": row["name"], "department_name": row["department_name"]}, 1000 if exact else 500, [{"field": "organization", "matched_phrase": q, "source_text": row["name"], "weight": 500, "category_id": "direct-search"}]))
-        people_rows = con.execute(
-            f"""SELECT p.source_url,p.display_name,p.title,o.org_id,o.name AS organization_name,d.name AS department_name
+        people_rows = []
+        if entity_kind in (None, "person"):
+            people_sql = f"""SELECT p.source_url,p.display_name,p.title,o.org_id,o.name AS organization_name,d.name AS department_name
                FROM {schema}.people_current p
                LEFT JOIN {schema}.organizations_current o ON o.release_id=p.release_id AND o.org_dn=p.org_dn
                LEFT JOIN {schema}.departments_current d ON d.release_id=p.release_id AND d.department_dn=p.department_dn
                WHERE p.release_id=%s AND p.presence_status='present'
-                 AND (p.display_name ILIKE %s OR COALESCE(p.title,'') ILIKE %s)
-               ORDER BY p.display_name LIMIT %s""",
-            (active["release_id"], f"%{q}%", f"%{q}%", limit),
-        ).fetchall()
+                  AND (p.display_name ILIKE %s OR COALESCE(p.title,'') ILIKE %s)
+            """
+            people_params: list[Any] = [active["release_id"], f"%{q}%", f"%{q}%"]
+            if department is not None:
+                people_sql += " AND d.name=%s"
+                people_params.append(department)
+            total += int(con.execute(
+                f"SELECT COUNT(*) FROM {schema}.people_current p LEFT JOIN {schema}.organizations_current o ON o.release_id=p.release_id AND o.org_dn=p.org_dn LEFT JOIN {schema}.departments_current d ON d.release_id=p.release_id AND d.department_dn=p.department_dn WHERE p.release_id=%s AND p.presence_status='present' AND (p.display_name ILIKE %s OR COALESCE(p.title,'') ILIKE %s)"
+                + (" AND d.name=%s" if department is not None else ""),
+                people_params,
+            ).fetchone()[0])
+            people_sql += " ORDER BY p.display_name LIMIT %s"
+            people_params.append(limit)
+            people_rows = con.execute(people_sql, people_params).fetchall()
         for row in people_rows:
             display_name = str(row["display_name"])
             field = "display_name" if q.casefold() in display_name.casefold() else "title"
             items.append(_search_item({"entity_id": f"person:{row['source_url']}", "entity_kind": "person", "org_id": row["org_id"], "title": row["title"], "organization_name": row["organization_name"], "department_name": row["department_name"], "display_name": display_name, "source_url": row["source_url"]}, 1000 if display_name.casefold() == q.casefold() else 450, [{"field": field, "matched_phrase": q, "source_text": display_name if field == "display_name" else str(row["title"] or ""), "weight": 450, "category_id": "direct-search"}]))
-        return _search_result(items, active, limit, "search", q, limit, interpretation=_direct_interpretation(q, active))
+        return _search_result(items, active, limit, "search", q, limit, department or "all", entity_kind or "all", interpretation=_direct_interpretation(q, active), total=total)
 
     return _read(read)
 
@@ -450,8 +481,13 @@ def roles(org_id: str | None = None, limit: int = Query(50, ge=1, le=200)):
 
 
 @app.get("/api/constellation")
-def constellation(q: str = Query(min_length=1, max_length=240), limit: int = Query(200, ge=1, le=2000)):
-    return search(q, limit)
+def constellation(
+    q: str = Query(min_length=1, max_length=240),
+    limit: int = Query(200, ge=1, le=2000),
+    department: str | None = Query(None, max_length=200),
+    entity_kind: str | None = Query(None, pattern=r"^(?:organization|person)$"),
+):
+    return search(q, limit, department, entity_kind)
 
 
 @app.get("/api/constellation/slice")
